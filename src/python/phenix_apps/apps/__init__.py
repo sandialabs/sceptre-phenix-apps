@@ -200,6 +200,14 @@ class AppBase(object):
         node = self.extract_node(hostname)
 
         if node.injections:
+            # First check to see if this exact injection already exists. This
+            # would occur, for example, if an experiment gets started multiple
+            # times. We don't raise an exception here since ultimately it's OK
+            # if the injection already exists.
+            for i in node.injections:
+                if i.src == inject['src'] and i.dst == inject['dst']:
+                    return
+
             node.injections.append(inject)
         else:
             # There was no injection list, so we put the
