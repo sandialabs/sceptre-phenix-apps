@@ -2,7 +2,7 @@ from phenix_apps.apps   import AppBase, AppKind
 from phenix_apps.common import logger
 
 class Protonuke(AppBase):
-    def __init__(self, experiment, topology):
+    def __init__(self):
         AppBase.__init__(self, 'protonuke', AppKind.HOST)
 
         self.startup_dir = f"{self.exp_dir}/startup"
