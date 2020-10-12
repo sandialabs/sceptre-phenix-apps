@@ -122,6 +122,20 @@ class AppBase(object):
         return hosts
 
 
+    def extract_all_nodes(self):
+        app   = self.extract_app()
+        hosts = []
+
+        for host in app.hosts:
+            hosts.append(copy.deepcopy(host))
+
+        for host in hosts:
+            node = self.extract_node(host.hostname)
+            host.update({'topology': node})
+
+        return hosts
+
+
     def extract_nodes_type(self, types):
         app   = self.extract_app()
         hosts = []
