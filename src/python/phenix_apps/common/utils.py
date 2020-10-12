@@ -3,7 +3,7 @@ import pkg_resources, random
 from socket import inet_ntoa
 from struct import pack
 
-import mako
+import mako.lookup, mako.template
 
 
 def mako_render(script_path, **kwargs):
