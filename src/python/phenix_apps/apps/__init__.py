@@ -199,7 +199,7 @@ class AppBase(object):
     def add_inject(self, hostname, inject):
         node = self.extract_node(hostname)
 
-        if node.injections:
+        if node.get('injections', None):
             # First check to see if this exact injection already exists. This
             # would occur, for example, if an experiment gets started multiple
             # times. We don't raise an exception here since ultimately it's OK
@@ -212,7 +212,7 @@ class AppBase(object):
         else:
             # There was no injection list, so we put the
             # injection dictionary in a list.
-            node.injections = [inject]
+            node['injections'] = [inject]
 
 
     def is_fully_scheduled(self):
