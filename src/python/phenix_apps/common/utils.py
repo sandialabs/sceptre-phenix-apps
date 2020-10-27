@@ -112,6 +112,10 @@ def hms_to_timedelta(uptime):
         str: time delta as a pretty string.
     """
     timedelta = None
+    if 'ms' in uptime:
+        temp = uptime.split('ms')
+        ms = math.floor(float(temp[0]))
+        timedelta = datetime.timedelta(milliseconds=ms)
     if 'h' in uptime:
         temp = uptime.split('h')
         hrs = int(temp[0])
