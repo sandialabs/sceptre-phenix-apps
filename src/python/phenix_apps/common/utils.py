@@ -1,4 +1,4 @@
-import pkg_resources, random
+import datetime, math, pkg_resources, random
 
 from socket import inet_ntoa
 from struct import pack
@@ -100,3 +100,38 @@ def netmask_to_cidr(netmask):
     """
 
     return sum([bin(int(x)).count('1') for x in netmask.split('.')])
+
+
+def hms_to_timedelta(uptime):
+    """Convert XXhXXmXXs string to a time delta.
+
+    Args:
+        uptime (str): string delta time in hms format.
+
+    Returns:
+        str: time delta as a pretty string.
+    """
+    timedelta = None
+    if 'ms' in uptime:
+        temp = uptime.split('ms')
+        ms = math.floor(float(temp[0]))
+        timedelta = datetime.timedelta(milliseconds=ms)
+    elif 'h' in uptime:
+        temp = uptime.split('h')
+        hrs = int(temp[0])
+        temp = temp[1].split('m')
+        minutes = int(temp[0])
+        temp = temp[1].split('s')
+        sec = math.floor(float(temp[0]))
+        timedelta = datetime.timedelta(hours=hrs, minutes=minutes, seconds=sec)
+    elif 'm' in uptime:
+        temp = uptime.split('m')
+        minutes = int(temp[0])
+        temp = temp[1].split('s')
+        sec = math.floor(float(temp[0]))
+        timedelta = datetime.timedelta(minutes=minutes, seconds=sec)
+    elif 's' in uptime:
+        temp = uptime.split('s')
+        sec = math.floor(float(temp[0]))
+        timedelta = datetime.timedelta(seconds=sec)
+    return str(timedelta)
