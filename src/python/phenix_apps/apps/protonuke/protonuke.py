@@ -15,29 +15,20 @@ class Protonuke(AppBase):
         print(self.experiment.to_json())
 
 
-    def configure(self):
-        logger.log('INFO', f'Configuring user application: {self.name}')
+    def pre_start(self):
+        logger.log('INFO', f'Starting user application: {self.name}')
 
-        nukes = self.extract_nodes_label('protonuke')
+        nukes = self.extract_all_nodes()
 
         for vm in nukes:
+            path = f'{self.startup_dir}/{vm.hostname}-protonuke'
+
             kwargs = {
-                'src' : f'{self.startup_dir}/{vm.hostname}-protonuke',
+                'src' : path,
                 'dst' : '/etc/default/protonuke',
             }
 
             self.add_inject(hostname=vm.hostname, inject=kwargs)
-
-        logger.log('INFO', f'Configured user application: {self.name}')
-
-
-    def pre_start(self):
-        logger.log('INFO', f'Starting user application: {self.name}')
-
-        nukes = self.extract_nodes_label('protonuke')
-
-        for vm in nukes:
-            path = f'{self.startup_dir}/{vm.hostname}-protonuke'
 
             with open(path, 'w') as f:
                 f.write('PROTONUKE_ARGS = {}'.format(vm.metadata.args))
