@@ -1,16 +1,10 @@
-import copy, enum, json, os, sys
+import copy, json, os, sys
 
 from box import Box
 
 
-class AppKind(enum.Enum):
-    EXP  = 'experiment'
-    HOST = 'host'
-
-
 class AppBase(object):
     valid_stages = ["configure", "pre-start", "post-start", "cleanup"]
-
 
     @classmethod
     def check_stdin(klass):
@@ -34,7 +28,6 @@ class AppBase(object):
 
             sys.exit(1)
 
-
     @staticmethod
     def eprint(*args):
         """
@@ -43,10 +36,8 @@ class AppBase(object):
 
         print(*args, file=sys.stderr)
 
-
-    def __init__(self, name, kind):
+    def __init__(self, name):
         self.name = name
-        self.kind = kind
 
         self.check_stdin()
         self.stage = sys.argv[1]
@@ -58,12 +49,10 @@ class AppBase(object):
         self.experiment = Box.from_json(self.raw_input)
         self.exp_name   = self.extract_experiment_name()
         self.exp_dir    = self.extract_experiment_dir()
-
+        self.asset_dir  = self.extract_asset_dir()
+        self.metadata   = self.extract_metadata()
+        self.topo       = self.get_annotation('topology')
         os.makedirs(self.exp_dir, exist_ok=True)
-
-        self.topo      = self.get_annotation('topology')
-        self.asset_dir = self.extract_asset_dir()
-
 
     def execute_stage(self):
         """
@@ -83,21 +72,18 @@ class AppBase(object):
         # we do, app developers won't be able to do any additional manipulation
         # to the experiment after the appropriate stage function has completed.
 
-
     def get_annotation(self, key):
         if 'annotations' in self.experiment.metadata:
             return self.experiment.metadata.annotations[key]
 
         return None
 
-
     def extract_app(self):
         apps = self.experiment.spec.scenario.apps
 
-        for app in apps[self.kind.value]:
+        for app in apps:
             if app.name == self.name:
                 return app
-
 
     def extract_node(self, hostname):
         nodes = self.experiment.spec.topology.nodes
@@ -105,7 +91,6 @@ class AppBase(object):
         for node in nodes:
             if node.general.hostname == hostname:
                 return node
-
 
     def extract_nodes_topology_type(self, types):
         hosts = []
@@ -121,7 +106,6 @@ class AppBase(object):
 
         return hosts
 
-
     def extract_all_nodes(self):
         app   = self.extract_app()
         hosts = []
@@ -134,7 +118,6 @@ class AppBase(object):
             host.update({'topology': node})
 
         return hosts
-
 
     def extract_nodes_type(self, types):
         app   = self.extract_app()
@@ -154,7 +137,6 @@ class AppBase(object):
             host.update({'topology': node})
 
         return hosts
-
 
     def extract_nodes_label(self, labels):
         app   = self.extract_app()
@@ -181,20 +163,24 @@ class AppBase(object):
 
         return hosts
 
-
     def extract_experiment_name(self):
         return self.experiment.spec.experimentName
 
-
     def extract_experiment_dir(self):
         return self.experiment.spec.baseDir
-
 
     def extract_asset_dir(self):
         app = self.extract_app()
 
         return app.get('assetDir', None)
 
+    def extract_metadata(self):
+        app = self.extract_app()
+
+        return app.get('metadata', None)
+
+    def add_node(self, node):
+        self.experiment.spec.topology.nodes.append(node)
 
     def add_inject(self, hostname, inject):
         node = self.extract_node(hostname)
@@ -214,7 +200,6 @@ class AppBase(object):
             # injection dictionary in a list.
             node['injections'] = [inject]
 
-
     def is_fully_scheduled(self):
         schedules = self.experiment.spec.schedules
 
@@ -226,18 +211,14 @@ class AppBase(object):
 
         return True
 
-
     def configure(self):
         pass
-
 
     def pre_start(self):
         pass
 
-
     def post_start(self):
         pass
-
 
     def cleanup(self):
         pass
