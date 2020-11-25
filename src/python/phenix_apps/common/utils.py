@@ -82,7 +82,7 @@ def pkg_path(relative_path):
         str: Full path to package resource.
     """
 
-    return pkg_resources.resource_filename('phenix', relative_path)
+    return pkg_resources.resource_filename('phenix_apps', relative_path)
 
 
 def cidr_to_netmask(cidr):

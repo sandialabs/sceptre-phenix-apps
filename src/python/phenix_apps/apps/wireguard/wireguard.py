@@ -1,10 +1,10 @@
 from phenix_apps.apps   import AppBase
-from phenix_apps.common import logger
+from phenix_apps.common import logger, utils
 
 
-class Protonuke(AppBase):
+class Wireguard(AppBase):
     def __init__(self):
-        AppBase.__init__(self, 'protonuke')
+        AppBase.__init__(self, 'wireguard')
 
         self.startup_dir = f"{self.exp_dir}/startup"
 
@@ -19,26 +19,30 @@ class Protonuke(AppBase):
     def pre_start(self):
         logger.log('INFO', f'Starting user application: {self.name}')
 
-        nukes = self.extract_all_nodes()
+        templates = utils.pkg_path('apps/wireguard/templates/')
 
-        for vm in nukes:
-            path = f'{self.startup_dir}/{vm.hostname}-protonuke'
+        guards = self.extract_all_nodes()
+
+        for vm in guards:
+            path = f"{self.startup_dir}/{vm.hostname}-wireguard.conf"
 
             kwargs = {
-                'src' : path,
-                'dst' : '/etc/default/protonuke',
+                'src': path,
+                'dst': '/etc/wireguard/wg0.conf',
             }
 
             self.add_inject(hostname=vm.hostname, inject=kwargs)
 
             with open(path, 'w') as f:
-                f.write('PROTONUKE_ARGS = {}'.format(vm.metadata.args))
+                utils.mako_serve_template(
+                    'wireguard_config.mako', templates, f, wireguard=vm.metadata
+                )
 
         logger.log('INFO', f'Started user application: {self.name}')
 
 
 def main():
-    Protonuke()
+    Wireguard()
 
 
 if __name__ == '__main__':

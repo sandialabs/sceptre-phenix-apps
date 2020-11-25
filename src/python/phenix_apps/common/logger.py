@@ -26,7 +26,7 @@ def log(level, msg):
     """
 
     # create phenix logger
-    logger = logging.getLogger('phenix')
+    logger = logging.getLogger('phenix-apps')
     logger.setLevel(s.PHENIX_LOG_LEVEL.upper())
 
     # create handler for phenix logger

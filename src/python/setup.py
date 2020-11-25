@@ -10,6 +10,7 @@ with open("README.md", "r") as fh:
 ENTRIES = {
     'console_scripts' : [
         'phenix-app-protonuke = phenix_apps.apps.protonuke.protonuke:main',
+        'phenix-app-wireguard = phenix_apps.apps.wireguard.wireguard:main',
         'phenix-scheduler-single-node = phenix_apps.schedulers.single_node.single_node:main',
     ]
 }
@@ -40,4 +41,6 @@ setup(
 
     long_description = long_description,
     long_description_content_type = "text/markdown",
+
+    include_package_data = True,
 )
