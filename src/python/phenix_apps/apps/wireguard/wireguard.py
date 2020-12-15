@@ -19,7 +19,7 @@ class Wireguard(AppBase):
     def pre_start(self):
         logger.log('INFO', f'Starting user application: {self.name}')
 
-        templates = utils.pkg_path('apps/wireguard/templates/')
+        templates = utils.abs_path(__file__, 'templates/')
 
         guards = self.extract_all_nodes()
 
