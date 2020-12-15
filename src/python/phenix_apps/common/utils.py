@@ -1,4 +1,4 @@
-import datetime, math, pkg_resources, random
+import datetime, math, pathlib, random
 
 from socket import inet_ntoa
 from struct import pack
