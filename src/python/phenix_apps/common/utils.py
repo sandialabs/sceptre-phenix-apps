@@ -72,17 +72,20 @@ def validate_mac_addr(macs):
     return True
 
 
-def pkg_path(relative_path):
-    """Return package resource path.
+def abs_path(file_, relative_path=None):
+
+    """Return absolute path to file_ with optional relative resource.
 
     Args:
-        relative_path (str): Relative path of resource.
+        file_ (str): Name of file.
+        relative_path (str): Optional relative path of resource.
 
     Returns:
-        str: Full path to package resource.
+        str: Full path to file_ (and optional relative resource).
     """
 
-    return pkg_resources.resource_filename('phenix_apps', relative_path)
+    base_path = pathlib.Path(file_).parent.absolute()
+    return f"{base_path}/{relative_path}" if relative_path else base_path
 
 
 def cidr_to_netmask(cidr):
