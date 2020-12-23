@@ -1,0 +1,11 @@
+Package: golang-phenix-apps
+Version: 0.1
+Section: utils
+Priority: extra
+Architecture: amd64
+Depends:
+Maintainer: Bryan Richardson <bryan@activeshadow.com>
+Description:
+ some stuff
+ .
+ and some other stuff
