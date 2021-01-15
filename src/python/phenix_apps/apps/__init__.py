@@ -52,6 +52,7 @@ class AppBase(object):
         self.asset_dir  = self.extract_asset_dir()
         self.metadata   = self.extract_metadata()
         self.topo       = self.get_annotation('topology')
+
         os.makedirs(self.exp_dir, exist_ok=True)
 
     def execute_stage(self):
@@ -63,6 +64,7 @@ class AppBase(object):
             'configure'  : self.configure,
             'pre-start'  : self.pre_start,
             'post-start' : self.post_start,
+            'running'    : self.running,
             'cleanup'    : self.cleanup
         }
 
@@ -218,6 +220,9 @@ class AppBase(object):
         pass
 
     def post_start(self):
+        pass
+
+    def running(self):
         pass
 
     def cleanup(self):
