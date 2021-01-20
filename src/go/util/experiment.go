@@ -3,6 +3,7 @@ package util
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 
 	"phenix/types"
 	ifaces "phenix/types/interfaces"
@@ -47,4 +48,16 @@ func DecodeExperiment(body []byte) (*types.Experiment, error) {
 	}
 
 	return &types.Experiment{Spec: spec, Status: status}, nil
+}
+
+func FindNodeByNameRegex(exp *types.Experiment, regex string) ifaces.NodeSpec {
+	matcher := regexp.MustCompile(regex)
+
+	for _, node := range exp.Spec.Topology().Nodes() {
+		if matcher.MatchString(regex) {
+			return node
+		}
+	}
+
+	return nil
 }

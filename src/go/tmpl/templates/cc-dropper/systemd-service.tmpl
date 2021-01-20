@@ -1,0 +1,15 @@
+[Unit]
+Description=Command and Control Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/minimega/cc-startup.sh
+RemainAfterExit=true
+StandardOutput=journal
+
+{{if eq .AutoStart true}}
+[Install]
+WantedBy=multi-user.target
+{{ end }}
