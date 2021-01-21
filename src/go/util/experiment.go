@@ -50,14 +50,17 @@ func DecodeExperiment(body []byte) (*types.Experiment, error) {
 	return &types.Experiment{Spec: spec, Status: status}, nil
 }
 
-func FindNodeByNameRegex(exp *types.Experiment, regex string) ifaces.NodeSpec {
-	matcher := regexp.MustCompile(regex)
+func FindNodesByNameRegex(exp *types.Experiment, regex string) []ifaces.NodeSpec {
+	var (
+		matcher = regexp.MustCompile(regex)
+		nodes   []ifaces.NodeSpec
+	)
 
 	for _, node := range exp.Spec.Topology().Nodes() {
 		if matcher.MatchString(node.General().Hostname()) {
-			return node
+			nodes = append(nodes, node)
 		}
 	}
 
-	return nil
+	return nodes
 }

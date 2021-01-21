@@ -114,65 +114,66 @@ func configure(exp *types.Experiment) error {
 			continue
 		}
 
-		// FIXME: this could be more than one node...
-		node := util.FindNodeByNameRegex(exp, host.Hostname())
+		nodes := util.FindNodesByNameRegex(exp, host.Hostname())
 
-		if node == nil {
+		if nodes == nil {
 			// TODO: yell loudly
 			continue
 		}
 
-		agentPath := md.AgentDir + "/" + hmd.Agent
+		for _, node := range nodes {
+			agentPath := md.AgentDir + "/" + hmd.Agent
 
-		switch strings.ToUpper(node.Hardware().OSType()) {
-		case "WINDOWS":
-			var (
-				startupFile  = startupDir + "/" + node.General().Hostname() + "-phenix-command-and-control.ps1"
-				scheduleFile = startupDir + "/phenix-command-and-control-scheduler.cmd"
-			)
-
-			if !strings.HasSuffix(agentPath, ".exe") {
-				agentPath = agentPath + ".exe"
-			}
-
-			node.AddInject(startupFile, "/minimega/phenix-command-and-control.ps1", "", "")
-
-			if hmd.AutoStart {
-				node.AddInject(scheduleFile, "ProgramData/Microsoft/Windows/Start Menu/Programs/StartUp/phenix-command-and-control-scheduler.cmd", "", "")
-			}
-		default:
-			startupFile := startupDir + "/" + node.General().Hostname() + "-phenix-command-and-control.sh"
-
-			switch strings.ToLower(hmd.ServiceType) {
-			case "systemd":
+			switch strings.ToUpper(node.Hardware().OSType()) {
+			case "WINDOWS":
 				var (
-					serviceFile = startupDir + "/" + node.General().Hostname() + "-phenix-command-and-control.service"
-					serviceLink = startupDir + "/symlinks/phenix-command-and-control.service"
+					startupFile  = startupDir + "/" + node.General().Hostname() + "-phenix-command-and-control.ps1"
+					scheduleFile = startupDir + "/phenix-command-and-control-scheduler.cmd"
 				)
 
-				node.AddInject(startupFile, "/minimega/phenix-command-and-control.sh", "", "")
-				node.AddInject(serviceFile, "/etc/systemd/system/phenix-command-and-control.service", "", "")
+				if !strings.HasSuffix(agentPath, ".exe") {
+					agentPath = agentPath + ".exe"
+				}
+
+				node.AddInject(startupFile, "/minimega/phenix-command-and-control.ps1", "", "")
 
 				if hmd.AutoStart {
-					node.AddInject(serviceLink, "/etc/systemd/system/multi-user.target.wants/phenix-command-and-control.service", "", "")
+					node.AddInject(scheduleFile, "ProgramData/Microsoft/Windows/Start Menu/Programs/StartUp/phenix-command-and-control-scheduler.cmd", "", "")
 				}
-			case "sysinitv":
-				var (
-					serviceFile = startupDir + "/phenix-command-and-control"
-					serviceLink = startupDir + "/symlinks/S99-phenix-command-and-control"
-				)
+			default:
+				startupFile := startupDir + "/" + node.General().Hostname() + "-phenix-command-and-control.sh"
 
-				node.AddInject(startupFile, "/minimega/phenix-command-and-control.sh", "", "")
-				node.AddInject(serviceFile, "/etc/init.d/phenix-command-and-control", "", "")
+				switch strings.ToLower(hmd.ServiceType) {
+				case "systemd":
+					var (
+						serviceFile = startupDir + "/" + node.General().Hostname() + "-phenix-command-and-control.service"
+						serviceLink = startupDir + "/symlinks/phenix-command-and-control.service"
+					)
 
-				if hmd.AutoStart {
-					node.AddInject(serviceLink, "/etc/rc5.d/S99-phenix-command-and-control", "", "")
+					node.AddInject(startupFile, "/minimega/phenix-command-and-control.sh", "", "")
+					node.AddInject(serviceFile, "/etc/systemd/system/phenix-command-and-control.service", "", "")
+
+					if hmd.AutoStart {
+						node.AddInject(serviceLink, "/etc/systemd/system/multi-user.target.wants/phenix-command-and-control.service", "", "")
+					}
+				case "sysinitv":
+					var (
+						serviceFile = startupDir + "/phenix-command-and-control"
+						serviceLink = startupDir + "/symlinks/S99-phenix-command-and-control"
+					)
+
+					node.AddInject(startupFile, "/minimega/phenix-command-and-control.sh", "", "")
+					node.AddInject(serviceFile, "/etc/init.d/phenix-command-and-control", "", "")
+
+					if hmd.AutoStart {
+						node.AddInject(serviceLink, "/etc/rc5.d/S99-phenix-command-and-control", "", "")
+					}
+				case "custom":
+					node.AddInject(startupFile, hmd.CustomService.InjectPath, "", "")
 				}
-			case "custom":
-				node.AddInject(startupFile, hmd.CustomService.InjectPath, "", "")
+
+				node.AddInject(agentPath, "/minimega/"+path.Base(agentPath), "", "")
 			}
-
-			node.AddInject(agentPath, "/minimega/"+path.Base(agentPath), "", "")
 		}
 	}
 
@@ -203,107 +204,108 @@ func preStart(exp *types.Experiment) error {
 			continue
 		}
 
-		// FIXME: this could be more than one node...
-		node := util.FindNodeByNameRegex(exp, host.Hostname())
+		nodes := util.FindNodesByNameRegex(exp, host.Hostname())
 
-		if node == nil {
+		if nodes == nil {
 			// TODO: yell loudly
 			continue
 		}
 
-		switch strings.ToUpper(node.Hardware().OSType()) {
-		case "WINDOWS":
-			var (
-				startupFile  = startupDir + "/" + node.General().Hostname() + "-phenix-command-and-control.ps1"
-				scheduleFile = startupDir + "/phenix-command-and-control-scheduler.cmd"
-			)
+		for _, node := range nodes {
+			switch strings.ToUpper(node.Hardware().OSType()) {
+			case "WINDOWS":
+				var (
+					startupFile  = startupDir + "/" + node.General().Hostname() + "-phenix-command-and-control.ps1"
+					scheduleFile = startupDir + "/phenix-command-and-control-scheduler.cmd"
+				)
 
-			if err := tmpl.CreateFileFromTemplate("cc-dropper/windows-startup.tmpl", hmd, startupFile, 0755); err != nil {
-				return fmt.Errorf("generating windows command and control startup script: %w", err)
-			}
-
-			if hmd.AutoStart {
-				if err := tmpl.CreateFileFromTemplate("cc-dropper/windows-scheduler.tmpl", hmd, scheduleFile, 0755); err != nil {
-					return fmt.Errorf("generating windows command and control service script: %w", err)
-				}
-			}
-		default:
-			startupFile := startupDir + "/" + node.General().Hostname() + "-phenix-command-and-control.sh"
-
-			if err := tmpl.CreateFileFromTemplate("cc-dropper/linux-startup.tmpl", hmd, startupFile, 0755); err != nil {
-				return fmt.Errorf("generating linux command and control startup script: %w", err)
-			}
-
-			switch strings.ToLower(hmd.ServiceType) {
-			case "systemd":
-				serviceFile := startupDir + "/" + node.General().Hostname() + "-phenix-command-and-control.service"
-
-				if err := tmpl.CreateFileFromTemplate("cc-dropper/systemd-service.tmpl", hmd, serviceFile, 0644); err != nil {
-					return fmt.Errorf("generating linux command and control service file: %w", err)
+				if err := tmpl.CreateFileFromTemplate("cc-dropper/windows-startup.tmpl", hmd, startupFile, 0755); err != nil {
+					return fmt.Errorf("generating windows command and control startup script: %w", err)
 				}
 
 				if hmd.AutoStart {
-					symlinksDir := startupDir + "/symlinks"
+					if err := tmpl.CreateFileFromTemplate("cc-dropper/windows-scheduler.tmpl", hmd, scheduleFile, 0755); err != nil {
+						return fmt.Errorf("generating windows command and control service script: %w", err)
+					}
+				}
+			default:
+				startupFile := startupDir + "/" + node.General().Hostname() + "-phenix-command-and-control.sh"
 
-					if err := os.MkdirAll(symlinksDir, 0755); err != nil {
-						return fmt.Errorf("creating experiment startup symlinks directory path: %w", err)
+				if err := tmpl.CreateFileFromTemplate("cc-dropper/linux-startup.tmpl", hmd, startupFile, 0755); err != nil {
+					return fmt.Errorf("generating linux command and control startup script: %w", err)
+				}
+
+				switch strings.ToLower(hmd.ServiceType) {
+				case "systemd":
+					serviceFile := startupDir + "/" + node.General().Hostname() + "-phenix-command-and-control.service"
+
+					if err := tmpl.CreateFileFromTemplate("cc-dropper/systemd-service.tmpl", hmd, serviceFile, 0644); err != nil {
+						return fmt.Errorf("generating linux command and control service file: %w", err)
 					}
 
-					if err := os.Symlink("../phenix-command-and-control.service", symlinksDir+"/phenix-command-and-control.service"); err != nil {
-						// Ignore the error if it was for the symlinked file already existing.
-						if !strings.Contains(err.Error(), "file exists") {
-							return fmt.Errorf("generating linux command and control service link: %w", err)
+					if hmd.AutoStart {
+						symlinksDir := startupDir + "/symlinks"
+
+						if err := os.MkdirAll(symlinksDir, 0755); err != nil {
+							return fmt.Errorf("creating experiment startup symlinks directory path: %w", err)
+						}
+
+						if err := os.Symlink("../phenix-command-and-control.service", symlinksDir+"/phenix-command-and-control.service"); err != nil {
+							// Ignore the error if it was for the symlinked file already existing.
+							if !strings.Contains(err.Error(), "file exists") {
+								return fmt.Errorf("generating linux command and control service link: %w", err)
+							}
 						}
 					}
-				}
-			case "sysinitv":
-				serviceFile := startupDir + "/phenix-command-and-control"
+				case "sysinitv":
+					serviceFile := startupDir + "/phenix-command-and-control"
 
-				if err := tmpl.CreateFileFromTemplate("cc-dropper/sysinitv-service.tmpl", hmd, serviceFile, 0755); err != nil {
-					return fmt.Errorf("generating linux command and control service file: %w", err)
-				}
-
-				if hmd.AutoStart {
-					symlinksDir := startupDir + "/symlinks"
-
-					if err := os.MkdirAll(symlinksDir, 0755); err != nil {
-						return fmt.Errorf("creating experiment startup symlinks directory path: %w", err)
+					if err := tmpl.CreateFileFromTemplate("cc-dropper/sysinitv-service.tmpl", hmd, serviceFile, 0755); err != nil {
+						return fmt.Errorf("generating linux command and control service file: %w", err)
 					}
 
-					if err := os.Symlink("../init.d/phenix-command-and-control", symlinksDir+"/S99-phenix-command-and-control"); err != nil {
-						// Ignore the error if it was for the symlinked file already existing.
-						if !strings.Contains(err.Error(), "file exists") {
-							return fmt.Errorf("generating linux command and control service link: %w", err)
+					if hmd.AutoStart {
+						symlinksDir := startupDir + "/symlinks"
+
+						if err := os.MkdirAll(symlinksDir, 0755); err != nil {
+							return fmt.Errorf("creating experiment startup symlinks directory path: %w", err)
+						}
+
+						if err := os.Symlink("../init.d/phenix-command-and-control", symlinksDir+"/S99-phenix-command-and-control"); err != nil {
+							// Ignore the error if it was for the symlinked file already existing.
+							if !strings.Contains(err.Error(), "file exists") {
+								return fmt.Errorf("generating linux command and control service link: %w", err)
+							}
 						}
 					}
-				}
-			case "custom":
-				if hmd.CustomService.ScriptPath != "" {
-					if _, err := os.Stat(hmd.CustomService.ScriptPath); err != nil {
-						return fmt.Errorf("custom service script not found on disk")
-					}
+				case "custom":
+					if hmd.CustomService.ScriptPath != "" {
+						if _, err := os.Stat(hmd.CustomService.ScriptPath); err != nil {
+							return fmt.Errorf("custom service script not found on disk")
+						}
 
-					body, err := ioutil.ReadFile(hmd.CustomService.ScriptPath)
-					if err != nil {
-						return fmt.Errorf("reading custom service script %s: %w", hmd.CustomService.ScriptPath, err)
-					}
+						body, err := ioutil.ReadFile(hmd.CustomService.ScriptPath)
+						if err != nil {
+							return fmt.Errorf("reading custom service script %s: %w", hmd.CustomService.ScriptPath, err)
+						}
 
-					custom := strings.Split(string(body), "\n")
-					custom = append(custom, "##### Generated by phenix cc-dropper app ######")
+						custom := strings.Split(string(body), "\n")
+						custom = append(custom, "##### Generated by phenix cc-dropper app ######")
 
-					//Generate the template into a string
-					existing := new(bytes.Buffer)
+						//Generate the template into a string
+						existing := new(bytes.Buffer)
 
-					if err := tmpl.GenerateFromTemplate("cc-dropper/linux-startup.tmpl", hmd, existing); err != nil {
-						return fmt.Errorf("generating linux command and control startup script: %w", err)
-					}
+						if err := tmpl.GenerateFromTemplate("cc-dropper/linux-startup.tmpl", hmd, existing); err != nil {
+							return fmt.Errorf("generating linux command and control startup script: %w", err)
+						}
 
-					//Grab all the startup stuff for CC and add it the the users script
-					custom = append(custom, strings.Split(existing.String(), "\n")...)
+						//Grab all the startup stuff for CC and add it the the users script
+						custom = append(custom, strings.Split(existing.String(), "\n")...)
 
-					err = ioutil.WriteFile(startupFile, []byte(strings.Join(custom, "\n")), 0755)
-					if err != nil {
-						return fmt.Errorf("writing %s: %w", startupFile, err)
+						err = ioutil.WriteFile(startupFile, []byte(strings.Join(custom, "\n")), 0755)
+						if err != nil {
+							return fmt.Errorf("writing %s: %w", startupFile, err)
+						}
 					}
 				}
 			}
