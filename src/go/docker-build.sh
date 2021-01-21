@@ -24,6 +24,6 @@ EOF
 echo BUILDING golang-phenix-apps...
 
 docker run -it --rm -v $(pwd):/phenix-apps -w /phenix-apps -u $USERNAME \
-  golang-phenix-apps:builder ./build.sh
+  golang-phenix-apps:builder make install
 
 echo DONE BUILDING golang-phenix-apps

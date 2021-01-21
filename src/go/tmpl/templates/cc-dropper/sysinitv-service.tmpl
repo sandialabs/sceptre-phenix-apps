@@ -9,38 +9,46 @@
 ### END INIT INFO
 
 . /lib/lsb/init-functions
-prog=cc_startup
-PIDFILE=/var/run/$prog.pid
+
+PROG=phenix-command-and-control
+PIDFILE=/var/run/$PROG.pid
 DESC="Command and Control Agent"
+
 start() {
-	log_daemon_msg "Starting $DESC" "$prog"
-	start_daemon -p $PIDFILE /minimega/cc-startup.sh
+	log_daemon_msg "Starting $DESC" "$PROG"
+	start_daemon -p $PIDFILE /minimega/$PROG.sh
+
 	if [ $? -ne 0 ]; then
 		log_end_msg 1
 		exit 1
 	fi
+
 	if [ $? -eq 0 ]; then
 		log_end_msg 0
 	fi
+
 	exit 0
 }
 
 stop() {
-	log_daemon_msg "Stopping $DESC" "$prog"
-	killproc -p $PIDFILE /minimega/cc-startup.sh
+	log_daemon_msg "Stopping $DESC" "$PROG"
+	killproc -p $PIDFILE /minimega/$PROG.sh
+
 	if [ $? -ne 0 ]; then
 		log_end_msg 1
 		exit 1
 	fi
+
 	if [ $? -eq 0 ]; then
 		log_end_msg 0
 	fi
+
+	exit 0
 }
 
 force_reload() {
 	stop
 	start
-
 }
 
 case "$1" in
@@ -57,7 +65,6 @@ case "$1" in
 		stop
 		start
 		;;
-
 	*)
 		echo "$Usage: $prog {start|stop|force-reload|restart}"
 		exit 2

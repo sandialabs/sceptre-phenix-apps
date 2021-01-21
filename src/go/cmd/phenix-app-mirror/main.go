@@ -24,14 +24,31 @@ type MirrorMetadata struct {
 	VLANs     []string `mapstructure:"vlans"`
 }
 
+var logger *log.Logger
+
 func main() {
+	out := os.Stderr
+
+	if env, ok := os.LookupEnv("PHENIX_LOG_FILE"); ok {
+		var err error
+
+		out, err = os.OpenFile(env, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			log.Fatal("unable to open phenix log file for writing")
+		}
+
+		defer out.Close()
+	}
+
+	logger = log.New(out, " mirror ", log.Ldate|log.Ltime|log.Lmsgprefix)
+
 	if len(os.Args) != 2 {
-		log.Fatal("incorrect amount of args provided")
+		logger.Fatal("incorrect amount of args provided")
 	}
 
 	body, err := ioutil.ReadAll(os.Stdin)
 	if err != nil {
-		log.Fatal("unable to read JSON from STDIN")
+		logger.Fatal("unable to read JSON from STDIN")
 	}
 
 	stage := os.Args[1]
@@ -43,23 +60,23 @@ func main() {
 
 	exp, err := util.DecodeExperiment(body)
 	if err != nil {
-		log.Fatalf("decoding experiment: %v", err)
+		logger.Fatalf("decoding experiment: %v", err)
 	}
 
 	switch stage {
 	case "post-start":
 		if err := postStart(exp); err != nil {
-			log.Fatalf("failed to execute post-start stage: %v", err)
+			logger.Fatalf("failed to execute post-start stage: %v", err)
 		}
 	case "cleanup":
 		if err := cleanup(exp); err != nil {
-			log.Fatalf("failed to execute cleanup stage: %v", err)
+			logger.Fatalf("failed to execute cleanup stage: %v", err)
 		}
 	}
 
 	body, err = json.Marshal(exp)
 	if err != nil {
-		log.Fatal("unable to convert experiment to JSON")
+		logger.Fatal("unable to convert experiment to JSON")
 	}
 
 	fmt.Print(string(body))
@@ -273,7 +290,7 @@ func cleanup(exp *types.Experiment) error {
 		)
 
 		if err := meshSend("all", cmd); err != nil {
-			log.Printf("removing mirror %s on all cluster hosts: %v", host.Hostname(), err)
+			logger.Printf("removing mirror %s on all cluster hosts: %v", host.Hostname(), err)
 		}
 
 		// We only need to worry about GRE tunnels if more than one cluster host is
@@ -284,13 +301,13 @@ func cleanup(exp *types.Experiment) error {
 			cmd = fmt.Sprintf(`shell ovs-ofctl del-flows %s in_port=%s`, monitorIfaceBridge, host.Hostname())
 
 			if err := meshSend(scheduled, cmd); err != nil {
-				log.Printf("deleting OpenFlow flow rule for %s on cluster host %s: %v", host.Hostname(), scheduled, err)
+				logger.Printf("deleting OpenFlow flow rule for %s on cluster host %s: %v", host.Hostname(), scheduled, err)
 			}
 
 			cmd = fmt.Sprintf(`shell ovs-vsctl del-port %s %s`, monitorIfaceBridge, host.Hostname())
 
 			if err := meshSend("all", cmd); err != nil {
-				log.Printf("deleting GRE tunnel %s on all cluster hosts: %v", host.Hostname(), err)
+				logger.Printf("deleting GRE tunnel %s on all cluster hosts: %v", host.Hostname(), err)
 			}
 		}
 	}

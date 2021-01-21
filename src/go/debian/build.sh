@@ -15,7 +15,7 @@ if (( $DOCKER == 0 )); then
 else
   echo "Docker not detected, using natively installed Go."
 
-  (cd $APPS && $APPS/build.sh)
+  (cd $APPS && make install)
 fi
 
 

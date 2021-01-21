@@ -32,5 +32,5 @@ func CreateFileFromTemplate(name string, data interface{}, filename string, perm
 
 	defer f.Close()
 
-	return GenerateFromTemplate(name, tmpl, data, f)
+	return GenerateFromTemplate(name, data, f)
 }

@@ -5,11 +5,11 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/minimega/cc-startup.sh
+ExecStart=/minimega/phenix-command-and-control.sh
 RemainAfterExit=true
 StandardOutput=journal
 
-{{if eq .AutoStart true}}
+{{ if .AutoStart }}
 [Install]
 WantedBy=multi-user.target
 {{ end }}

@@ -54,7 +54,7 @@ func FindNodeByNameRegex(exp *types.Experiment, regex string) ifaces.NodeSpec {
 	matcher := regexp.MustCompile(regex)
 
 	for _, node := range exp.Spec.Topology().Nodes() {
-		if matcher.MatchString(regex) {
+		if matcher.MatchString(node.General().Hostname()) {
 			return node
 		}
 	}
