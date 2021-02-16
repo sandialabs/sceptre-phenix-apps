@@ -112,7 +112,7 @@ class AppBase(object):
         app   = self.extract_app()
         hosts = []
 
-        for host in app.hosts:
+        for host in app.get("hosts", []):
             hosts.append(copy.deepcopy(host))
 
         for host in hosts:
@@ -128,7 +128,7 @@ class AppBase(object):
         if isinstance(types, str):
             types = [types]
 
-        for host in app.hosts:
+        for host in app.get("hosts", []):
             node_type = host.metadata.get("type", None)
 
             if node_type in types:
@@ -147,7 +147,7 @@ class AppBase(object):
         if isinstance(labels, str):
             labels = [labels]
 
-        for host in app.hosts:
+        for host in app.get("hosts", []):
             node_labels = host.metadata.get("labels", [])
 
             if isinstance(node_labels, str):
