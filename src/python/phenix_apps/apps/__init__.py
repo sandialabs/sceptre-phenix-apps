@@ -39,6 +39,8 @@ class AppBase(object):
     def __init__(self, name):
         self.name = name
 
+        self.dryrun = os.getenv('PHENIX_DRYRUN', 'false') == 'true'
+
         self.check_stdin()
         self.stage = sys.argv[1]
 
