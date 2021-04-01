@@ -138,3 +138,17 @@ def hms_to_timedelta(uptime):
         sec = math.floor(float(temp[0]))
         timedelta = datetime.timedelta(seconds=sec)
     return str(timedelta)
+
+
+SECONDS_PER_UNIT = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800}
+
+def convert_to_seconds(time):
+    """Convert time string to seconds (e.g. 30s, 24h).
+    
+    Args:
+        time (str): time string.
+
+    Returns:
+        str: time in seconds.
+    """
+    return str(int(time[:-1]) * SECONDS_PER_UNIT[time[-1]])
