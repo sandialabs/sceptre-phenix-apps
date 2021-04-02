@@ -303,8 +303,29 @@ func postStartGRE(exp *types.Experiment) error {
 				}
 			}
 
+			// list of VMs currently scheduled on this cluster host
+			vms := cluster[h]
+
+			// If more than one VLAN is being monitored, don't include router/firewall
+			// interfaces in the mirror to avoid duplicate packets. By default, we
+			// include routers and firewalls since doing so when monitoring a single
+			// VLAN allows the capture of packets leaving the VLAN as well.
+			if len(vlans) > 1 {
+				// Iterate backwards so elements can be removed while iterating.
+				for i := len(vms) - 1; i >= 0; i-- {
+					name := vms[i]
+					node := exp.Spec.Topology().FindNodeByName(name)
+
+					// check to see if this VM is a router or firewall
+					if strings.EqualFold(node.Type(), "router") || strings.EqualFold(node.Type(), "firewall") {
+						// remove current VM from list of VMs
+						vms = append(vms[:i], vms[i+1:]...)
+					}
+				}
+			}
+
 			// Create mirror, using GRE tunnel as the output port
-			command := buildMirrorCommand(exp.Spec.ExperimentName(), name, amd.DirectGRE.MirrorBridge, name, cluster[h], vlans)
+			command := buildMirrorCommand(exp.Spec.ExperimentName(), name, amd.DirectGRE.MirrorBridge, name, vms, vlans)
 
 			if command == nil {
 				// Likely means no VMs scheduled on this cluster host have interfaces in
