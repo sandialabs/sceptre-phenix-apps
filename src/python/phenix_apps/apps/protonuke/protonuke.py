@@ -1,5 +1,5 @@
 from phenix_apps.apps   import AppBase
-from phenix_apps.common import logger
+from phenix_apps.common import logger, utils
 
 
 class Protonuke(AppBase):
@@ -24,15 +24,28 @@ class Protonuke(AppBase):
         for vm in nukes:
             path = f'{self.startup_dir}/{vm.hostname}-protonuke'
 
-            kwargs = {
-                'src' : path,
-                'dst' : '/etc/default/protonuke',
-            }
+            if vm.topology.hardware.os_type.upper() == 'WINDOWS':
+                kwargs = {
+                    'src' : path,
+                    'dst' : '/ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/protonuke-scheduler.cmd',
+                }
+
+                templates = utils.abs_path(__file__, 'templates/')
+
+                with open(path, 'w') as f:
+                    utils.mako_serve_template(
+                        'protonuke_scheduler.mako', templates, f, protonuke_args=vm.metadata.args
+                    )
+            else:
+                kwargs = {
+                    'src' : path,
+                    'dst' : '/etc/default/protonuke',
+                }
+
+                with open(path, 'w') as f:
+                    f.write('PROTONUKE_ARGS = {}'.format(vm.metadata.args))
 
             self.add_inject(hostname=vm.hostname, inject=kwargs)
-
-            with open(path, 'w') as f:
-                f.write('PROTONUKE_ARGS = {}'.format(vm.metadata.args))
 
         logger.log('INFO', f'Started user application: {self.name}')
 
