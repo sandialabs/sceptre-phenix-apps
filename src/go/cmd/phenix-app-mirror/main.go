@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -40,7 +41,11 @@ type MirrorAppMetadata struct {
 type MirrorHostMetadata struct {
 	Interface string   `mapstructure:"interface"`
 	VLANs     []string `mapstructure:"vlans"`
+	SetupOVS  bool     `mapstructure:"setupOVS"`
 }
+
+//go:embed templates/*
+var templates embed.FS
 
 func main() {
 	util.SetupLogging()
@@ -65,6 +70,10 @@ func main() {
 	case "configure":
 		if err := configure(exp); err != nil {
 			log.Fatal("failed to execute configure stage: %v", err)
+		}
+	case "pre-start":
+		if err := preStart(exp); err != nil {
+			log.Fatal("failed to execute pre-start stage: %v", err)
 		}
 	case "post-start":
 		if err := postStart(exp); err != nil {
@@ -158,6 +167,61 @@ func configure(exp *types.Experiment) error {
 	return nil
 }
 
+func preStart(exp *types.Experiment) error {
+	var (
+		app = util.ExtractApp(exp.Spec.Scenario(), "mirror")
+		amd MirrorAppMetadata
+	)
+
+	if err := mapstructure.Decode(app.Metadata(), &amd); err != nil {
+		return fmt.Errorf("decoding app metadata: %w", err)
+	}
+
+	if !amd.DirectGRE.Enabled {
+		return nil
+	}
+
+	startupDir := exp.Spec.BaseDir() + "/startup"
+
+	for _, host := range app.Hosts() {
+		var hmd MirrorHostMetadata
+
+		if err := mapstructure.Decode(host.Metadata(), &hmd); err != nil {
+			log.Error("decoding host metadata for %s: %w", host.Hostname(), err)
+			continue
+		}
+
+		if !hmd.SetupOVS {
+			continue
+		}
+
+		node := exp.Spec.Topology().FindNodeByName(host.Hostname())
+		if node == nil {
+			log.Error("no node found in topology for %s", host.Hostname())
+			continue
+		}
+
+		if strings.EqualFold(node.Hardware().OSType(), "windows") {
+			log.Error("setting up OVS not currently supported on Windows (%s)", host.Hostname())
+			continue
+		}
+
+		setupFile := startupDir + "/" + host.Hostname() + "-setup-ovs.sh"
+
+		node.AddInject(
+			setupFile,
+			"/etc/phenix/startup/99-setup-ovs.sh",
+			"0755", "",
+		)
+
+		if err := util.RestoreAsset(templates, setupFile, "templates/setup-ovs.tmpl"); err != nil {
+			return fmt.Errorf("writing OVS setup script to file: %w", err)
+		}
+	}
+
+	return nil
+}
+
 func postStartGRE(exp *types.Experiment) error {
 	var (
 		app = util.ExtractApp(exp.Spec.Scenario(), "mirror")
@@ -187,12 +251,12 @@ func postStartGRE(exp *types.Experiment) error {
 	// For each cluster host, create tap on mirror VLAN with IP in mirror network.
 	// The tap's name will be something like `foobar-mirror`, assuming `foobar` is
 	// the name of the experiment. The maximum length of the name is dictated by
-	// the maximum length of a Linux interface name, which is 16 characters. As
-	// such, the experiment name will be truncated to 9 characters before adding
+	// the maximum length of a Linux interface name, which is 15 characters. As
+	// such, the experiment name will be truncated to 8 characters before adding
 	// `-mirror` to the end of it.
 	for host := range cluster {
 		cmd := fmt.Sprintf(
-			"tap create %s//%s bridge %s ip %s/%d %.9s-mirror",
+			"tap create %s//%s bridge %s ip %s/%d %.8s-mirror",
 			exp.Spec.ExperimentName(), amd.DirectGRE.MirrorVLAN, amd.DirectGRE.MirrorBridge, ip.String(), mask, exp.Spec.ExperimentName(),
 		)
 
@@ -258,15 +322,15 @@ func postStartGRE(exp *types.Experiment) error {
 		// tunnel interfaces and mirrors will have names like `foobar-nids`, where
 		// `foobar` is the name of the experiment and `nids` is the name of the
 		// target VM. The maximum length of the tunnel interface name is dictated by
-		// the maximum length of a Linux interface name, which is 16 characters. As
+		// the maximum length of a Linux interface name, which is 15 characters. As
 		// such, the name used for both the tunnel interface and the mirror will be
-		// truncated to 16 characters.
+		// truncated to 15 characters.
 		for h := range cluster {
 			name := fmt.Sprintf("%s-%s", exp.Spec.ExperimentName(), host.Hostname())
 
-			// Truncate name to max of 16 characters to keep it within the maximum
+			// Truncate name to max of 15 characters to keep it within the maximum
 			// length limit of Linux interface names.
-			name = fmt.Sprintf("%.16s", name)
+			name = fmt.Sprintf("%.15s", name)
 
 			if amd.DirectGRE.ERSPAN.Enabled {
 				var cmd string
@@ -514,30 +578,40 @@ func cleanupGRE(exp *types.Experiment) error {
 		return nil
 	}
 
+	cluster := cluster(exp)
+
 	for _, host := range app.Hosts() {
 		// This is the name used for both the GRE tunnels and the mirrors
 		name := fmt.Sprintf("%s-%s", exp.Spec.ExperimentName(), host.Hostname())
 
-		cmd := fmt.Sprintf(
-			`shell ovs-vsctl -- --id=@m get mirror %s -- remove bridge %s mirrors @m`,
-			name, amd.DirectGRE.MirrorBridge,
-		)
+		// Truncate name to max of 15 characters to keep it within the maximum
+		// length limit of Linux interface names.
+		name = fmt.Sprintf("%.15s", name)
 
-		if err := meshSend("all", cmd); err != nil {
-			log.Error("removing mirror %s on all cluster hosts: %v", name, err)
-		}
+		for h := range cluster {
+			cmd := fmt.Sprintf(
+				`shell ovs-vsctl -- --id=@m get mirror %s -- remove bridge %s mirrors @m`,
+				name, amd.DirectGRE.MirrorBridge,
+			)
 
-		cmd = fmt.Sprintf(`shell ovs-vsctl del-port %s %s`, amd.DirectGRE.MirrorBridge, name)
+			if err := meshSend(h, cmd); err != nil {
+				log.Error("removing mirror %s on all cluster hosts: %v", name, err)
+			}
 
-		if err := meshSend("all", cmd); err != nil {
-			log.Error("deleting GRE tunnel %s on all cluster hosts: %v", name, err)
+			cmd = fmt.Sprintf(`shell ovs-vsctl del-port %s %s`, amd.DirectGRE.MirrorBridge, name)
+
+			if err := meshSend(h, cmd); err != nil {
+				log.Error("deleting GRE tunnel %s on all cluster hosts: %v", name, err)
+			}
 		}
 	}
 
-	cmd := fmt.Sprintf("tap delete %.9s-mirror", exp.Spec.ExperimentName())
+	for h := range cluster {
+		cmd := fmt.Sprintf("tap delete %.8s-mirror", exp.Spec.ExperimentName())
 
-	if err := meshSend("all", cmd); err != nil {
-		return fmt.Errorf("deleting tap on all cluster hosts: %w", err)
+		if err := meshSend(h, cmd); err != nil {
+			return fmt.Errorf("deleting tap on all cluster hosts: %w", err)
+		}
 	}
 
 	return nil
