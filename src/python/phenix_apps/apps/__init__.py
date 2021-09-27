@@ -4,7 +4,7 @@ from box import Box
 
 
 class AppBase(object):
-    valid_stages = ["configure", "pre-start", "post-start", "cleanup"]
+    valid_stages = ["configure", "pre-start", "post-start", "running", "cleanup"]
 
     @classmethod
     def check_stdin(klass):
@@ -70,11 +70,12 @@ class AppBase(object):
             'cleanup'    : self.cleanup
         }
 
+        sys.stdout = open('/dev/null', 'w')
+
         stages_dict[self.stage]()
 
-        # TODO: should we go ahead and print self.experiment to STDOUT here? If
-        # we do, app developers won't be able to do any additional manipulation
-        # to the experiment after the appropriate stage function has completed.
+        sys.stdout.close()
+        sys.stdout = sys.__stdout__
 
     def get_annotation(self, key):
         if 'annotations' in self.experiment.metadata:

@@ -1,7 +1,9 @@
-import datetime, math, pathlib, random
+import datetime, math, os, pathlib, random, re, shutil, tempfile, time
 
 from socket import inet_ntoa
 from struct import pack
+
+import phenix_apps.common.settings as s
 
 import mako.lookup, mako.template
 
@@ -152,3 +154,116 @@ def convert_to_seconds(time):
         str: time in seconds.
     """
     return str(int(time[:-1]) * SECONDS_PER_UNIT[time[-1]])
+
+
+def expand_shorthand(short):
+    """Expand shorthand naming notation.
+
+    An example would be foo[1-3] = [foo1, foo2, foo3]
+
+    Args:
+        short (str): shorthand notation.
+
+    Returns:
+        array: expanded names.
+    """
+
+    match = re.match(r"(.+)\[(\d+)\-(\d+)\]", short)
+
+    if match:
+        expanded = []
+
+        base  = match.group(1)
+        start = int(match.group(2))
+        end   = int(match.group(3)) + 1
+
+        for i in range(start, end):
+            expanded.append(f'{base}{i}')
+
+        return expanded
+
+    return [short]
+
+
+def mm_send(mm, vm, src, dst):
+    # Use PHENIX_DIR as base directory to ensure minimega has access to it. This
+    # assumes PHENIX_DIR is mounted into the containers if containers are being
+    # used.
+    with tempfile.TemporaryDirectory(dir=s.PHENIX_DIR) as tmp:
+        vm_dst  = os.path.join(tmp, dst.strip('/'))
+        dst_dir = os.path.dirname(vm_dst)
+
+        try:
+            mm.cc_mount(vm, tmp)
+
+            if not os.path.exists(dst_dir):
+                os.makedirs(dst_dir)
+
+            if os.path.isdir(src):
+                shutil.copytree(src, vm_dst)
+            else:
+                shutil.copyfile(src, vm_dst)
+        finally:
+            mm.clear_cc_mount(vm)
+
+
+def mm_recv(mm, vm, src, dst):
+    # Use PHENIX_DIR as base directory to ensure minimega has access to it. This
+    # assumes PHENIX_DIR is mounted into the containers if containers are being
+    # used.
+    with tempfile.TemporaryDirectory(dir=s.PHENIX_DIR) as tmp:
+        vm_src  = os.path.join(tmp, src.strip('/'))
+        dst_dir = os.path.dirname(dst)
+
+        if not os.path.exists(dst_dir):
+            os.makedirs(dst_dir)
+
+        try:
+            mm.cc_mount(vm, tmp)
+
+            tries = 0
+            while not os.path.exists(vm_src):
+                tries += 1
+
+                if tries >= 5:
+                    # finally block will still get called
+                    raise ValueError(f'{src} not found in VM {vm}')
+                else:
+                    time.sleep(0.5)
+
+            if os.path.isdir(vm_src):
+                shutil.copytree(vm_src, dst)
+            else:
+                shutil.copyfile(vm_src, dst)
+        finally:
+            mm.clear_cc_mount(vm)
+
+
+def mm_exec_wait(mm, vm, cmd):
+    mm.cc_filter(f'name={vm}')
+    mm.cc_exec(cmd)
+
+    commands = mm.cc_commands()
+    last_cmd_id = commands[0]['Tabular'][-1][0]
+
+    mm_wait_for_cmd(mm, last_cmd_id)
+
+
+def mm_wait_for_cmd(mm, id):
+    last_test = lambda c: c[0] == id
+    done_test = lambda c: c[3] == '1'
+
+    waiting = True
+
+    while waiting:
+        time.sleep(1)
+
+        commands = mm.cc_commands()
+
+        for host in commands:
+            last = list(filter(last_test, host['Tabular']))
+            done = list(filter(done_test, last))
+
+            if len(done) > 0:
+                waiting = False
+                break

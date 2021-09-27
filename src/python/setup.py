@@ -12,6 +12,14 @@ ENTRIES = {
         'phenix-app-protonuke = phenix_apps.apps.protonuke.protonuke:main',
         'phenix-app-wireguard = phenix_apps.apps.wireguard.wireguard:main',
         'phenix-scheduler-single-node = phenix_apps.schedulers.single_node.single_node:main',
+        'phenix-scorch-component-art = phenix_apps.apps.scorch.art.art:main',
+        'phenix-scorch-component-cc = phenix_apps.apps.scorch.cc.cc:main',
+        'phenix-scorch-component-ettercap = phenix_apps.apps.scorch.ettercap.ettercap:main',
+        'phenix-scorch-component-hoststats = phenix_apps.apps.scorch.hoststats.hoststats:main',
+        'phenix-scorch-component-snort = phenix_apps.apps.scorch.snort.snort:main',
+        'phenix-scorch-component-tcpdump = phenix_apps.apps.scorch.tcpdump.tcpdump:main',
+        'phenix-scorch-component-trafficgen = phenix_apps.apps.scorch.trafficgen.trafficgen:main',
+        'phenix-scorch-component-vmstats = phenix_apps.apps.scorch.vmstats.vmstats:main',
     ]
 }
 
@@ -24,7 +32,7 @@ setup(
     packages        = find_packages(),
     platforms       = 'Linux',
     python_requires = '>=3.7',
-    url             = 'https://github.com/activeshadow/phenix-apps',
+    url             = 'https://github.com/sandia-minimega/phenix-apps',
     version         = phenix_apps.__version__,
 
     classifiers = [
@@ -36,6 +44,7 @@ setup(
 
     install_requires = [
         'Mako~=1.1.3',
+        'minimega',
         'python-box~=5.1.1',
     ],
 
