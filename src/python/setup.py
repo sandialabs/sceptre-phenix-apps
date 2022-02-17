@@ -7,6 +7,14 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 
+# Include app template files.
+DATA = {
+    'phenix_apps': [
+        'apps/*/templates/*.mako',
+    ],
+}
+
+
 ENTRIES = {
     'console_scripts' : [
         'phenix-app-protonuke = phenix_apps.apps.protonuke.protonuke:main',
@@ -27,9 +35,10 @@ ENTRIES = {
 setup(
     author          = 'Bryan Richardson, Active Shadow LLC',
     description     = 'User apps and schedulers for phenix orchestration',
+    packages        = find_packages(),
+    package_data    = DATA,
     entry_points    = ENTRIES,
     name            = 'phenix-apps',
-    packages        = find_packages(),
     platforms       = 'Linux',
     python_requires = '>=3.7',
     url             = 'https://github.com/sandia-minimega/phenix-apps',
@@ -50,6 +59,4 @@ setup(
 
     long_description = long_description,
     long_description_content_type = "text/markdown",
-
-    include_package_data = True,
 )
