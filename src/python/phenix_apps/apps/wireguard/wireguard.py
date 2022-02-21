@@ -38,6 +38,21 @@ class Wireguard(AppBase):
                     'wireguard_config.mako', templates, f, wireguard=vm.metadata
                 )
 
+            if vm.metadata.get('boot', False):
+                path = f"{self.startup_dir}/{vm.hostname}-wireguard-enable.sh"
+
+                kwargs = {
+                    'src': path,
+                    'dst': '/etc/phenix/startup/wireguard-enable.sh',
+                }
+
+                self.add_inject(hostname=vm.hostname, inject=kwargs)
+
+                with open(path, 'w') as f:
+                    utils.mako_serve_template(
+                        'wireguard_enable.mako', templates, f, name='wg0'
+                    )
+
         logger.log('INFO', f'Started user application: {self.name}')
 
 
