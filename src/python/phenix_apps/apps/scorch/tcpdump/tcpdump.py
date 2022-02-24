@@ -1,4 +1,4 @@
-import subprocess
+import subprocess, sys
 
 from phenix_apps.apps.scorch import ComponentBase
 from phenix_apps.common import logger, utils
@@ -26,11 +26,16 @@ class TCPDump(ComponentBase):
 
             if not hostname:
                 self.eprint('no hostname provided for VM config')
-                continue
+                sys.exit(1)
 
             if not iface:
                 self.eprint('no interface name provided for VM config')
-                continue
+                sys.exit(1)
+
+            res = utils.mm_exec_wait(mm, hostname, 'which tcpdump')
+            if not res:
+                self.eprint(f'tcpdump is not installed in VM {hostname}')
+                sys.exit(1)
 
             self.print(f'starting tcpdump on interface {iface} in VM {hostname}')
 
@@ -63,7 +68,7 @@ class TCPDump(ComponentBase):
 
             if not hostname:
                 self.eprint('no hostname provided for VM config')
-                continue
+                sys.exit(1)
 
             pcap_out = f'{self.base_dir}/{hostname}.pcap'
             json_out = f'{self.base_dir}/{hostname}.pcap.jsonl'

@@ -248,6 +248,14 @@ def mm_exec_wait(mm, vm, cmd):
 
     mm_wait_for_cmd(mm, last_cmd_id)
 
+    resps = mm.cc_responses(last_cmd_id, raw='raw')
+
+    for resp in resps:
+        if resp['Response']:
+            return resp['Response']
+
+    return None
+
 
 def mm_wait_for_cmd(mm, id):
     last_test = lambda c: c[0] == id
