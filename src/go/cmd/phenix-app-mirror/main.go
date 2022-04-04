@@ -159,6 +159,7 @@ func configure(exp *types.Experiment) error {
 		iface.SetAddress(ip.String())
 		iface.SetMask(mask)
 		iface.SetGateway("") // just in case it was set in the topology...
+		iface.SetVLAN(amd.DirectGRE.MirrorVLAN)
 
 		// Decrement IP for next target VM.
 		ip, _ = nw.PreviousIP(ip)
@@ -820,16 +821,21 @@ func vlanTaps(ns string, vms, vlans []string) []string {
 			vmTaps = strings.Split(s, ", ")
 		}
 
-		// `vmVLANs` will be a slice of VLAN aliases (ie. EXP_1 (101), EXP_2 (102))
 		for idx, alias := range vmVLANs {
+			// assume by default that `alias` is the actual VLAN ID
+			vlanID := alias
+
+			// check to see if `alias` is indeed a VLAN alias (e.g., EXP_1 (101), EXP_2 (102))
 			if match := vlanAliasRegex.FindStringSubmatch(alias); match != nil {
-				// `vlans` will be a slice of VLAN IDs (ie. 101, 102)
-				for _, id := range vlans {
-					// `match` will be a slice of regex matches (ie. EXP_1 (101), EXP_1, 101)
-					if match[2] == id {
-						taps = append(taps, vmTaps[idx])
-						break
-					}
+				// `match` will be a slice of regex matches (e.g., EXP_1 (101), EXP_1, 101)
+				vlanID = match[2]
+			}
+
+			// `vlans` will be a slice of VLAN IDs (e.g., 101, 102)
+			for _, id := range vlans {
+				if id == vlanID {
+					taps = append(taps, vmTaps[idx])
+					break
 				}
 			}
 		}
