@@ -865,7 +865,7 @@ func buildMirrorCommand(ns, name, bridge, port string, vms, vlans []string) []st
 
 	command = append(command, fmt.Sprintf(`--id=@o get port %s`, port))
 	command = append(command, fmt.Sprintf(`--id=@m create mirror name=%s select-dst-port=%s select-vlan=%s output-port=@o`, name, strings.Join(ids, ","), strings.Join(vlans, ",")))
-	command = append(command, fmt.Sprintf(`set bridge %s mirrors=@m`, bridge))
+	command = append(command, fmt.Sprintf(`add bridge %s mirrors @m`, bridge))
 
 	return command
 }
