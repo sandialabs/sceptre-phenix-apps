@@ -22,28 +22,6 @@ import (
 	"github.com/mitchellh/mapstructure"
 )
 
-type MirrorAppMetadata struct {
-	DirectGRE struct {
-		Enabled      bool   `mapstructure:"enabled"`
-		MirrorNet    string `mapstructure:"mirrorNet"`
-		MirrorBridge string `mapstructure:"mirrorBridge"`
-		MirrorVLAN   string `mapstructure:"mirrorVLAN"`
-		ERSPAN       struct {
-			Enabled    bool `mapstructure:"enabled"`
-			Version    int  `mapstructure:"version"`
-			Index      int  `mapstructure:"index"`
-			Direction  int  `mapstructure:"direction"`
-			HardwareID int  `mapstructure:"hwid"`
-		} `mapstructure:"erspan"`
-	} `mapstructure:"directGRE"`
-}
-
-type MirrorHostMetadata struct {
-	Interface string   `mapstructure:"interface"`
-	VLANs     []string `mapstructure:"vlans"`
-	SetupOVS  bool     `mapstructure:"setupOVS"`
-}
-
 //go:embed templates/*
 var templates embed.FS
 
@@ -249,6 +227,12 @@ func postStartGRE(exp *types.Experiment) error {
 
 	cluster := cluster(exp)
 
+	status := MirrorAppStatus{
+		// Tap name is random, yet descriptive to the fact that it's a mirror tap.
+		TapName: fmt.Sprintf("%s-mirror", util.RandomString(8)),
+		Mirrors: make(map[string]MirrorConfig),
+	}
+
 	// For each cluster host, create tap on mirror VLAN with IP in mirror network.
 	// The tap's name will be something like `foobar-mirror`, assuming `foobar` is
 	// the name of the experiment. The maximum length of the name is dictated by
@@ -257,8 +241,8 @@ func postStartGRE(exp *types.Experiment) error {
 	// `-mirror` to the end of it.
 	for host := range cluster {
 		cmd := fmt.Sprintf(
-			"tap create %s//%s bridge %s ip %s/%d %.8s-mirror",
-			exp.Spec.ExperimentName(), amd.DirectGRE.MirrorVLAN, amd.DirectGRE.MirrorBridge, ip.String(), mask, exp.Spec.ExperimentName(),
+			"tap create %s//%s bridge %s ip %s/%d %s",
+			exp.Spec.ExperimentName(), amd.DirectGRE.MirrorVLAN, amd.DirectGRE.MirrorBridge, ip.String(), mask, status.TapName,
 		)
 
 		if err := meshSend(host, cmd); err != nil {
@@ -319,20 +303,20 @@ func postStartGRE(exp *types.Experiment) error {
 			}
 		}
 
-		// Create GRE tunnel and mirror on each cluster host to this VM. The GRE
-		// tunnel interfaces and mirrors will have names like `foobar-nids`, where
-		// `foobar` is the name of the experiment and `nids` is the name of the
-		// target VM. The maximum length of the tunnel interface name is dictated by
-		// the maximum length of a Linux interface name, which is 15 characters. As
-		// such, the name used for both the tunnel interface and the mirror will be
-		// truncated to 15 characters.
+		// Limit name to 15 characters since it will be used for an OVS port name
+		// (limited to 15 characters by Linux since it will be used as an interface
+		// name).
+		name := util.RandomString(15)
+
+		cfg := MirrorConfig{
+			MirrorName: name,
+			IP:         ip.String(),
+			VLANs:      vlans,
+		}
+
+		status.Mirrors[host.Hostname()] = cfg
+
 		for h := range cluster {
-			name := fmt.Sprintf("%s-%s", exp.Spec.ExperimentName(), host.Hostname())
-
-			// Truncate name to max of 15 characters to keep it within the maximum
-			// length limit of Linux interface names.
-			name = fmt.Sprintf("%.15s", name)
-
 			if amd.DirectGRE.ERSPAN.Enabled {
 				var cmd string
 
@@ -405,6 +389,8 @@ func postStartGRE(exp *types.Experiment) error {
 			}
 		}
 	}
+
+	exp.Status.SetAppStatus("mirror", status)
 
 	return nil
 }
@@ -581,13 +567,22 @@ func cleanupGRE(exp *types.Experiment) error {
 
 	cluster := cluster(exp)
 
-	for _, host := range app.Hosts() {
-		// This is the name used for both the GRE tunnels and the mirrors
-		name := fmt.Sprintf("%s-%s", exp.Spec.ExperimentName(), host.Hostname())
+	var status MirrorAppStatus
 
-		// Truncate name to max of 15 characters to keep it within the maximum
-		// length limit of Linux interface names.
-		name = fmt.Sprintf("%.15s", name)
+	if app, ok := exp.Status.AppStatus()["mirror"]; ok {
+		if err := mapstructure.Decode(app, &status); err != nil {
+			return fmt.Errorf("decoding app status: %w", err)
+		}
+	}
+
+	for _, host := range app.Hosts() {
+		cfg, ok := status.Mirrors[host.Hostname()]
+		if !ok {
+			log.Error("missing mirror config for %s in experiment status", host.Hostname())
+			continue
+		}
+
+		name := cfg.MirrorName
 
 		for h := range cluster {
 			cmd := fmt.Sprintf(
@@ -608,7 +603,7 @@ func cleanupGRE(exp *types.Experiment) error {
 	}
 
 	for h := range cluster {
-		cmd := fmt.Sprintf("tap delete %.8s-mirror", exp.Spec.ExperimentName())
+		cmd := fmt.Sprintf("tap delete %s", status.TapName)
 
 		if err := meshSend(h, cmd); err != nil {
 			return fmt.Errorf("deleting tap on all cluster hosts: %w", err)
