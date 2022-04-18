@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"regexp"
+	"runtime/debug"
 	"strconv"
 	"strings"
 
@@ -32,6 +33,32 @@ func main() {
 		log.Fatal("incorrect amount of args provided")
 	}
 
+	stage := os.Args[1]
+
+	if stage == "version" {
+		info, ok := debug.ReadBuildInfo()
+		if !ok {
+			log.Fatal("unable to read build info")
+		}
+
+		var (
+			rev string
+			ts  string
+		)
+
+		for _, setting := range info.Settings {
+			switch setting.Key {
+			case "vcs.revision":
+				rev = setting.Value[0:8]
+			case "vcs.time":
+				ts = setting.Value
+			}
+		}
+
+		fmt.Printf("%s (%s)\n", rev, ts)
+		return
+	}
+
 	body, err := ioutil.ReadAll(os.Stdin)
 	if err != nil {
 		log.Fatal("unable to read JSON from STDIN")
@@ -41,8 +68,6 @@ func main() {
 	if err != nil {
 		log.Fatal("decoding experiment: %v", err)
 	}
-
-	stage := os.Args[1]
 
 	switch stage {
 	case "configure":
