@@ -7,6 +7,7 @@ replace phenix => github.com/sandia-minimega/phenix/src/go v0.0.0-20210722230223
 require (
 	github.com/activeshadow/libminimega v0.0.0-20190412123224-5384445d4b63
 	github.com/c-robinson/iplib v0.3.1
+	github.com/hashicorp/go-multierror v1.0.0
 	github.com/mitchellh/mapstructure v1.4.0
 	phenix v0.0.0-00010101000000-000000000000
 )
@@ -23,7 +24,6 @@ require (
 	github.com/golang/protobuf v1.4.2 // indirect
 	github.com/google/uuid v1.0.0 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
-	github.com/hashicorp/go-multierror v1.0.0 // indirect
 	github.com/mattn/go-colorable v0.1.4 // indirect
 	github.com/mattn/go-isatty v0.0.11 // indirect
 	github.com/mattn/go-runewidth v0.0.7 // indirect

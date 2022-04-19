@@ -20,6 +20,7 @@ import (
 
 	log "github.com/activeshadow/libminimega/minilog"
 	"github.com/c-robinson/iplib"
+	"github.com/hashicorp/go-multierror"
 	"github.com/mitchellh/mapstructure"
 )
 
@@ -226,7 +227,7 @@ func preStart(exp *types.Experiment) error {
 	return nil
 }
 
-func postStartGRE(exp *types.Experiment) error {
+func postStartGRE(exp *types.Experiment) (ferr error) {
 	var (
 		app = util.ExtractApp(exp.Spec.Scenario(), "mirror")
 		amd MirrorAppMetadata
@@ -245,11 +246,6 @@ func postStartGRE(exp *types.Experiment) error {
 		return fmt.Errorf("determining mirror network: %w", err)
 	}
 
-	// Cluster hosts will be addressed at the beginning of the mirror network
-	// going forward (target VMs to receive mirrored data are addressed from the
-	// end of the mirror network backwards).
-	ip := nw.FirstAddress()
-
 	cluster := cluster(exp)
 
 	status := MirrorAppStatus{
@@ -257,6 +253,26 @@ func postStartGRE(exp *types.Experiment) error {
 		TapName: fmt.Sprintf("%s-mirror", util.RandomString(8)),
 		Mirrors: make(map[string]MirrorConfig),
 	}
+
+	defer func() {
+		// don't do any cleanup if no error is being returned
+		if ferr == nil {
+			return
+		}
+
+		// clean up any taps already created for this mirror
+		deleteTap(status.TapName, cluster)
+
+		// clean up any mirrors already created for this mirror
+		for _, mirror := range status.Mirrors {
+			deleteMirror(mirror.MirrorName, amd.DirectGRE.MirrorBridge, cluster)
+		}
+	}()
+
+	// Cluster hosts will be addressed at the beginning of the mirror network
+	// going forward (target VMs to receive mirrored data are addressed from the
+	// end of the mirror network backwards).
+	ip := nw.FirstAddress()
 
 	// For each cluster host, create tap on mirror VLAN with IP in mirror network.
 	// The tap's name will be something like `foobar-mirror`, assuming `foobar` is
@@ -609,30 +625,13 @@ func cleanupGRE(exp *types.Experiment) error {
 
 		name := cfg.MirrorName
 
-		for h := range cluster {
-			cmd := fmt.Sprintf(
-				`shell ovs-vsctl -- --id=@m get mirror %s -- remove bridge %s mirrors @m`,
-				name, amd.DirectGRE.MirrorBridge,
-			)
-
-			if err := meshSend(h, cmd); err != nil {
-				log.Error("removing mirror %s on all cluster hosts: %v", name, err)
-			}
-
-			cmd = fmt.Sprintf(`shell ovs-vsctl del-port %s %s`, amd.DirectGRE.MirrorBridge, name)
-
-			if err := meshSend(h, cmd); err != nil {
-				log.Error("deleting GRE tunnel %s on all cluster hosts: %v", name, err)
-			}
+		if err := deleteMirror(name, amd.DirectGRE.MirrorBridge, cluster); err != nil {
+			log.Error("removing mirror %s from cluster: %v", name, err)
 		}
 	}
 
-	for h := range cluster {
-		cmd := fmt.Sprintf("tap delete %s", status.TapName)
-
-		if err := meshSend(h, cmd); err != nil {
-			return fmt.Errorf("deleting tap on all cluster hosts: %w", err)
-		}
+	if err := deleteTap(status.TapName, cluster); err != nil {
+		log.Error("removing tap %s from cluster: %v", status.TapName, err)
 	}
 
 	return nil
@@ -904,4 +903,55 @@ func meshSend(host, command string) error {
 	}
 
 	return nil
+}
+
+func deleteTap(tap string, cluster map[string][]string) error {
+	var err error
+
+	for host := range cluster {
+		multierror.Append(err, deleteTapFromHost(tap, host))
+	}
+
+	return err
+}
+
+func deleteTapFromHost(tap, host string) error {
+	cmd := fmt.Sprintf("tap delete %s", tap)
+
+	if err := meshSend(host, cmd); err != nil {
+		return fmt.Errorf("deleting tap %s on cluster host %s: %w", tap, host, err)
+	}
+
+	return nil
+}
+
+func deleteMirror(mirror, bridge string, cluster map[string][]string) error {
+	var err error
+
+	for host := range cluster {
+		multierror.Append(err, deleteMirrorFromHost(mirror, bridge, host))
+	}
+
+	return err
+}
+
+func deleteMirrorFromHost(mirror, bridge, host string) error {
+	var err error
+
+	cmd := fmt.Sprintf(
+		`shell ovs-vsctl -- --id=@m get mirror %s -- remove bridge %s mirrors @m`,
+		mirror, bridge,
+	)
+
+	if err := meshSend(host, cmd); err != nil {
+		multierror.Append(err, fmt.Errorf("removing mirror %s from bridge %s on cluster host %s: %v", mirror, bridge, host, err))
+	}
+
+	cmd = fmt.Sprintf(`shell ovs-vsctl del-port %s %s`, bridge, mirror)
+
+	if err := meshSend(host, cmd); err != nil {
+		multierror.Append(fmt.Errorf("deleting GRE tunnel %s from bridge %s on cluster host %s: %v", mirror, bridge, host, err))
+	}
+
+	return err
 }
