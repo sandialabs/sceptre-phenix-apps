@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"net"
 	"os"
 	"regexp"
@@ -101,17 +100,11 @@ func main() {
 }
 
 func configure(exp *types.Experiment) error {
-	var (
-		app = util.ExtractApp(exp.Spec.Scenario(), "mirror")
-		amd MirrorAppMetadata
-	)
+	app := util.ExtractApp(exp.Spec.Scenario(), "mirror")
 
-	if err := mapstructure.Decode(app.Metadata(), &amd); err != nil {
-		return fmt.Errorf("decoding app metadata: %w", err)
-	}
-
-	if !amd.DirectGRE.Enabled {
-		return nil
+	amd, err := extractMetadata(app.Metadata())
+	if err != nil {
+		return fmt.Errorf("extracting app metadata: %w", err)
 	}
 
 	nw, mask, err := mirrorNet(amd)
@@ -126,10 +119,9 @@ func configure(exp *types.Experiment) error {
 	ip := nw.LastAddress()
 
 	for _, host := range app.Hosts() {
-		var hmd MirrorHostMetadata
-
-		if err := mapstructure.Decode(host.Metadata(), &hmd); err != nil {
-			return fmt.Errorf("decoding metadata for host %s: %w", host.Hostname(), err)
+		hmd, err := extractHostMetadata(host.Metadata())
+		if err != nil {
+			return fmt.Errorf("extracting host metadata for %s: %w", host.Hostname(), err)
 		}
 
 		if hmd.Interface == "" {
@@ -153,17 +145,17 @@ func configure(exp *types.Experiment) error {
 
 		// If the configured interface isn't present in the topology, create it.
 		if iface == nil {
-			iface = node.AddNetworkInterface("ethernet", hmd.Interface, amd.DirectGRE.MirrorVLAN)
+			iface = node.AddNetworkInterface("ethernet", hmd.Interface, amd.MirrorVLAN)
 		}
 
 		// No matter what, set the IP for the configured interface, even if it was
 		// already set in the topology.
-		iface.SetBridge(amd.DirectGRE.MirrorBridge)
+		iface.SetBridge(amd.MirrorBridge)
 		iface.SetProto("static")
 		iface.SetAddress(ip.String())
 		iface.SetMask(mask)
 		iface.SetGateway("") // just in case it was set in the topology...
-		iface.SetVLAN(amd.DirectGRE.MirrorVLAN)
+		iface.SetVLAN(amd.MirrorVLAN)
 
 		// Decrement IP for next target VM.
 		ip, _ = nw.PreviousIP(ip)
@@ -173,27 +165,13 @@ func configure(exp *types.Experiment) error {
 }
 
 func preStart(exp *types.Experiment) error {
-	var (
-		app = util.ExtractApp(exp.Spec.Scenario(), "mirror")
-		amd MirrorAppMetadata
-	)
-
-	if err := mapstructure.Decode(app.Metadata(), &amd); err != nil {
-		return fmt.Errorf("decoding app metadata: %w", err)
-	}
-
-	if !amd.DirectGRE.Enabled {
-		return nil
-	}
-
+	app := util.ExtractApp(exp.Spec.Scenario(), "mirror")
 	startupDir := exp.Spec.BaseDir() + "/startup"
 
 	for _, host := range app.Hosts() {
-		var hmd MirrorHostMetadata
-
-		if err := mapstructure.Decode(host.Metadata(), &hmd); err != nil {
-			log.Error("decoding host metadata for %s: %w", host.Hostname(), err)
-			continue
+		hmd, err := extractHostMetadata(host.Metadata())
+		if err != nil {
+			return fmt.Errorf("extracting host metadata for %s: %w", host.Hostname(), err)
 		}
 
 		if !hmd.SetupOVS {
@@ -227,18 +205,12 @@ func preStart(exp *types.Experiment) error {
 	return nil
 }
 
-func postStartGRE(exp *types.Experiment) (ferr error) {
-	var (
-		app = util.ExtractApp(exp.Spec.Scenario(), "mirror")
-		amd MirrorAppMetadata
-	)
+func postStart(exp *types.Experiment) (ferr error) {
+	app := util.ExtractApp(exp.Spec.Scenario(), "mirror")
 
-	if err := mapstructure.Decode(app.Metadata(), &amd); err != nil {
-		return fmt.Errorf("decoding app metadata: %w", err)
-	}
-
-	if !amd.DirectGRE.Enabled {
-		return nil
+	amd, err := extractMetadata(app.Metadata())
+	if err != nil {
+		return fmt.Errorf("extracting app metadata: %w", err)
 	}
 
 	nw, mask, err := mirrorNet(amd)
@@ -265,7 +237,7 @@ func postStartGRE(exp *types.Experiment) (ferr error) {
 
 		// clean up any mirrors already created for this mirror
 		for _, mirror := range status.Mirrors {
-			deleteMirror(mirror.MirrorName, amd.DirectGRE.MirrorBridge, cluster)
+			deleteMirror(mirror.MirrorName, amd.MirrorBridge, cluster)
 		}
 	}()
 
@@ -281,9 +253,11 @@ func postStartGRE(exp *types.Experiment) (ferr error) {
 	// such, the experiment name will be truncated to 8 characters before adding
 	// `-mirror` to the end of it.
 	for host := range cluster {
+		log.Info("creating mirror tap %s on host %s", status.TapName, host)
+
 		cmd := fmt.Sprintf(
 			"tap create %s//%s bridge %s ip %s/%d %s",
-			exp.Spec.ExperimentName(), amd.DirectGRE.MirrorVLAN, amd.DirectGRE.MirrorBridge, ip.String(), mask, status.TapName,
+			exp.Spec.ExperimentName(), amd.MirrorVLAN, amd.MirrorBridge, ip.String(), mask, status.TapName,
 		)
 
 		if err := meshSend(host, cmd); err != nil {
@@ -299,22 +273,22 @@ func postStartGRE(exp *types.Experiment) (ferr error) {
 	// stage) and create a mirror on each host using the GRE tunnel as the
 	// mirror's output port.
 	for _, host := range app.Hosts() {
-		var hmd MirrorHostMetadata
-
-		if err := mapstructure.Decode(host.Metadata(), &hmd); err != nil {
-			log.Error("decoding host metadata for %s: %w", host.Hostname(), err)
-			continue
+		hmd, err := extractHostMetadata(host.Metadata())
+		if err != nil {
+			return fmt.Errorf("extracting host metadata for %s: %w", host.Hostname(), err)
 		}
+
+		log.Info("setting up mirror to %s (VLANs: %d, MirrorRouted: %t)", host.Hostname(), len(hmd.VLANs), hmd.MirrorRouted)
 
 		node := exp.Spec.Topology().FindNodeByName(host.Hostname())
 
 		if node == nil {
-			log.Error("no node found in topology for %s", host.Hostname())
+			log.Warn("no node found in topology for %s", host.Hostname())
 			continue
 		}
 
 		if hmd.Interface == "" {
-			log.Error("no target interface provided for %s", host.Hostname())
+			log.Warn("no target interface provided for %s", host.Hostname())
 			continue
 		}
 
@@ -330,18 +304,8 @@ func postStartGRE(exp *types.Experiment) (ferr error) {
 		}
 
 		if ip == nil {
-			log.Error("no target interface IP configured for %s", host.Hostname())
+			log.Warn("no target interface IP configured for %s", host.Hostname())
 			continue
-		}
-
-		var vlans []string
-
-		// convert VLAN aliases to IDs
-		for _, vlan := range hmd.VLANs {
-			id, ok := exp.Status.VLANs()[vlan]
-			if ok {
-				vlans = append(vlans, strconv.Itoa(id))
-			}
 		}
 
 		// Limit name to 15 characters since it will be used for an OVS port name
@@ -349,43 +313,41 @@ func postStartGRE(exp *types.Experiment) (ferr error) {
 		// name).
 		name := util.RandomString(15)
 
-		cfg := MirrorConfig{
-			MirrorName: name,
-			IP:         ip.String(),
-			VLANs:      vlans,
-		}
+		cfg := MirrorConfig{MirrorName: name, IP: ip.String()}
 
 		status.Mirrors[host.Hostname()] = cfg
 
 		for h := range cluster {
-			if amd.DirectGRE.ERSPAN.Enabled {
+			if amd.ERSPAN.Enabled {
 				var cmd string
 
-				switch amd.DirectGRE.ERSPAN.Version {
+				switch amd.ERSPAN.Version {
 				case 1:
 					// Create ERSPAN v1 tunnel to target VM
 					cmd = fmt.Sprintf(
 						`shell ovs-vsctl add-port %s %s -- set interface %s type=erspan options:remote_ip=%s options:erspan_ver=%d options:erspan_idx=%d`,
-						amd.DirectGRE.MirrorBridge, name, name, ip, amd.DirectGRE.ERSPAN.Version, amd.DirectGRE.ERSPAN.Index,
+						amd.MirrorBridge, name, name, ip, amd.ERSPAN.Version, amd.ERSPAN.Index,
 					)
 				case 2:
 					// Create ERSPAN v2 tunnel to target VM
 					cmd = fmt.Sprintf(
 						`shell ovs-vsctl add-port %s %s -- set interface %s type=erspan options:remote_ip=%s options:erspan_ver=%d options:erspan_dir=%d options:erspan_hwid=%d`,
-						amd.DirectGRE.MirrorBridge, name, name, ip, amd.DirectGRE.ERSPAN.Version, amd.DirectGRE.ERSPAN.Direction, amd.DirectGRE.ERSPAN.HardwareID,
+						amd.MirrorBridge, name, name, ip, amd.ERSPAN.Version, amd.ERSPAN.Direction, amd.ERSPAN.HardwareID,
 					)
 				default:
-					return fmt.Errorf("unknown ERSPAN version (%d) configured for %s", amd.DirectGRE.ERSPAN.Version, host.Hostname())
+					return fmt.Errorf("unknown ERSPAN version (%d) configured for %s", amd.ERSPAN.Version, host.Hostname())
 				}
 
 				if err := meshSend(h, cmd); err != nil {
 					return fmt.Errorf("adding ERSPAN tunnel %s from cluster host %s: %w", name, h, err)
 				}
 			} else {
+				log.Info("creating GRE port %s to %s on host %s", name, host.Hostname(), h)
+
 				// Create GRE tunnel to target VM
 				cmd := fmt.Sprintf(
 					`shell ovs-vsctl add-port %s %s -- set interface %s type=gre options:remote_ip=%s`,
-					amd.DirectGRE.MirrorBridge, name, name, ip,
+					amd.MirrorBridge, name, name, ip,
 				)
 
 				if err := meshSend(h, cmd); err != nil {
@@ -394,13 +356,15 @@ func postStartGRE(exp *types.Experiment) (ferr error) {
 			}
 
 			// list of VMs currently scheduled on this cluster host
-			vms := cluster[h]
+			// (we make a copy since we potentially modify it below)
+			vms := make([]string, len(cluster[h]))
+			copy(vms, cluster[h])
 
 			// If more than one VLAN is being monitored, don't include router/firewall
 			// interfaces in the mirror to avoid duplicate packets. By default, we
 			// include routers and firewalls since doing so when monitoring a single
 			// VLAN allows the capture of packets leaving the VLAN as well.
-			if len(vlans) > 1 {
+			if len(hmd.VLANs) > 1 && !hmd.MirrorRouted {
 				// Iterate backwards so elements can be removed while iterating.
 				for i := len(vms) - 1; i >= 0; i-- {
 					name := vms[i]
@@ -408,6 +372,11 @@ func postStartGRE(exp *types.Experiment) (ferr error) {
 
 					// check to see if this VM is a router or firewall
 					if strings.EqualFold(node.Type(), "router") || strings.EqualFold(node.Type(), "firewall") {
+						log.Debug(
+							"removing VM %s (%s) from list of VMs to mirror to %s (VLANs: %d, MirrorRouted: %t)",
+							name, node.Type(), host, len(hmd.VLANs), hmd.MirrorRouted,
+						)
+
 						// remove current VM from list of VMs
 						vms = append(vms[:i], vms[i+1:]...)
 					}
@@ -415,18 +384,18 @@ func postStartGRE(exp *types.Experiment) (ferr error) {
 			}
 
 			// Create mirror, using GRE tunnel as the output port
-			command := buildMirrorCommand(exp.Spec.ExperimentName(), name, amd.DirectGRE.MirrorBridge, name, vms, vlans)
+			command := buildMirrorCommand(exp, name, amd.MirrorBridge, name, vms, hmd)
 
 			if command == nil {
 				// Likely means no VMs scheduled on this cluster host have interfaces in
-				// VMs being mirrored to the target VM.
-				log.Info("no VMs scheduled on cluster host %s with interfaces in VLANs %v", h, hmd.VLANs)
+				// VLANs being mirrored to the target VM.
 				continue
 			}
 
+			log.Info("creating mirror %s for %s on host %s", name, host.Hostname(), h)
+
 			if err := meshSend(h, strings.Join(command, " -- ")); err != nil {
-				log.Error("adding ingress-only mirror %s on cluster host %s: %v", name, h, err)
-				// return fmt.Errorf("adding ingress-only mirror %s on cluster host %s: %w", name, h, err)
+				return fmt.Errorf("adding ingress-only mirror %s on cluster host %s: %w", name, h, err)
 			}
 		}
 	}
@@ -436,174 +405,12 @@ func postStartGRE(exp *types.Experiment) (ferr error) {
 	return nil
 }
 
-func postStart(exp *types.Experiment) error {
-	var (
-		app = util.ExtractApp(exp.Spec.Scenario(), "mirror")
-		amd MirrorAppMetadata
-	)
+func cleanup(exp *types.Experiment) error {
+	app := util.ExtractApp(exp.Spec.Scenario(), "mirror")
 
-	if err := mapstructure.Decode(app.Metadata(), &amd); err != nil {
-		return fmt.Errorf("decoding app metadata: %w", err)
-	}
-
-	if amd.DirectGRE.Enabled {
-		return postStartGRE(exp)
-	}
-
-	cluster := cluster(exp)
-
-	for _, host := range app.Hosts() {
-		var hmd MirrorHostMetadata
-
-		if err := mapstructure.Decode(host.Metadata(), &hmd); err != nil {
-			log.Error("decoding host metadata for %s: %w", host.Hostname(), err)
-			continue
-		}
-
-		node := exp.Spec.Topology().FindNodeByName(host.Hostname())
-
-		if node == nil {
-			log.Error("no node found in topology for %s", host.Hostname())
-			continue
-		}
-
-		if hmd.Interface == "" {
-			log.Error("no target interface provided for %s", host.Hostname())
-			continue
-		}
-
-		var (
-			monitorIfaceIdx    = -1
-			monitorIfaceBridge string
-		)
-
-		for i, iface := range node.Network().Interfaces() {
-			if iface.Name() == hmd.Interface {
-				monitorIfaceIdx = i
-				monitorIfaceBridge = iface.Bridge()
-
-				break
-			}
-		}
-
-		if monitorIfaceIdx < 0 {
-			log.Error("target interface not found for %s", host.Hostname())
-			continue
-		}
-
-		taps := vmTaps(exp.Spec.ExperimentName(), host.Hostname())
-
-		if len(taps) <= monitorIfaceIdx {
-			log.Error("target interface not configured for %s", host.Hostname())
-			continue
-		}
-
-		monitorTap := taps[monitorIfaceIdx]
-
-		var vlans []string
-
-		for _, vlan := range hmd.VLANs {
-			id, ok := exp.Status.VLANs()[vlan]
-			if ok {
-				vlans = append(vlans, strconv.Itoa(id))
-			}
-		}
-
-		scheduled := exp.Status.Schedules()[host.Hostname()]
-
-		if scheduled == "" {
-			log.Error("%s is not scheduled in the experiment", host.Hostname())
-			continue
-		}
-
-		ips, _ := net.LookupIP(scheduled)
-
-		if len(ips) < 1 {
-			return fmt.Errorf("cannot determine IP for cluster host %s", scheduled)
-		}
-
-		var (
-			remote = ips[0].String()
-			key    = rand.Uint32()
-		)
-
-		// We only need to worry about GRE tunnels if more than one cluster host is
-		// involved in this experiment.
-		if len(cluster) > 1 {
-			cmd := fmt.Sprintf(`shell ovs-vsctl set bridge %s rstp-enable=true`, monitorIfaceBridge)
-
-			if err := meshSend(scheduled, cmd); err != nil {
-				return fmt.Errorf("enabling RSTP for bridge on cluster host %s: %w", scheduled, err)
-			}
-
-			cmd = fmt.Sprintf(
-				`shell ovs-vsctl add-port %s %s -- set interface %s type=gre options:remote_ip=flow options:key=%v`,
-				monitorIfaceBridge, host.Hostname(), host.Hostname(), key,
-			)
-
-			if err := meshSend(scheduled, cmd); err != nil {
-				return fmt.Errorf("adding GRE flow tunnel %s on cluster host %s: %w", host.Hostname(), scheduled, err)
-			}
-
-			cmd = fmt.Sprintf(
-				`shell ovs-ofctl add-flow %s "in_port=%s actions=output:%s"`,
-				monitorIfaceBridge, host.Hostname(), monitorTap,
-			)
-
-			if err := meshSend(scheduled, cmd); err != nil {
-				return fmt.Errorf("adding OpenFlow flow rule for %s on cluster host %s: %w", host.Hostname(), scheduled, err)
-			}
-
-			for h := range cluster {
-				if h == scheduled {
-					continue
-				}
-
-				cmd := fmt.Sprintf(`shell ovs-vsctl set bridge %s rstp-enable=true`, monitorIfaceBridge)
-
-				if err := meshSend(h, cmd); err != nil {
-					return fmt.Errorf("enabling RSTP for bridge on cluster host %s: %w", h, err)
-				}
-
-				cmd = fmt.Sprintf(
-					`shell ovs-vsctl add-port %s %s -- set interface %s type=gre options:remote_ip=%s options:key=%v`,
-					monitorIfaceBridge, host.Hostname(), host.Hostname(), remote, key,
-				)
-
-				if err := meshSend(h, cmd); err != nil {
-					return fmt.Errorf("adding GRE tunnel %s from cluster host %s: %w", host.Hostname(), h, err)
-				}
-
-				command := buildMirrorCommand(exp.Spec.ExperimentName(), host.Hostname(), monitorIfaceBridge, host.Hostname(), cluster[h], vlans)
-
-				if err := meshSend(h, strings.Join(command, " -- ")); err != nil {
-					return fmt.Errorf("adding ingress-only mirror %s on cluster host %s: %w", host.Hostname(), h, err)
-				}
-			}
-		}
-
-		command := buildMirrorCommand(exp.Spec.ExperimentName(), host.Hostname(), monitorIfaceBridge, monitorTap, cluster[scheduled], vlans)
-
-		if err := meshSend(scheduled, strings.Join(command, " -- ")); err != nil {
-			return fmt.Errorf("adding ingress-only mirror %s on cluster host %s: %w", host.Hostname(), scheduled, err)
-		}
-	}
-
-	return nil
-}
-
-func cleanupGRE(exp *types.Experiment) error {
-	var (
-		app = util.ExtractApp(exp.Spec.Scenario(), "mirror")
-		amd MirrorAppMetadata
-	)
-
-	if err := mapstructure.Decode(app.Metadata(), &amd); err != nil {
-		return fmt.Errorf("decoding app metadata: %w", err)
-	}
-
-	if !amd.DirectGRE.Enabled {
-		return nil
+	amd, err := extractMetadata(app.Metadata())
+	if err != nil {
+		return fmt.Errorf("extracting app metadata: %w", err)
 	}
 
 	cluster := cluster(exp)
@@ -625,7 +432,7 @@ func cleanupGRE(exp *types.Experiment) error {
 
 		name := cfg.MirrorName
 
-		if err := deleteMirror(name, amd.DirectGRE.MirrorBridge, cluster); err != nil {
+		if err := deleteMirror(name, amd.MirrorBridge, cluster); err != nil {
 			log.Error("removing mirror %s from cluster: %v", name, err)
 		}
 	}
@@ -637,104 +444,23 @@ func cleanupGRE(exp *types.Experiment) error {
 	return nil
 }
 
-func cleanup(exp *types.Experiment) error {
-	var (
-		app = util.ExtractApp(exp.Spec.Scenario(), "mirror")
-		amd MirrorAppMetadata
-	)
-
-	if err := mapstructure.Decode(app.Metadata(), &amd); err != nil {
-		return fmt.Errorf("decoding app metadata: %w", err)
-	}
-
-	if amd.DirectGRE.Enabled {
-		return cleanupGRE(exp)
-	}
-
-	cluster := cluster(exp)
-
-	for _, host := range app.Hosts() {
-		var hmd MirrorHostMetadata
-
-		if err := mapstructure.Decode(host.Metadata(), &hmd); err != nil {
-			log.Error("decoding host metadata for %s: %w", host.Hostname(), err)
-			continue
-		}
-
-		node := exp.Spec.Topology().FindNodeByName(host.Hostname())
-
-		if node == nil {
-			log.Error("no node found in topology for %s", host.Hostname())
-			continue
-		}
-
-		if hmd.Interface == "" {
-			log.Error("no target interface provided for %s", host.Hostname())
-			continue
-		}
-
-		var monitorIfaceBridge string
-
-		for _, iface := range node.Network().Interfaces() {
-			if iface.Name() == hmd.Interface {
-				monitorIfaceBridge = iface.Bridge()
-				break
-			}
-		}
-
-		if monitorIfaceBridge == "" {
-			log.Error("target interface not found for %s", host.Hostname())
-			continue
-		}
-
-		cmd := fmt.Sprintf(
-			`shell ovs-vsctl -- --id=@m get mirror %s -- remove bridge %s mirrors @m`,
-			host.Hostname(), monitorIfaceBridge,
-		)
-
-		if err := meshSend("all", cmd); err != nil {
-			log.Error("removing mirror %s on all cluster hosts: %v", host.Hostname(), err)
-		}
-
-		// We only need to worry about GRE tunnels if more than one cluster host is
-		// involved in this experiment.
-		if len(cluster) > 1 {
-			scheduled := exp.Status.Schedules()[host.Hostname()]
-
-			cmd = fmt.Sprintf(`shell ovs-ofctl del-flows %s in_port=%s`, monitorIfaceBridge, host.Hostname())
-
-			if err := meshSend(scheduled, cmd); err != nil {
-				log.Error("deleting OpenFlow flow rule for %s on cluster host %s: %v", host.Hostname(), scheduled, err)
-			}
-
-			cmd = fmt.Sprintf(`shell ovs-vsctl del-port %s %s`, monitorIfaceBridge, host.Hostname())
-
-			if err := meshSend("all", cmd); err != nil {
-				log.Error("deleting GRE tunnel %s on all cluster hosts: %v", host.Hostname(), err)
-			}
-		}
-	}
-
-	return nil
-}
-
-func mirrorNet(md MirrorAppMetadata) (iplib.Net, int, error) {
+func mirrorNet(md MirrorAppMetadataV1) (iplib.Net, int, error) {
 	var nw iplib.Net
 
 	// Set some default values if missing from metadata.
-	if md.DirectGRE.MirrorNet == "" {
-		md.DirectGRE.MirrorNet = "172.30.0.0/16"
+	if md.MirrorNet == "" {
+		md.MirrorNet = "172.30.0.0/16"
 	}
 
-	if md.DirectGRE.MirrorBridge == "" {
-		md.DirectGRE.MirrorBridge = "phenix"
+	if md.MirrorBridge == "" {
+		md.MirrorBridge = "phenix"
 	}
 
-	if md.DirectGRE.MirrorVLAN == "" {
-		md.DirectGRE.MirrorVLAN = "mirror"
+	if md.MirrorVLAN == "" {
+		md.MirrorVLAN = "mirror"
 	}
 
-	tokens := strings.Split(md.DirectGRE.MirrorNet, "/")
+	tokens := strings.Split(md.MirrorNet, "/")
 
 	var (
 		ip   = net.ParseIP(tokens[0])
@@ -768,30 +494,6 @@ func cluster(exp *types.Experiment) map[string][]string {
 	}
 
 	return cluster
-}
-
-func vmTaps(ns, vm string) []string {
-	cmd := mmcli.NewCommand(mmcli.Namespace(ns))
-	cmd.Command = "vm info"
-	cmd.Filters = []string{"name=" + vm}
-
-	rows := mmcli.RunTabular(cmd)
-
-	if len(rows) == 0 {
-		return nil
-	}
-
-	taps := rows[0]["tap"]
-
-	taps = strings.TrimPrefix(taps, "[")
-	taps = strings.TrimSuffix(taps, "]")
-	taps = strings.TrimSpace(taps)
-
-	if taps != "" {
-		return strings.Split(taps, ", ")
-	}
-
-	return nil
 }
 
 func vlanTaps(ns string, vms, vlans []string) []string {
@@ -853,6 +555,8 @@ func vlanTaps(ns string, vms, vlans []string) []string {
 			// `vlans` will be a slice of VLAN IDs (e.g., 101, 102)
 			for _, id := range vlans {
 				if id == vlanID {
+					log.Info("adding tap %s (VLAN %s) for VM %s", vmTaps[idx], vlanID, vm)
+
 					taps = append(taps, vmTaps[idx])
 					break
 				}
@@ -863,22 +567,36 @@ func vlanTaps(ns string, vms, vlans []string) []string {
 	return taps
 }
 
-func buildMirrorCommand(ns, name, bridge, port string, vms, vlans []string) []string {
+func buildMirrorCommand(exp *types.Experiment, name, bridge, port string, vms []string, hmd MirrorHostMetadata) []string {
 	var (
-		ids     []string
+		vlans   []string
 		command = []string{"shell ovs-vsctl"}
 	)
 
-	taps := vlanTaps(ns, vms, vlans)
+	// convert VLAN aliases to IDs
+	for _, vlan := range hmd.VLANs {
+		id, ok := exp.Status.VLANs()[vlan]
+		if ok {
+			vlans = append(vlans, strconv.Itoa(id))
+		}
+	}
+
+	taps := vlanTaps(exp.Spec.ExperimentName(), vms, vlans)
+
+	// add HIL interfaces to list of taps to mirror
+	log.Info("adding %v HIL taps to list of taps to mirror", hmd.HIL)
+	taps = append(taps, hmd.HIL...)
 
 	if len(taps) == 0 {
 		return nil
 	}
 
-	for idx, tap := range taps {
-		id := fmt.Sprintf("@i%d", idx)
+	ids := make([]string, len(taps))
 
-		ids = append(ids, id)
+	for i, tap := range taps {
+		id := fmt.Sprintf("@i%d", i)
+
+		ids[i] = id
 		command = append(command, fmt.Sprintf(`--id=%s get port %s`, id, tap))
 	}
 
@@ -916,6 +634,8 @@ func deleteTap(tap string, cluster map[string][]string) error {
 }
 
 func deleteTapFromHost(tap, host string) error {
+	log.Info("deleting tap %s from host %s", tap, host)
+
 	cmd := fmt.Sprintf("tap delete %s", tap)
 
 	if err := meshSend(host, cmd); err != nil {
@@ -936,6 +656,8 @@ func deleteMirror(mirror, bridge string, cluster map[string][]string) error {
 }
 
 func deleteMirrorFromHost(mirror, bridge, host string) error {
+	log.Info("deleting mirror %s on bridge %s from host %s", mirror, bridge, host)
+
 	var err error
 
 	cmd := fmt.Sprintf(

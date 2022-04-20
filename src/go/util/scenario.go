@@ -5,6 +5,18 @@ import (
 	ifaces "phenix/types/interfaces"
 )
 
+func ExtractVersion(md map[string]interface{}) string {
+	val, ok := md["version"]
+	if ok {
+		version, ok := val.(string)
+		if ok {
+			return version
+		}
+	}
+
+	return "v0"
+}
+
 func ExtractApp(scenario ifaces.ScenarioSpec, name string) ifaces.ScenarioApp {
 	if scenario == nil || scenario.Apps() == nil {
 		return nil
