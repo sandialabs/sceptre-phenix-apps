@@ -1,5 +1,7 @@
 import json, os, signal, sys, time
 
+from phenix_apps.common.settings import PHENIX_DIR
+
 from box import Box
 
 import minimega
@@ -76,7 +78,8 @@ class ComponentBase(object):
         self.exp_dir    = self.experiment.spec.baseDir
         self.metadata   = self.extract_metadata()
 
-        self.base_dir = f'{self.exp_dir}/scorch/run-{self.run}/{self.name}/loop-{self.loop}-count-{self.count}'
+        self.files_dir = os.getenv('PHENIX_FILES_DIR', f'{PHENIX_DIR}/images/{self.exp_name}/files')
+        self.base_dir  = f'{self.files_dir}/scorch/run-{self.run}/{self.name}/loop-{self.loop}-count-{self.count}'
         os.makedirs(self.base_dir, exist_ok=True)
 
         def signal_handler(signum, stack):
