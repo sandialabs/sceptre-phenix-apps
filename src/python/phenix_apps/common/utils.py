@@ -189,7 +189,16 @@ def mm_send(mm, vm, src, dst):
     # Use PHENIX_DIR as base directory to ensure minimega has access to it. This
     # assumes PHENIX_DIR is mounted into the containers if containers are being
     # used.
-    with tempfile.TemporaryDirectory(dir=s.PHENIX_DIR) as tmp:
+    base = s.PHENIX_DIR
+
+    # If the well-known '/tmp/miniccc-mounts' directory is present, then use it
+    # as the base directory instead. This is common when deploying minimega and
+    # phenix as a Kubernetes deployment, wherein bidirectional mount propagation
+    # has to be enabled (and is done so via a Kubernetes `emptyDir` volume).
+    if pathlib.Path('/tmp/miniccc-mounts').is_dir():
+        base = '/tmp/miniccc-mounts'
+
+    with tempfile.TemporaryDirectory(dir=base) as tmp:
         vm_dst  = os.path.join(tmp, dst.strip('/'))
         dst_dir = os.path.dirname(vm_dst)
 
@@ -211,7 +220,16 @@ def mm_recv(mm, vm, src, dst):
     # Use PHENIX_DIR as base directory to ensure minimega has access to it. This
     # assumes PHENIX_DIR is mounted into the containers if containers are being
     # used.
-    with tempfile.TemporaryDirectory(dir=s.PHENIX_DIR) as tmp:
+    base = s.PHENIX_DIR
+
+    # If the well-known '/tmp/miniccc-mounts' directory is present, then use it
+    # as the base directory instead. This is common when deploying minimega and
+    # phenix as a Kubernetes deployment, wherein bidirectional mount propagation
+    # has to be enabled (and is done so via a Kubernetes `emptyDir` volume).
+    if pathlib.Path('/tmp/miniccc-mounts').is_dir():
+        base = '/tmp/miniccc-mounts'
+
+    with tempfile.TemporaryDirectory(dir=base) as tmp:
         vm_src  = os.path.join(tmp, src.strip('/'))
         dst_dir = os.path.dirname(dst)
 
