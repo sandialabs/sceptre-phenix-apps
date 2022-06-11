@@ -20,6 +20,33 @@ metadata:
     cleanup: [] # same array of keys as above
 ```
 
+## Notes on the `send` Type
+
+When sending a file with `send`, the source and destination can be specified by
+separating them with a colon (`:`). If a colon is not present, then it is
+assumed that the file should be placed in the same location in the VM as it is
+on the phenix host.
+
+For example, if `/tmp/file.txt:/file.txt` is provided, then the file located at
+`/tmp/file.txt` on the phenix host will be placed at `/file.txt` in the VM. If
+the VM is a Windows VM, this will translate to `C:\file.txt`.
+
+If only `/tmp/file.txt` is provided, then it will be placed at `/tmp/file.txt`
+in the VM. If the VM is a Windows VM, this will translate to `C:\tmp\file.txt`.
+
+If either path is a relative path, then it's assumed to be relative to the
+`/phenix` directory on the phenix host and/or the VM.
+
+## Notes on the `recv` Type
+
+When receiving a file with `recv`, the source and destination can be specified
+by separating them with a colon (`:`). If a colon is not present, then it is
+assumed that the file should be placed in the appropriate location on the phenix
+host for the current scorch run, loop, and count.
+
+> In most cases, it's recommended to only provide the source path and let the
+> file be placed in the appropriate location on the phenix host.
+
 ## Example Configuration
 
 ```

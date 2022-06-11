@@ -1,7 +1,7 @@
-import os, subprocess, sys, uuid
+import os, sys
 
 from phenix_apps.apps.scorch import ComponentBase
-from phenix_apps.common import logger, settings, utils
+from phenix_apps.common import utils
 
 
 class CC(ComponentBase):
@@ -52,15 +52,46 @@ class CC(ComponentBase):
                     mm.cc_filter(f'name={vm.hostname}')
                     mm.cc_background(cmd.args)
                 elif cmd.type == 'send':
-                    self.print(f"sending file '{cmd.args}' to VM {vm.hostname} using cc")
+                    args = cmd.args.split(':')
+                    src  = None
+                    dst  = None
 
-                    mm.cc_filter(f'name={vm.hostname}')
-                    mm.cc_send(cmd.args)
+                    if len(args) == 1:
+                        src = dst = args[0]
+                    elif len(args) == 2:
+                        src = args[0]
+                        dst = args[1]
+                    else:
+                        self.eprint(f'too many files provided for send command: {cmd.args}')
+                        sys.exit(1)
+
+                    if not os.path.isabs(src):
+                        src = '/phenix/' + src
+
+                    if not os.path.isabs(dst):
+                        dst = '/phenix/' + dst
+
+                    self.print(f"sending file '{src}' to VM {vm.hostname} at '{dst}' using cc")
+
+                    utils.mm_send(mm, vm.hostname, src, dst)
                 elif cmd.type == 'recv':
-                    self.print(f"receiving file '{cmd.args}' from VM {vm.hostname} using cc")
+                    args = cmd.args.split(':')
+                    src  = None
+                    dst  = None
 
-                    mm.cc_filter(f'name={vm.hostname}')
-                    mm.cc_recv(cmd.args)
+                    if len(args) == 1:
+                        src = args[0]
+                        dst = self.base_dir + '/' + os.path.basename(src)
+                    elif len(args) == 2:
+                        src = args[0]
+                        dst = args[1]
+                    else:
+                        self.eprint(f'too many files provided for recv command: {cmd.args}')
+                        sys.exit(1)
+
+                    self.print(f"receiving file '{src}' from VM {vm.hostname} to `{dst}` using cc")
+
+                    utils.mm_recv(mm, vm.hostname, src, dst)
 
 
 def main():
