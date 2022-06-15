@@ -1,5 +1,7 @@
 package main
 
+import "strings"
+
 type MirrorAppMetadata struct {
 	DirectGRE struct {
 		Enabled      bool   `mapstructure:"enabled"`
@@ -40,6 +42,25 @@ func (this *MirrorAppMetadataV1) Upgrade(md MirrorAppMetadata) {
 	this.ERSPAN.HardwareID = md.DirectGRE.ERSPAN.HardwareID
 }
 
+func (this *MirrorAppMetadataV1) Init() {
+	// Set some default values if missing from metadata.
+	if this.MirrorNet == "" {
+		this.MirrorNet = "10.248.171.0/24"
+	}
+
+	if !strings.Contains(this.MirrorNet, "/") {
+		this.MirrorNet += "/24" // default to class C network
+	}
+
+	if this.MirrorBridge == "" {
+		this.MirrorBridge = "phenix"
+	}
+
+	if this.MirrorVLAN == "" {
+		this.MirrorVLAN = "mirror"
+	}
+}
+
 type MirrorHostMetadata struct {
 	Interface    string   `mapstructure:"interface"`
 	VLANs        []string `mapstructure:"vlans"`
@@ -49,11 +70,12 @@ type MirrorHostMetadata struct {
 }
 
 type MirrorAppStatus struct {
-	TapName string                  `json:"tapName" mapstructure:"tapName"`
-	Mirrors map[string]MirrorConfig `json:"mirrors" mapstructure:"mirrors"`
+	TapName string                  `structs:"tapName" mapstructure:"tapName"`
+	Subnet  string                  `structs:"subnet" mapstructure:"subnet"`
+	Mirrors map[string]MirrorConfig `structs:"mirrors" mapstructure:"mirrors"`
 }
 
 type MirrorConfig struct {
-	MirrorName string `json:"mirrorName" mapstructure:"mirrorName"`
-	IP         string `json:"ip" mapstructure:"ip"`
+	MirrorName string `structs:"mirrorName" mapstructure:"mirrorName"`
+	IP         string `structs:"ip" mapstructure:"ip"`
 }
