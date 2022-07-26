@@ -11,6 +11,12 @@ Apps written to work with the latest version of
 
 Below are relevant notes for each phenix app available in this repo.
 
+### ot-sim
+
+The `ot-sim` app aids in the generation of configuration files for
+[OT-sim](https://ot-sim.patsec.dev). The configuration options it provides can
+be found [here](src/python/phenix_apps/apps/otsim/README.md).
+
 ### protonuke
 
 The `protonuke` app simply injects the `/etc/default/protonuke` file into

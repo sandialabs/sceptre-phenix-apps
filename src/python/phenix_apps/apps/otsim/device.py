@@ -1,0 +1,250 @@
+import xml.etree.ElementTree as ET
+
+from phenix_apps.apps.otsim.infrastructure   import DEFAULT_INFRASTRUCTURES
+from phenix_apps.apps.otsim.protocols.dnp3   import DNP3
+from phenix_apps.apps.otsim.protocols.modbus import Modbus
+
+
+class Register:
+  def __init__(self, type, tag, md):
+    self.type = type
+    self.tag  = tag
+    self.md   = md
+
+
+class Device:
+  def __init__(self, node):
+    self.node  = node
+    self.md    = node.get('metadata', {})
+    self.infra = self.md.get('infrastructure', 'power-distribution')
+
+    self.registers = {}
+    self.processed = False
+
+
+class FEP(Device):
+  def __init__(self, node):
+    Device.__init__(self, node)
+
+  def process(self, devices):
+    if self.processed: return
+
+    # TODO: track downstream device registers by device name (which should be
+    # unique across device types) so upstream server doesn't include a register
+    # twice if a downstream server provides access to the same device across
+    # multiple protocols. Would need to figure out how to handle what client to
+    # default to using if multiple protocols provide access downstream.
+
+    for name in self.md.get('connected_rtus', []):
+      device = devices[name]
+      assert device
+
+      device.process(devices)
+
+      for proto, regs in device.registers.items():
+        if proto not in self.registers:
+          self.registers[proto] = []
+
+        self.registers[proto] += regs
+
+    self.processed = True
+
+  def configure(self, config, known):
+    protos = {}
+
+    for downstream in self.md.get('connected_rtus', []):
+      device = known[downstream]
+
+      if 'modbus' in device.registers:
+        client = Modbus()
+        client.init_xml_root('client', device.node)
+        client.registers_to_xml(device.registers['modbus'])
+
+        config.append_to_root(client.root)
+        protos['modbus'] = True
+
+      if 'dnp3' in device.registers:
+        client = DNP3()
+        client.init_xml_root('client', device.node)
+        client.init_master_xml()
+        client.registers_to_xml(device.registers['dnp3'])
+
+        config.append_to_root(client.root)
+        protos['dnp3'] = True
+
+    # For now, assume upstream server is always DNP3.
+
+    registers = []
+    for regs in self.registers.values():
+      registers += regs
+
+    server = DNP3()
+    server.init_xml_root('server', self.node)
+    server.init_outstation_xml()
+    server.registers_to_xml(registers)
+
+    config.append_to_root(server.root)
+
+    module = ET.Element('module', {'name': 'dnp3'})
+    module.text = 'ot-sim-dnp3-module {{config_file}}'
+
+    config.append_to_cpu(module)
+
+    if 'modbus' in protos:
+      module = ET.Element('module', {'name': 'modbus'})
+      module.text = 'ot-sim-modbus-module {{config_file}}'
+
+      config.append_to_cpu(module)
+
+
+class FieldDeviceServer(Device):
+  def __init__(self, node):
+    Device.__init__(self, node)
+
+  def process(self, mappings):
+    if self.processed: return
+
+    # merge provided mappings (if any) with default mappings (if any)
+    default = DEFAULT_INFRASTRUCTURES.get(self.infra, {})
+    mapping = {**default, **mappings.get(self.infra, {})}
+
+    if 'dnp3' in self.md:
+      if 'dnp3' not in self.registers:
+        self.registers['dnp3'] = []
+
+      # md['dnp3'] can either be a list of infrastructure devices configured to
+      # be monitored using the DNP3 protocol or a dictionary that contains a
+      # `devices` key that holds the list. Each entry includes a name that's
+      # used for tags and a type that references an infrastructure type.
+      if isinstance(self.md['dnp3'], dict):
+        devices = self.md['dnp3']['devices']
+      else:
+        devices = self.md['dnp3']
+
+      for fd in devices:
+        assert fd['type'] in mapping
+        device = mapping[fd['type']]
+
+        # defice name might be prefixed with HELICS federate name
+        parts = fd['name'].split('/')
+        name  = parts[1] if len(parts) > 1 else parts[0]
+
+        for var, var_type in device.items():
+          # We care about static and event variable types in the DNP3 protocol
+          # module, so if the variable type is a string convert it to a
+          # dictionary so the rest of the code can be the same when checking to
+          # see if variable types were provided.
+          if isinstance(var_type, str):
+            var_type = {'type': var_type}
+
+          reg = Register(var_type['type'], f"{name}.{var}", var_type.get('dnp3', {}))
+          self.registers['dnp3'].append(reg)
+
+    if 'modbus' in self.md:
+      if 'modbus' not in self.registers:
+        self.registers['modbus'] = []
+
+      # md['modbus'] can either be a list of infrastructure devices configured
+      # to be monitored using the DNP3 protocol or a dictionary that contains a
+      # `devices` key that holds the list. Each entry includes a name that's
+      # used for tags and a type that references an infrastructure type.
+      if isinstance(self.md['modbus'], dict):
+        devices = self.md['modbus']['devices']
+      else:
+        devices = self.md['modbus']
+
+      for fd in devices:
+        assert fd['type'] in mapping
+        device = mapping[fd['type']]
+
+        # defice name might be prefixed with HELICS federate name
+        parts = fd['name'].split('/')
+        name  = parts[1] if len(parts) > 1 else parts[0]
+
+        for var, var_type in device.items():
+          # We care about scaling in the Modbus protocol module, so if the
+          # variable type is a string convert it to a dictionary so the rest of
+          # the code can be the same when checking to see if a scaling factor
+          # was provided.
+          if isinstance(var_type, str):
+            var_type = {'type': var_type}
+
+          reg = Register(var_type['type'], f"{name}.{var}", var_type.get('modbus', {}))
+          self.registers['modbus'].append(reg)
+
+    self.processed = True
+
+  def configure(self, config):
+    if 'dnp3' in self.registers:
+      server = DNP3()
+      server.init_xml_root('server', self.node)
+      server.init_outstation_xml()
+      server.registers_to_xml(self.registers['dnp3'])
+
+      module = ET.Element('module', {'name': 'dnp3'})
+      module.text = 'ot-sim-dnp3-module {{config_file}}'
+
+      config.append_to_root(server.root)
+      config.append_to_cpu(module)
+
+    if 'modbus' in self.registers:
+      server = Modbus()
+      server.init_xml_root('server', self.node)
+      server.registers_to_xml(self.registers['modbus'])
+
+      module = ET.Element('module', {'name': 'modbus'})
+      module.text = 'ot-sim-modbus-module {{config_file}}'
+
+      config.append_to_root(server.root)
+      config.append_to_cpu(module)
+
+
+class FieldDeviceClient(Device):
+  def __init__(self, node):
+    Device.__init__(self, node)
+
+  def process(self, devices):
+    if self.processed: return
+
+    for name in self.md.get('connected_rtus', []):
+      device = devices[name]
+      assert device
+
+      device.process(devices)
+
+    self.processed = True
+
+  def configure(self, config, known):
+    protos = {}
+
+    for downstream in self.md.get('connected_rtus', []):
+      device = known[downstream]
+
+      if 'modbus' in device.registers:
+        client = Modbus()
+        client.init_xml_root('client', device.node)
+        client.registers_to_xml(device.registers['modbus'])
+
+        config.append_to_root(client.root)
+        protos['modbus'] = True
+
+      if 'dnp3' in device.registers:
+        client = DNP3()
+        client.init_xml_root('client', device.node)
+        client.init_master_xml()
+        client.registers_to_xml(device.registers['dnp3'])
+
+        config.append_to_root(client.root)
+        protos['dnp3'] = True
+
+    if 'modbus' in protos:
+      module = ET.Element('module', {'name': 'modbus'})
+      module.text = 'ot-sim-modbus-module {{config_file}}'
+
+      config.append_to_cpu(module)
+
+    if 'dnp3' in protos:
+      module = ET.Element('module', {'name': 'dnp3'})
+      module.text = 'ot-sim-dnp3-module {{config_file}}'
+
+      config.append_to_cpu(module)

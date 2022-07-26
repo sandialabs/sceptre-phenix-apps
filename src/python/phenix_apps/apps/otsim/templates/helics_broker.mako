@@ -1,0 +1,1 @@
+helics_broker -f ${feds} --ipv4 --loglevel ${log_level} --logfile ${log_file} --autorestart &

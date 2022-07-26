@@ -1,4 +1,4 @@
-import copy, json, os, sys
+import copy, os, sys
 
 from box import Box
 
@@ -97,6 +97,39 @@ class AppBase(object):
             if node.general.hostname == hostname:
                 return node
 
+    def extract_annotated_topology_nodes(self, annotations):
+        nodes = self.experiment.spec.topology.nodes
+        hosts = []
+
+        if isinstance(annotations, str):
+            annotations = [annotations]
+
+        for node in nodes:
+            node_annotations = node.get('annotations', {})
+
+            # Could be a null entry in the JSON schema.
+            if not node_annotations:
+                continue
+
+            for annotation in node_annotations.keys():
+                if annotation in annotations:
+                    hosts.append(node)
+                    break
+
+        return hosts
+
+    def extract_app_node(self, hostname):
+        app = self.extract_app()
+
+        for host in app.get("hosts", []):
+            if host.hostname == hostname:
+                node = copy.deepcopy(host)
+                node.update({'topology': self.extract_node(hostname)})
+
+                return node
+
+        return None
+
     def extract_nodes_topology_type(self, types):
         hosts = []
 
@@ -168,6 +201,9 @@ class AppBase(object):
 
         return hosts
 
+    def extract_labeled_nodes(self, labels):
+        return self.extract_nodes_label(labels)
+
     def extract_experiment_name(self):
         return self.experiment.spec.experimentName
 
@@ -182,7 +218,16 @@ class AppBase(object):
     def extract_metadata(self):
         app = self.extract_app()
 
-        return app.get('metadata', None)
+        return app.get('metadata', {})
+
+    def extract_node_metadata(self, hostname):
+        app = self.extract_app()
+
+        for host in app.get("hosts", []):
+            if host.hostname == hostname:
+                return host.metadata
+
+        return {}
 
     def add_node(self, node):
         self.experiment.spec.topology.nodes.append(node)
