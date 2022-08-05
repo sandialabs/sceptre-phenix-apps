@@ -199,17 +199,10 @@ func preStart(exp *types.Experiment) error {
 
 	cluster := cluster(exp)
 
-	for _, host := range app.Hosts() {
-		cfg, ok := status.Mirrors[host.Hostname()]
-		if !ok {
-			continue
-		}
-
-		name := cfg.MirrorName
-
+	for _, cfg := range status.Mirrors {
 		// Ignoring errors here since in most cases all the mirrors would have
 		// already been removed when the previous experiment was stopped.
-		deleteMirror(name, amd.MirrorBridge, cluster)
+		deleteMirror(cfg.MirrorName, cfg.MirrorBridge, cluster)
 	}
 
 	// Ignoring errors here since in most cases all the taps would have already
@@ -252,7 +245,7 @@ func postStart(exp *types.Experiment) (ferr error) {
 
 		// clean up any mirrors already created for this mirror
 		for _, mirror := range status.Mirrors {
-			deleteMirror(mirror.MirrorName, amd.MirrorBridge, cluster)
+			deleteMirror(mirror.MirrorName, mirror.MirrorBridge, cluster)
 		}
 	}()
 
@@ -331,7 +324,7 @@ func postStart(exp *types.Experiment) (ferr error) {
 		// name).
 		name := util.RandomString(15)
 
-		cfg := MirrorConfig{MirrorName: name, IP: ip.String()}
+		cfg := MirrorConfig{MirrorName: name, MirrorBridge: amd.MirrorBridge, IP: ip.String()}
 
 		status.Mirrors[host.Hostname()] = cfg
 
@@ -440,17 +433,9 @@ func cleanup(exp *types.Experiment) error {
 		return fmt.Errorf("decoding app status: %w", err)
 	}
 
-	for _, host := range app.Hosts() {
-		cfg, ok := status.Mirrors[host.Hostname()]
-		if !ok {
-			log.Error("missing mirror config for %s in experiment status", host.Hostname())
-			continue
-		}
-
-		name := cfg.MirrorName
-
-		if err := deleteMirror(name, amd.MirrorBridge, cluster); err != nil {
-			log.Error("removing mirror %s from cluster: %v", name, err)
+	for _, cfg := range status.Mirrors {
+		if err := deleteMirror(cfg.MirrorName, cfg.MirrorBridge, cluster); err != nil {
+			log.Error("removing mirror %s from cluster: %v", cfg.MirrorName, err)
 		}
 	}
 
@@ -528,7 +513,11 @@ func mirrorNet(md *MirrorAppMetadataV1) (netaddr.IPPrefix, error) {
 
 	running, err := types.RunningExperiments()
 	if err != nil {
-		return netaddr.IPPrefix{}, fmt.Errorf("getting running experiments: %w", err)
+		// Log the error, but don't escalate it. Instead, just assume there's no
+		// other experiments running and let things (potentially) fail
+		// spectacularly.
+		log.Error("getting running experiments: %v", err)
+		return subnet, nil
 	}
 
 	var used []netaddr.IPPrefix
@@ -536,11 +525,10 @@ func mirrorNet(md *MirrorAppMetadataV1) (netaddr.IPPrefix, error) {
 	for _, exp := range running {
 		var status MirrorAppStatus
 
-		if err := exp.Status.ParseAppStatus("mirror", &status); err != nil {
-			return netaddr.IPPrefix{}, fmt.Errorf("parsing mirror app status for experiment %s: %w", exp.Metadata.Name, err)
+		// Not every experiment uses the mirror app, so don't worry about errors.
+		if err := exp.Status.ParseAppStatus("mirror", &status); err == nil {
+			used = append(used, netaddr.MustParseIPPrefix(status.Subnet))
 		}
-
-		used = append(used, netaddr.MustParseIPPrefix(status.Subnet))
 	}
 
 	subnet, err = putil.UnusedSubnet(subnet, used)

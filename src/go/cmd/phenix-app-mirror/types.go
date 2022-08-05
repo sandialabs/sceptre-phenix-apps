@@ -76,6 +76,7 @@ type MirrorAppStatus struct {
 }
 
 type MirrorConfig struct {
-	MirrorName string `structs:"mirrorName" mapstructure:"mirrorName"`
-	IP         string `structs:"ip" mapstructure:"ip"`
+	MirrorName   string `structs:"mirrorName" mapstructure:"mirrorName"`
+	MirrorBridge string `structs:"mirrorBridge" mapstructure:"mirrorBridge"`
+	IP           string `structs:"ip" mapstructure:"ip"`
 }
