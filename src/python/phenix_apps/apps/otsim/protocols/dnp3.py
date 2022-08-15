@@ -10,7 +10,7 @@ class DNP3(Protocol):
   def __init__(self):
     Protocol.__init__(self, 'dnp3')
 
-    self.addrs = {'analog': 0, 'binary': 0}
+    self.addrs = {'ai': 0, 'ao': 0, 'bi': 0, 'bo': 0}
 
 
   def init_xml_root(self, mode, node, name='dnp3-outstation'):
@@ -61,6 +61,9 @@ class DNP3(Protocol):
     remote = ET.SubElement(self.master, 'remote-address')
     remote.text = str(1024)
 
+    scan_rate = ET.SubElement(self.master, 'scan-rate')
+    scan_rate.text = str(5)
+
 
   def init_outstation_xml(self, name='dnp3-outstation'):
     self.outstn = ET.SubElement(self.root, 'outstation', {'name': name})
@@ -80,113 +83,95 @@ class DNP3(Protocol):
         input = ET.SubElement(parent, 'input', {'type': 'analog'})
 
         addr = ET.SubElement(input, 'address')
-        addr.text = str(self.addrs['analog'])
+        addr.text = str(self.addrs['ai'])
 
-        self.addrs['analog'] += 1
+        self.addrs['ai'] += 1
 
         tag = ET.SubElement(input, 'tag')
         tag.text = reg.tag
 
-        if 'dnp3' in reg.md:
-          if 'svar' in reg.md['dnp3']:
-            svar = ET.SubElement(input, 'svar')
-            svar.text = reg.md['dnp3']['svar']
+        if 'sgvar' in reg.md:
+          svar = ET.SubElement(input, 'sgvar')
+          svar.text = reg.md['sgvar']
 
-          if 'evar' in reg.md['dnp3']:
-            evar = ET.SubElement(input, 'evar')
-            evar.text = reg.md['dnp3']['evar']
+        if 'egvar' in reg.md:
+          evar = ET.SubElement(input, 'egvar')
+          evar.text = reg.md['egvar']
 
-          if 'class' in reg.md['dnp3']:
-            klass = ET.SubElement(input, 'class')
-            klass.text = reg.md['dnp3']['class']
+        if 'class' in reg.md:
+          klass = ET.SubElement(input, 'class')
+          klass.text = reg.md['class']
       elif reg.type == 'analog-read-write':
-        input  = ET.SubElement(parent, 'input',  {'type': 'analog'})
         output = ET.SubElement(parent, 'output', {'type': 'analog'})
 
-        in_addr = ET.SubElement(input, 'address')
-        in_addr.text = str(self.addrs['analog'])
+        addr = ET.SubElement(output, 'address')
+        addr.text = str(self.addrs['ao'])
 
-        out_addr = ET.SubElement(output, 'address')
-        out_addr.text = str(self.addrs['analog'] + 1000)
+        self.addrs['ao'] += 1
 
-        self.addrs['analog'] += 1
+        tag = ET.SubElement(output, 'tag')
+        tag.text = reg.tag
 
-        in_tag = ET.SubElement(input, 'tag')
-        in_tag.text = reg.tag
+        if 'sgvar' in reg.md:
+          svar = ET.SubElement(output, 'sgvar')
+          svar.text = reg.md['sgvar']
 
-        out_tag = ET.SubElement(output, 'tag')
-        out_tag.text = reg.tag
+        if 'egvar' in reg.md:
+          evar = ET.SubElement(output, 'egvar')
+          evar.text = reg.md['egvar']
 
-        if 'dnp3' in reg.md:
-          if 'svar' in reg.md['dnp3']:
-            svar = ET.SubElement(input, 'svar')
-            svar.text = reg.md['dnp3']['svar']
+        if 'class' in reg.md:
+          klass = ET.SubElement(output, 'class')
+          klass.text = reg.md['class']
 
-          if 'evar' in reg.md['dnp3']:
-            evar = ET.SubElement(input, 'evar')
-            evar.text = reg.md['dnp3']['evar']
-
-          if 'class' in reg.md['dnp3']:
-            klass = ET.SubElement(input, 'class')
-            klass.text = reg.md['dnp3']['class']
-
-          if 'sbo' in reg.md['dnp3']:
-            sbo = ET.SubElement(output, 'sbo')
-            sbo.text = str(reg.md['dnp3']['sbo'])
+        if 'sbo' in reg.md:
+          sbo = ET.SubElement(output, 'sbo')
+          sbo.text = str(reg.md['sbo'])
       elif reg.type == 'binary-read':
         input = ET.SubElement(parent, 'input', {'type': 'binary'})
 
         addr = ET.SubElement(input, 'address')
-        addr.text = str(self.addrs['binary'])
+        addr.text = str(self.addrs['bi'])
 
-        self.addrs['binary'] += 1
+        self.addrs['bi'] += 1
 
         tag = ET.SubElement(input, 'tag')
         tag.text = reg.tag
 
-        if 'dnp3' in reg.md:
-          if 'svar' in reg.md['dnp3']:
-            svar = ET.SubElement(input, 'svar')
-            svar.text = reg.md['dnp3']['svar']
+        if 'sgvar' in reg.md:
+          svar = ET.SubElement(input, 'sgvar')
+          svar.text = reg.md['sgvar']
 
-          if 'evar' in reg.md['dnp3']:
-            evar = ET.SubElement(input, 'evar')
-            evar.text = reg.md['dnp3']['evar']
+        if 'egvar' in reg.md:
+          evar = ET.SubElement(input, 'egvar')
+          evar.text = reg.md['egvar']
 
-          if 'class' in reg.md['dnp3']:
-            klass = ET.SubElement(input, 'class')
-            klass.text = reg.md['dnp3']['class']
+        if 'class' in reg.md:
+          klass = ET.SubElement(input, 'class')
+          klass.text = reg.md['class']
       elif reg.type == 'binary-read-write':
-        input  = ET.SubElement(parent, 'input',  {'type': 'binary'})
         output = ET.SubElement(parent, 'output', {'type': 'binary'})
 
-        in_addr = ET.SubElement(input, 'address')
-        in_addr.text = str(self.addrs['binary'])
+        addr = ET.SubElement(output, 'address')
+        addr.text = str(self.addrs['bo'])
 
-        out_addr = ET.SubElement(output, 'address')
-        out_addr.text = str(self.addrs['binary'] + 1000)
+        self.addrs['bo'] += 1
 
-        self.addrs['binary'] += 1
+        tag = ET.SubElement(output, 'tag')
+        tag.text = reg.tag
 
-        in_tag = ET.SubElement(input, 'tag')
-        in_tag.text = reg.tag
+        if 'sgvar' in reg.md:
+          svar = ET.SubElement(output, 'sgvar')
+          svar.text = reg.md['sgvar']
 
-        out_tag = ET.SubElement(output, 'tag')
-        out_tag.text = reg.tag
+        if 'egvar' in reg.md:
+          evar = ET.SubElement(output, 'egvar')
+          evar.text = reg.md['egvar']
 
-        if 'dnp3' in reg.md:
-          if 'svar' in reg.md['dnp3']:
-            svar = ET.SubElement(input, 'svar')
-            svar.text = reg.md['dnp3']['svar']
+        if 'class' in reg.md:
+          klass = ET.SubElement(output, 'class')
+          klass.text = reg.md['class']
 
-          if 'evar' in reg.md['dnp3']:
-            evar = ET.SubElement(input, 'evar')
-            evar.text = reg.md['dnp3']['evar']
-
-          if 'class' in reg.md['dnp3']:
-            klass = ET.SubElement(input, 'class')
-            klass.text = reg.md['dnp3']['class']
-
-          if 'sbo' in reg.md['dnp3']:
-            sbo = ET.SubElement(output, 'sbo')
-            sbo.text = str(reg.md['dnp3']['sbo'])
+        if 'sbo' in reg.md:
+          sbo = ET.SubElement(output, 'sbo')
+          sbo.text = str(reg.md['sbo'])

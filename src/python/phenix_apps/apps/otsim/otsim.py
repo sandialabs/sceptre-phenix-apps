@@ -148,8 +148,12 @@ class OTSim(AppBase):
           broker.text = addr
 
           if 'federate' in md['helics']:
-            federate.text  = md['helics']['federate'].get('name', server.hostname)
-            log_level.text = md['helics']['federate'].get('log-level', 'SUMMARY')
+            if isinstance(md['helics']['federate'], str):
+              federate.text  = md['helics']['federate']
+              log_level.text = 'SUMMARY'
+            else:
+              federate.text  = md['helics']['federate'].get('name', server.hostname)
+              log_level.text = md['helics']['federate'].get('log-level', 'SUMMARY')
           else:
             federate.text  = server.hostname
             log_level.text = 'SUMMARY'

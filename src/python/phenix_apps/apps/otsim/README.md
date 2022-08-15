@@ -123,7 +123,7 @@ spec:
             # specified.
             broker:
               address: helics-broker.other.network.test
-            federate:
+            federate: # value can be a string or map; string value used directly as name for federate
               name: outstation-fed # name to use for this federate; defaults to hostname if not provided
               log-level: SUMMARY   # log level to pass to I/O module's init string; this is the default
 

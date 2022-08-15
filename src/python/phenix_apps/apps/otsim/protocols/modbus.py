@@ -88,12 +88,11 @@ class Modbus(Protocol):
         tag = ET.SubElement(input, 'tag')
         tag.text = reg.tag
 
-        if 'modbus' in reg.md:
-          if 'scaling' in reg.md['modbus']:
-            scale = reg.md['modbus']['scaling']
+        if 'scaling' in reg.md:
+          scale = reg.md['scaling']
 
-            scaling = ET.SubElement(input, 'scaling')
-            scaling.text = str(int(scale) * -1 if self.mode == 'server' else int(scale))
+          scaling = ET.SubElement(input, 'scaling')
+          scaling.text = str(int(scale) * -1 if self.mode == 'server' else int(scale))
       elif reg.type == 'analog-read-write':
         typ = 'holding'
         holding = ET.SubElement(self.root, 'register', {'type': typ})
@@ -106,9 +105,8 @@ class Modbus(Protocol):
         tag = ET.SubElement(holding, 'tag')
         tag.text = reg.tag
 
-        if 'modbus' in reg.md:
-          if 'scaling' in reg.md['modbus']:
-            scale = reg.md['modbus']['scaling']
+        if 'scaling' in reg.md:
+          scale = reg.md['scaling']
 
-            scaling = ET.SubElement(holding, 'scaling')
-            scaling.text = str(int(scale) * -1 if self.mode == 'server' else int(scale))
+          scaling = ET.SubElement(holding, 'scaling')
+          scaling.text = str(int(scale) * -1 if self.mode == 'server' else int(scale))

@@ -1,3 +1,5 @@
+import copy
+
 import xml.etree.ElementTree as ET
 
 
@@ -10,20 +12,18 @@ DEFAULT_INFRASTRUCTURES = {
       'voltage': {'type': 'analog-read', 'modbus': {'scaling': 2}},
     },
     'breaker': {
-      'voltage':  {'type': 'analog-read',       'modbus': {'scaling': 2}},
-      'current':  {'type': 'analog-read',       'modbus': {'scaling': 2}},
-      'freq':     {'type': 'analog-read',       'modbus': {'scaling': 2}},
-      'power':    {'type': 'analog-read',       'modbus': {'scaling': 2}},
-      'status':   {'type': 'analog-read',       'modbus': {'scaling': 2}},
-      'controls': {'type': 'analog-read-write', 'modbus': {'scaling': 2}},
+      'voltage':  {'type': 'analog-read', 'modbus': {'scaling': 2}},
+      'current':  {'type': 'analog-read', 'modbus': {'scaling': 2}},
+      'freq':     {'type': 'analog-read', 'modbus': {'scaling': 2}},
+      'power':    {'type': 'analog-read', 'modbus': {'scaling': 2}},
+      'status':   {'type': 'binary-read'},
+      'controls': {'type': 'binary-read-write'},
     },
     'capacitor': {
       'voltage':       {'type': 'analog-read',       'modbus': {'scaling': 2}},
       'current':       {'type': 'analog-read',       'modbus': {'scaling': 2}},
       'freq':          {'type': 'analog-read',       'modbus': {'scaling': 2}},
       'power':         {'type': 'analog-read',       'modbus': {'scaling': 2}},
-      'status':        {'type': 'analog-read',       'modbus': {'scaling': 2}},
-      'on_off_status': {'type': 'analog-read',       'modbus': {'scaling': 2}},
       'setpt':         {'type': 'analog-read-write', 'modbus': {'scaling': 2}},
     },
     'regulator': {
@@ -31,8 +31,6 @@ DEFAULT_INFRASTRUCTURES = {
       'current':       {'type': 'analog-read',       'modbus': {'scaling': 2}},
       'freq':          {'type': 'analog-read',       'modbus': {'scaling': 2}},
       'power':         {'type': 'analog-read',       'modbus': {'scaling': 2}},
-      'status':        {'type': 'analog-read',       'modbus': {'scaling': 2}},
-      'on_off_status': {'type': 'analog-read',       'modbus': {'scaling': 2}},
       'setpt':         {'type': 'analog-read-write', 'modbus': {'scaling': 2}},
     },
     'load': {
@@ -71,9 +69,14 @@ class Infrastructure:
 
 
   def io_module_xml(self, doc, infra, devices, default_fed):
-    # merge provided mappings (if any) with default mappings (if any)
-    default = DEFAULT_INFRASTRUCTURES.get(infra, {})
-    mapping = {**default, **self.mappings.get(infra, {})}
+    # Merge provided mappings (if any) with default mappings (if any). Note that
+    # this only goes two levels deep (which is all that's needed right now).
+    mapping = copy.deepcopy(DEFAULT_INFRASTRUCTURES.get(infra, {}))
+    for k, v in self.mappings.get(infra, {}).items():
+      if k in mapping:
+        mapping[k] = {**mapping[k], **v}
+      else:
+        mapping[k] = v
 
     # `devices` is a dictionary mapping infrastructure device names (used for
     # HELICS topic names and ot-sim tag names) to its corresponding
