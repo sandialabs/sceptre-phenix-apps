@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"phenix/store"
 	"phenix/types"
 	ifaces "phenix/types/interfaces"
 	"phenix/types/version"
@@ -16,6 +17,11 @@ func DecodeExperiment(body []byte) (*types.Experiment, error) {
 
 	if err := json.Unmarshal(body, &mapper); err != nil {
 		return nil, fmt.Errorf("unable to parse JSON: %w", err)
+	}
+
+	var md store.ConfigMetadata
+	if err := mapstructure.Decode(mapper["metadata"], &md); err != nil {
+		return nil, fmt.Errorf("decoding experiment metadata: %w", err)
 	}
 
 	iface, err := version.GetVersionedSpecForKind("Experiment", "v1")
@@ -46,5 +52,5 @@ func DecodeExperiment(body []byte) (*types.Experiment, error) {
 		return nil, fmt.Errorf("invalid experiment status")
 	}
 
-	return &types.Experiment{Spec: spec, Status: status}, nil
+	return &types.Experiment{Metadata: md, Spec: spec, Status: status}, nil
 }

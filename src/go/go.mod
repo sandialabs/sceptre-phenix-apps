@@ -2,7 +2,7 @@ module phenix-apps
 
 go 1.18
 
-replace phenix => github.com/sandia-minimega/phenix/src/go v0.0.0-20220731034611-f62f53b485df
+replace phenix => github.com/sandia-minimega/phenix/src/go v0.0.0-20220817213300-38be1f4f2aa4
 
 require (
 	github.com/activeshadow/libminimega v0.0.0-20190412123224-5384445d4b63

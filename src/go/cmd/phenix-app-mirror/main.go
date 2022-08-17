@@ -262,7 +262,7 @@ func postStart(exp *types.Experiment) (ferr error) {
 	// experiments on the same cluster hosts that might be using the same mirror
 	// network.
 	for host := range cluster {
-		log.Info("creating mirror tap %s on host %s", status.TapName, host)
+		log.Info("creating mirror tap %s using VLAN %s on host %s", status.TapName, amd.MirrorVLAN, host)
 
 		addr := fmt.Sprintf("%s/%d", ip, nw.Bits())
 
@@ -272,7 +272,7 @@ func postStart(exp *types.Experiment) (ferr error) {
 		}
 
 		if err := mm.TapVLAN(opts...); err != nil {
-			return fmt.Errorf("creating tap on host %s: %w", host, err)
+			return fmt.Errorf("creating tap using VLAN %s on host %s: %w", amd.MirrorVLAN, host, err)
 		}
 
 		// Increment IP for next cluster host.
@@ -457,14 +457,15 @@ func deleteTap(name, exp string, cluster map[string][]string) error {
 }
 
 func deleteTapFromHost(name, exp, host string) error {
+	log.Info("deleting mirror tap %s on host %s", name, host)
+
 	opts := []mm.TapOption{
 		mm.TapHost(host), mm.TapNS(exp),
-		mm.TapName(name), mm.TapNetNS(name),
-		mm.TapDelete(),
+		mm.TapName(name), mm.TapDelete(),
 	}
 
 	if err := mm.TapVLAN(opts...); err != nil {
-		return fmt.Errorf("deleting tap on host %s: %w", host, err)
+		return fmt.Errorf("deleting tap %s on host %s: %w", name, host, err)
 	}
 
 	return nil
