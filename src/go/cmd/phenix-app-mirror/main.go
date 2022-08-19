@@ -77,6 +77,10 @@ func main() {
 	}
 
 	switch stage {
+	case "configure":
+		if err := configure(exp); err != nil {
+			log.Fatal("failed to execute configure stage: %v", err)
+		}
 	case "pre-start":
 		if err := preStart(exp); err != nil {
 			log.Fatal("failed to execute pre-start stage: %v", err)
@@ -102,9 +106,8 @@ func main() {
 	fmt.Print(string(body))
 }
 
-func preStart(exp *types.Experiment) error {
+func configure(exp *types.Experiment) error {
 	app := util.ExtractApp(exp.Spec.Scenario(), "mirror")
-	startupDir := exp.Spec.BaseDir() + "/startup"
 
 	amd, err := extractMetadata(app.Metadata())
 	if err != nil {
@@ -162,9 +165,28 @@ func preStart(exp *types.Experiment) error {
 
 		// Decrement IP for next target VM.
 		ip = ip.Prior()
+	}
+
+	return nil
+}
+
+func preStart(exp *types.Experiment) error {
+	app := util.ExtractApp(exp.Spec.Scenario(), "mirror")
+	startupDir := exp.Spec.BaseDir() + "/startup"
+
+	for _, host := range app.Hosts() {
+		hmd, err := extractHostMetadata(host.Metadata())
+		if err != nil {
+			return fmt.Errorf("extracting host metadata for %s: %w", host.Hostname(), err)
+		}
 
 		if !hmd.SetupOVS {
 			continue
+		}
+
+		node := exp.Spec.Topology().FindNodeByName(host.Hostname())
+		if node == nil {
+			return fmt.Errorf("no node found in topology for %s", host.Hostname())
 		}
 
 		if strings.EqualFold(node.Hardware().OSType(), "windows") {
