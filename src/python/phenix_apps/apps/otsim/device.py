@@ -1,6 +1,6 @@
 import xml.etree.ElementTree as ET
 
-from phenix_apps.apps.otsim.infrastructure   import DEFAULT_INFRASTRUCTURES
+from phenix_apps.apps.otsim.infrastructure   import merge_infrastructure_with_default
 from phenix_apps.apps.otsim.protocols.dnp3   import DNP3
 from phenix_apps.apps.otsim.protocols.modbus import Modbus
 
@@ -105,8 +105,7 @@ class FieldDeviceServer(Device):
     if self.processed: return
 
     # merge provided mappings (if any) with default mappings (if any)
-    default = DEFAULT_INFRASTRUCTURES.get(self.infra, {})
-    mapping = {**default, **mappings.get(self.infra, {})}
+    mapping = merge_infrastructure_with_default(self.infra, mappings.get(self.infra, {}))
 
     if 'dnp3' in self.md:
       if 'dnp3' not in self.registers:

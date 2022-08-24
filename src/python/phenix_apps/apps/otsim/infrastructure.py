@@ -63,20 +63,29 @@ DEFAULT_INFRASTRUCTURES = {
 }
 
 
+def merge_infrastructure_with_default(infra, mappings):
+  # Merge provided infrastructure mappings (if any) with default infrastructure
+  # mappings (if any). Note that this only goes two levels deep (which is all
+  # that's needed right now).
+  merged = copy.deepcopy(DEFAULT_INFRASTRUCTURES.get(infra, {}))
+
+  for k, v in mappings.items():
+    if k in merged:
+      merged[k] = {**merged[k], **v}
+    else:
+      merged[k] = v
+
+  return merged
+
+
 class Infrastructure:
   def __init__(self, mappings):
     self.mappings = mappings
 
 
   def io_module_xml(self, doc, infra, devices, default_fed):
-    # Merge provided mappings (if any) with default mappings (if any). Note that
-    # this only goes two levels deep (which is all that's needed right now).
-    mapping = copy.deepcopy(DEFAULT_INFRASTRUCTURES.get(infra, {}))
-    for k, v in self.mappings.get(infra, {}).items():
-      if k in mapping:
-        mapping[k] = {**mapping[k], **v}
-      else:
-        mapping[k] = v
+    # merge provided mappings (if any) with default mappings (if any)
+    mapping = merge_infrastructure_with_default(infra, self.mappings.get(infra, {}))
 
     # `devices` is a dictionary mapping infrastructure device names (used for
     # HELICS topic names and ot-sim tag names) to its corresponding
