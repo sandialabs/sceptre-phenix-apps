@@ -1,0 +1,16 @@
+name: Repository Dispatch
+on:
+  push:
+    branches: [main]
+jobs:
+  dispatch:
+    name: Dispatch to phenix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repository Dispatch
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.REPO_DISPATCH_PAT }}
+          repository: ${{ github.repository_owner }}/phenix
+          event-type: apps-update
+          client-payload: '{"repo": "${{ github.repository }}"}'
