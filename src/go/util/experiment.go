@@ -3,6 +3,8 @@ package util
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"strconv"
 
 	"phenix/store"
 	"phenix/types"
@@ -11,6 +13,22 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 )
+
+func IsDryRun() bool {
+	val, ok := os.LookupEnv("PHENIX_DRYRUN")
+	if !ok {
+		// default to not a dry run if env variable is not present
+		return false
+	}
+
+	dryrun, err := strconv.ParseBool(val)
+	if err != nil {
+		// default to not a dry run if value is not a valid boolean
+		return false
+	}
+
+	return dryrun
+}
 
 func DecodeExperiment(body []byte) (*types.Experiment, error) {
 	var mapper map[string]interface{}

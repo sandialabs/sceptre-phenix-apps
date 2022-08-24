@@ -35,7 +35,10 @@ func main() {
 		log.Fatal("incorrect amount of args provided")
 	}
 
-	stage := os.Args[1]
+	var (
+		stage  = os.Args[1]
+		dryrun = util.IsDryRun()
+	)
 
 	if stage == "version" {
 		info, ok := debug.ReadBuildInfo()
@@ -82,15 +85,15 @@ func main() {
 			log.Fatal("failed to execute configure stage: %v", err)
 		}
 	case "pre-start":
-		if err := preStart(exp); err != nil {
+		if err := preStart(exp, dryrun); err != nil {
 			log.Fatal("failed to execute pre-start stage: %v", err)
 		}
 	case "post-start":
-		if err := postStart(exp); err != nil {
+		if err := postStart(exp, dryrun); err != nil {
 			log.Fatal("failed to execute post-start stage: %v", err)
 		}
 	case "cleanup":
-		if err := cleanup(exp); err != nil {
+		if err := cleanup(exp, dryrun); err != nil {
 			log.Fatal("failed to execute cleanup stage: %v", err)
 		}
 	default:
@@ -170,7 +173,7 @@ func configure(exp *types.Experiment) error {
 	return nil
 }
 
-func preStart(exp *types.Experiment) error {
+func preStart(exp *types.Experiment, dryrun bool) error {
 	app := util.ExtractApp(exp.Spec.Scenario(), "mirror")
 	startupDir := exp.Spec.BaseDir() + "/startup"
 
@@ -207,6 +210,11 @@ func preStart(exp *types.Experiment) error {
 		}
 	}
 
+	// no need to try to clean up previous experiments if this is a dry run
+	if dryrun {
+		return nil
+	}
+
 	// The remaining code in this function is essentially the same as the cleanup
 	// function, but without logging. We are running the cleanup code here just in
 	// case the previous experiment didn't exit cleanly, so we can avoid any
@@ -234,7 +242,7 @@ func preStart(exp *types.Experiment) error {
 	return nil
 }
 
-func postStart(exp *types.Experiment) (ferr error) {
+func postStart(exp *types.Experiment, dryrun bool) (ferr error) {
 	app := util.ExtractApp(exp.Spec.Scenario(), "mirror")
 
 	amd, err := extractMetadata(app.Metadata())
@@ -257,8 +265,8 @@ func postStart(exp *types.Experiment) (ferr error) {
 	}
 
 	defer func() {
-		// don't do any cleanup if no error is being returned
-		if ferr == nil {
+		// don't do any cleanup if no error is being returned or this is a dry run
+		if ferr == nil || dryrun {
 			return
 		}
 
@@ -288,13 +296,17 @@ func postStart(exp *types.Experiment) (ferr error) {
 
 		addr := fmt.Sprintf("%s/%d", ip, nw.Bits())
 
-		opts := []mm.TapOption{
-			mm.TapHost(host), mm.TapNS(exp.Metadata.Name), mm.TapName(status.TapName),
-			mm.TapBridge(amd.MirrorBridge), mm.TapVLANAlias(amd.MirrorVLAN), mm.TapIP(addr),
-		}
+		if dryrun {
+			log.Debug("[DRYRUN] using IP %s for tap", addr)
+		} else {
+			opts := []mm.TapOption{
+				mm.TapHost(host), mm.TapNS(exp.Metadata.Name), mm.TapName(status.TapName),
+				mm.TapBridge(amd.MirrorBridge), mm.TapVLANAlias(amd.MirrorVLAN), mm.TapIP(addr),
+			}
 
-		if err := mm.TapVLAN(opts...); err != nil {
-			return fmt.Errorf("creating tap using VLAN %s on host %s: %w", amd.MirrorVLAN, host, err)
+			if err := mm.TapVLAN(opts...); err != nil {
+				return fmt.Errorf("creating tap using VLAN %s on host %s: %w", amd.MirrorVLAN, host, err)
+			}
 		}
 
 		// Increment IP for next cluster host.
@@ -352,6 +364,8 @@ func postStart(exp *types.Experiment) (ferr error) {
 
 		for h := range cluster {
 			if amd.ERSPAN.Enabled {
+				log.Info("creating ERSPAN port %s to %s on host %s", name, host.Hostname(), h)
+
 				var cmd string
 
 				switch amd.ERSPAN.Version {
@@ -371,8 +385,12 @@ func postStart(exp *types.Experiment) (ferr error) {
 					return fmt.Errorf("unknown ERSPAN version (%d) configured for %s", amd.ERSPAN.Version, host.Hostname())
 				}
 
-				if err := mm.MeshShell(h, cmd); err != nil {
-					return fmt.Errorf("adding ERSPAN tunnel %s from cluster host %s: %w", name, h, err)
+				if dryrun {
+					log.Debug("[DRYRUN] ERSPAN tunnel command: %s", cmd)
+				} else {
+					if err := mm.MeshShell(h, cmd); err != nil {
+						return fmt.Errorf("adding ERSPAN tunnel %s from cluster host %s: %w", name, h, err)
+					}
 				}
 			} else {
 				log.Info("creating GRE port %s to %s on host %s", name, host.Hostname(), h)
@@ -383,8 +401,12 @@ func postStart(exp *types.Experiment) (ferr error) {
 					amd.MirrorBridge, name, name, ip,
 				)
 
-				if err := mm.MeshShell(h, cmd); err != nil {
-					return fmt.Errorf("adding GRE tunnel %s from cluster host %s: %w", name, h, err)
+				if dryrun {
+					log.Debug("[DRYRUN] GRE tunnel command: %s", cmd)
+				} else {
+					if err := mm.MeshShell(h, cmd); err != nil {
+						return fmt.Errorf("adding GRE tunnel %s from cluster host %s: %w", name, h, err)
+					}
 				}
 			}
 
@@ -416,19 +438,28 @@ func postStart(exp *types.Experiment) (ferr error) {
 				}
 			}
 
-			// Create mirror, using GRE tunnel as the output port
-			command := buildMirrorCommand(exp, name, amd.MirrorBridge, name, vms, hmd)
+			var command []string
 
-			if command == nil {
-				// Likely means no VMs scheduled on this cluster host have interfaces in
-				// VLANs being mirrored to the target VM.
-				continue
+			// only try to build the mirror command if this is not a dry run since
+			// building the mirror command uses info about VMs actually deployed
+			if !dryrun {
+				// Create mirror, using GRE tunnel as the output port
+				command = buildMirrorCommand(exp, name, amd.MirrorBridge, name, vms, hmd)
+
+				if command == nil {
+					// Likely means no VMs scheduled on this cluster host have interfaces in
+					// VLANs being mirrored to the target VM.
+					continue
+				}
 			}
 
 			log.Info("creating mirror %s for %s on host %s", name, host.Hostname(), h)
 
-			if err := mm.MeshShell(h, strings.Join(command, " -- ")); err != nil {
-				return fmt.Errorf("adding ingress-only mirror %s on cluster host %s: %w", name, h, err)
+			// only create the mirror if this is not a dry run
+			if !dryrun {
+				if err := mm.MeshShell(h, strings.Join(command, " -- ")); err != nil {
+					return fmt.Errorf("adding ingress-only mirror %s on cluster host %s: %w", name, h, err)
+				}
 			}
 		}
 	}
@@ -438,7 +469,13 @@ func postStart(exp *types.Experiment) (ferr error) {
 	return nil
 }
 
-func cleanup(exp *types.Experiment) error {
+func cleanup(exp *types.Experiment, dryrun bool) error {
+	// cleanup is not needed if this is a dry run
+	if dryrun {
+		log.Debug("[DRYRUN] skipping cleanup code")
+		return nil
+	}
+
 	app := util.ExtractApp(exp.Spec.Scenario(), "mirror")
 
 	amd, err := extractMetadata(app.Metadata())
