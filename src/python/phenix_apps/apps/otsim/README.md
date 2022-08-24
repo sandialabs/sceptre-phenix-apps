@@ -52,7 +52,7 @@ spec:
                 modbus:      # Device type variables support per-protocol configurations. Right now,
                   scaling: 2 # the Modbus protocol only looks for a single config: `scaling`. If not
                              # provided, the scaling defaults to 0. The DNP3 protocol looks for four
-                             # configs: `svar`, `evar`, `class`, and `sbo`.
+                             # configs: `sgvar`, `egvar`, `class`, and `sbo`.
             bus:
               voltage:
                 type: analog-read
