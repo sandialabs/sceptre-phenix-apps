@@ -1,4 +1,4 @@
-import os, sys
+import os
 
 import xml.etree.ElementTree as ET
 
@@ -76,9 +76,15 @@ class OTSim(AppBase):
 
     if 'helics' in self.metadata:
       # The `helics.broker` key gets processed by each app host if needed.
-      self.default_fed = self.metadata['helics'].get('federate', 'OpenDSS')
+      self.default_fed      = self.metadata['helics'].get('federate', 'OpenDSS')
+      self.default_endpoint = self.metadata['helics'].get('endpoint', f'{self.default_fed}/updates')
+
+      # handle `self.default_endpoint` being set to False
+      if self.default_endpoint and '/' not in self.default_endpoint:
+        self.default_endpoint = f'{self.default_fed}/{self.default_endpoint}'
     else:
-      self.default_fed = 'OpenDSS'
+      self.default_fed      = 'OpenDSS'
+      self.default_endpoint = 'OpenDSS/updates'
 
 
   def pre_start(self):
@@ -105,7 +111,7 @@ class OTSim(AppBase):
       md    = server.metadata
       infra = md.get('infrastructure', self.default_infrastructure)
 
-      # dict[name, type] -- name could be namespaced by federate
+      # dict[name, device_dict] -- name could be namespaced by federate
       devices = {}
       proto_devs = []
 
@@ -125,15 +131,26 @@ class OTSim(AppBase):
         assert 'name' in device
         assert 'type' in device
 
+        if not '/' in device['name']:
+          device['name'] = f"{self.default_fed}/{device['name']}"
+
+        if not 'endpoint' in device:
+          device['endpoint'] = self.default_endpoint
+
+        # handle `endpoint` for this device being set to False
+        if device['endpoint'] and not '/' in device['endpoint']:
+          fed = device['name'].split('/')[0]
+          device['endpoint'] = f"{fed}/{device['endpoint']}"
+
         if device['name'] in devices:
-          assert devices[device['name']] == device['type']
+          assert devices[device['name']] == device
         else:
-          devices[device['name']] = device['type']
+          devices[device['name']] = device
 
       if len(devices) > 0:
         infrastructure = Infrastructure(mappings)
 
-        io = ET.Element('io', {'name': f'helics-federate'})
+        io = ET.Element('io', {'name': 'helics-federate'})
         broker    = ET.SubElement(io, 'broker-endpoint')
         federate  = ET.SubElement(io, 'federate-name')
         log_level = ET.SubElement(io, 'federate-log-level')
@@ -165,7 +182,7 @@ class OTSim(AppBase):
           federate.text  = server.hostname
           log_level.text = 'SUMMARY'
 
-        infrastructure.io_module_xml(io, infra, devices, self.default_fed)
+        infrastructure.io_module_xml(io, infra, devices)
 
         config.append_to_root(io)
 

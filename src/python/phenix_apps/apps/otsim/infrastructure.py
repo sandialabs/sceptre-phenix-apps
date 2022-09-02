@@ -2,6 +2,8 @@ import copy
 
 import xml.etree.ElementTree as ET
 
+from collections import defaultdict
+
 
 DEFAULT_INFRASTRUCTURES = {
   'power-distribution': {
@@ -83,18 +85,25 @@ class Infrastructure:
     self.mappings = mappings
 
 
-  def io_module_xml(self, doc, infra, devices, default_fed):
+  def io_module_xml(self, doc, infra, devices):
     # merge provided mappings (if any) with default mappings (if any)
     mapping = merge_infrastructure_with_default(infra, self.mappings.get(infra, {}))
 
-    # `devices` is a dictionary mapping infrastructure device names (used for
-    # HELICS topic names and ot-sim tag names) to its corresponding
-    # intfrastructure type.
-    for name, type in devices.items():
-      assert type in mapping
-      device = mapping[type]
+    # mapping of unique message endpoint names --> tag elements for IO module
+    endpoints = defaultdict(list)
 
-      parts = name.split('/')
+    # `devices` is a dictionary mapping infrastructure device names (used for
+    # HELICS topic names and ot-sim tag names - always prepended with source
+    # federate name) to its corresponding device.
+    for topic in devices.keys():
+      type     = devices[topic]['type']
+      endpoint = devices[topic]['endpoint']
+
+      assert type in mapping
+      assert endpoint
+
+      device   = mapping[type]
+      tag_name = topic.split('/')[1]
 
       for var, var_type in device.items():
           # We don't care about scaling in the I/O module, so if the variable
@@ -106,18 +115,8 @@ class Infrastructure:
         if var_type in ['analog-read', 'binary-read']:
           sub = ET.Element('subscription')
 
-          if len(parts) == 1:
-            topic_name = f'{default_fed}/{name}'
-          else:
-            topic_name = name
-
           key = ET.SubElement(sub, 'key')
-          key.text = f'{topic_name}.{var}'
-
-          if len(parts) == 2:
-            tag_name = parts[1]
-          else:
-            tag_name = name
+          key.text = f'{topic}.{var}'
 
           tag = ET.SubElement(sub, 'tag')
           tag.text = f'{tag_name}.{var}'
@@ -131,22 +130,38 @@ class Infrastructure:
 
           doc.append(sub)
         elif var_type in ['analog-read-write', 'binary-read-write']:
-          pub = ET.Element('publication')
+          # `endpoint` will be False if disabled, otherwise it will be the name
+          # of the endpoint to send updates to (prepended with the destination
+          # federate name).
+          if endpoint:
+            tag = ET.Element('tag')
+            tag.attrib['key'] = f'{tag_name}.{var}'
+            tag.text = f'{tag_name}.{var}'
 
-          if len(parts) == 2:
-            name = parts[1]
-
-          key = ET.SubElement(pub, 'key')
-          key.text = f'{name}.{var}'
-
-          tag = ET.SubElement(pub, 'tag')
-          tag.text = f'{name}.{var}'
-
-          typ = ET.SubElement(pub, 'type')
-
-          if var_type == 'analog-read-write':
-            typ.text = 'double'
+            endpoints[endpoint].append(tag)
           else:
-            typ.text = 'boolean'
+            pub = ET.Element('publication')
 
-          doc.append(pub)
+            key = ET.SubElement(pub, 'key')
+            key.text = f'{tag_name}.{var}'
+
+            tag = ET.SubElement(pub, 'tag')
+            tag.text = f'{tag_name}.{var}'
+
+            typ = ET.SubElement(pub, 'type')
+
+            if var_type == 'analog-read-write':
+              typ.text = 'double'
+            else:
+              typ.text = 'boolean'
+
+            doc.append(pub)
+
+    for name, tags in endpoints.items():
+      endpoint = ET.Element('endpoint')
+      endpoint.attrib['name'] = name
+
+      for tag in tags:
+        endpoint.append(tag)
+
+      doc.append(endpoint)

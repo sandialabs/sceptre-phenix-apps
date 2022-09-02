@@ -38,6 +38,9 @@ spec:
             log-level: SUMMARY                   # this is the default
             log-file: /var/log/helics-broker.log # this is the default
           federate: OpenDSS # default federate to subscribe to; this is the default
+          endpoint: updates # default endpoint to send updates to on default federate
+                            # this is the default; set it to false to disable using
+                            # endpoints for updates
         message-bus:
           pull-endpoint: tcp://127.0.0.1:1234 # this is the default
           pub-endpoint: tcp://127.0.0.1:5678  # this is the default
@@ -147,9 +150,13 @@ spec:
           - name: OpenDSS/bus-01 # name of topic key from another federate to subscribe to
                                  # defaults to helics.federate in app metadata if 'OpenDSS/' (federate name) is left off
             type: bus            # type of device for topic key -- this determines values to publish and subscribe to based on infrastructure
+            endpoint: updates    # endpoint to send updates to at federate being used for this topic
+                                 # defaults to helics.endpoint in app metadata if not set here
+                                 # set to false to disable using endpoints for this topic
           dnp3:
             interface: IF1:20000
             devices:
             - name: line-01-03
               type: branch
+              endpoint: updates
 ```
