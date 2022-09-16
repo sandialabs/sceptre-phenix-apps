@@ -13,10 +13,10 @@ class Register:
 
 
 class Device:
-  def __init__(self, node):
+  def __init__(self, node, default_infra = 'power-distribution'):
     self.node  = node
     self.md    = node.get('metadata', {})
-    self.infra = self.md.get('infrastructure', 'power-distribution')
+    self.infra = self.md.get('infrastructure', default_infra)
 
     self.registers = {}
     self.processed = False
@@ -98,8 +98,8 @@ class FEP(Device):
 
 
 class FieldDeviceServer(Device):
-  def __init__(self, node):
-    Device.__init__(self, node)
+  def __init__(self, node, default_infra = 'power-distribution'):
+    Device.__init__(self, node, default_infra)
 
   def process(self, mappings):
     if self.processed: return

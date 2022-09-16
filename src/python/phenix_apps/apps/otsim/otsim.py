@@ -99,20 +99,20 @@ class OTSim(AppBase):
     servers = self.extract_nodes_type('fd-server')
 
     for server in servers:
+      md    = server.metadata
+      infra = md.get('infrastructure', self.default_infrastructure)
+
       config = Config(self.metadata)
       config.init_xml_root(server.metadata)
 
-      device = FieldDeviceServer(server)
+      device = FieldDeviceServer(server, infra)
       device.process(mappings)
       device.configure(config)
 
       ot_devices[server.hostname] = device
 
-      md    = server.metadata
-      infra = md.get('infrastructure', self.default_infrastructure)
-
       # dict[name, device_dict] -- name could be namespaced by federate
-      devices = {}
+      devices    = {}
       proto_devs = []
 
       if 'dnp3' in md:
