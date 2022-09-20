@@ -15,10 +15,15 @@ metadata:
     - type: exec # can be exec, background, send, or recv
       args: whoami # a simple string of args (not an array)
       wait: <bool> # wait for cmd to be executed by VM (default: false)
+      validator: <bash script to validate exec results>
     start: [] # same array of keys as above
     stop: [] # same array of keys as above
     cleanup: [] # same array of keys as above
 ```
+
+> The validator is only used when `type = exec` and forces `wait = true`. The
+> validator script should be written to process STDIN. Anything the validator
+> script writes to STDERR will be available to the user if the validation fails.
 
 ## Notes on the `send` Type
 

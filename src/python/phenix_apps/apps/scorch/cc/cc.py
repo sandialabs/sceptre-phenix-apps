@@ -1,7 +1,9 @@
-import os, sys
+import os, subprocess, sys, uuid
 
 from phenix_apps.apps.scorch import ComponentBase
 from phenix_apps.common import utils
+
+from box import Box
 
 
 class CC(ComponentBase):
@@ -35,14 +37,49 @@ class CC(ComponentBase):
         for vm in vms:
             commands = vm.get(stage, [])
 
+            if len(commands) == 0:
+                self.eprint(f'{vm.hostname} has no commands for stage {stage}')
+                os.exit(1)
+
             for cmd in commands:
                 if cmd.type == 'exec':
+                    validator = cmd.get('validator', None)
+                    wait      = cmd.get('wait', False)
+
+                    if validator:
+                        wait = True # force waiting so validation can occur
+
                     wait = cmd.get('wait', False)
 
                     self.print(f"executing command '{cmd.args}' in VM {vm.hostname} using cc")
 
                     if wait:
-                        utils.mm_exec_wait(mm, vm.hostname, cmd.args)
+                        results = utils.mm_exec_wait(mm, vm.hostname, cmd.args)
+
+                        if validator:
+                            self.print(f'validating results from {vm.hostname}')
+
+                            tempfile = f'/tmp/{str(uuid.uuid4())}.sh'
+
+                            with open(tempfile, 'w') as tf:
+                                tf.write(validator)
+
+                            proc = subprocess.run(
+                                ['sh', tempfile, vm.hostname], input=results, capture_output=True,
+                            )
+
+                            os.remove(tempfile)
+
+                            if proc.returncode != 0:
+                                stderr = proc.stderr.decode()
+                                if stderr:
+                                    self.eprint(f'results validation failed: {stderr}')
+                                else:
+                                    self.eprint('results validation failed')
+
+                                os.exit(1)
+                            else:
+                                self.print('results are valid')
                     else:
                         mm.cc_filter(f'name={vm.hostname}')
                         mm.cc_exec(cmd.args)

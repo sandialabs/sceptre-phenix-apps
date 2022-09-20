@@ -1,7 +1,7 @@
 import os, subprocess, sys, uuid
 
 from phenix_apps.apps.scorch import ComponentBase
-from phenix_apps.common import logger, settings, utils
+from phenix_apps.common import logger, utils
 
 from box import Box
 
