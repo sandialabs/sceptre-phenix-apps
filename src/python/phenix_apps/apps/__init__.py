@@ -118,13 +118,18 @@ class AppBase(object):
 
         return hosts
 
-    def extract_app_node(self, hostname):
+    def extract_app_node(self, hostname, include_missing = True):
         app = self.extract_app()
 
         for host in app.get("hosts", []):
             if host.hostname == hostname:
+                topo_node = self.extract_node(hostname)
+
+                if not topo_node and not include_missing:
+                    continue
+
                 node = copy.deepcopy(host)
-                node.update({'topology': self.extract_node(hostname)})
+                node.update({'topology': topo_node})
 
                 return node
 
@@ -144,20 +149,24 @@ class AppBase(object):
 
         return hosts
 
-    def extract_all_nodes(self):
+    def extract_all_nodes(self, include_missing = True):
         app   = self.extract_app()
         hosts = []
 
         for host in app.get("hosts", []):
-            hosts.append(copy.deepcopy(host))
+            topo_node = self.extract_node(host.hostname)
 
-        for host in hosts:
-            node = self.extract_node(host.hostname)
-            host.update({'topology': node})
+            if not topo_node and not include_missing:
+                continue
+
+            node = copy.deepcopy(host)
+            node.update({'topology': topo_node})
+
+            hosts.append(node)
 
         return hosts
 
-    def extract_nodes_type(self, types):
+    def extract_nodes_type(self, types, include_missing = True):
         app   = self.extract_app()
         hosts = []
 
@@ -168,15 +177,19 @@ class AppBase(object):
             node_type = host.metadata.get("type", None)
 
             if node_type in types:
-                hosts.append(copy.deepcopy(host))
+                topo_node = self.extract_node(host.hostname)
 
-        for host in hosts:
-            node = self.extract_node(host.hostname)
-            host.update({'topology': node})
+                if not topo_node and not include_missing:
+                    continue
+
+                node = copy.deepcopy(host)
+                node.update({'topology': topo_node})
+
+                hosts.append(node)
 
         return hosts
 
-    def extract_nodes_label(self, labels):
+    def extract_nodes_label(self, labels, include_missing = True):
         app   = self.extract_app()
         hosts = []
 
@@ -188,16 +201,36 @@ class AppBase(object):
 
             if isinstance(node_labels, str):
                 if node_labels in labels:
-                    hosts.append(copy.deepcopy(host))
+                    topo_node = self.extract_node(host.hostname)
+
+                    if not topo_node and not include_missing:
+                        continue
+
+                    node = copy.deepcopy(host)
+                    node.update({'topology': topo_node})
+
+                    hosts.append(node)
             elif isinstance(node_labels, list):
                 if any(item in node_labels for item in labels):
-                    hosts.append(copy.deepcopy(host))
-            elif str(node_labels) in labels:
-                hosts.append(copy.deepcopy(host))
+                    topo_node = self.extract_node(host.hostname)
 
-        for host in hosts:
-            node = self.extract_node(host.hostname)
-            host.update({'topology': node})
+                    if not topo_node and not include_missing:
+                        continue
+
+                    node = copy.deepcopy(host)
+                    node.update({'topology': topo_node})
+
+                    hosts.append(node)
+            elif str(node_labels) in labels:
+                topo_node = self.extract_node(host.hostname)
+
+                if not topo_node and not include_missing:
+                    continue
+
+                node = copy.deepcopy(host)
+                node.update({'topology': topo_node})
+
+                hosts.append(node)
 
         return hosts
 

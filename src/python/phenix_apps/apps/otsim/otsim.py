@@ -96,7 +96,7 @@ class OTSim(AppBase):
     # Field device, assumed to use the I/O module that acts as a HELICS
     # federate. Will use default I/O federate provided in app metadata if
     # not provided as part of the device name(s).
-    servers = self.extract_nodes_type('fd-server')
+    servers = self.extract_nodes_type('fd-server', False)
 
     for server in servers:
       md    = server.metadata
@@ -199,7 +199,7 @@ class OTSim(AppBase):
     # Front-end processor (FEP), assumed to act as a protocol gateway or
     # proxy via two or more protocol modules acting in client/server
     # configurations. Also assumed to **not** include an I/O module.
-    feps = self.extract_nodes_type('fep')
+    feps = self.extract_nodes_type('fep', False)
 
     # Preload all the FEPs so they can force downstream FEPs to process their
     # configs during their own processing.
@@ -221,7 +221,7 @@ class OTSim(AppBase):
 
     # Field device client, acting as a protocol client via one or more protocol
     # modules. Also assumed to **not** include an I/O module.
-    clients = self.extract_nodes_type('fd-client')
+    clients = self.extract_nodes_type('fd-client', False)
 
     # By this point, all the FEPs each client will potentially talk to should
     # have already been configured.
