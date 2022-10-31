@@ -47,6 +47,12 @@ spec:
         cpu-module:
           api-endpoint: 0.0.0.0:9101 # this is the default; can be set to null to disable globally
                                      # can also be set per device via host metadata
+        ground-truth-module:
+          elastic:
+            endpoint: http://localhost:9200 # endpoint for ElasticSearch cluster
+            index-base-name: ot-sim         # base name for index ground truth data is written to;
+                                            # will be appended with current date stamp in the form
+                                            # of "-YYYY.mm.dd"
         infrastructures:
           power-distribution:
             node:
@@ -111,11 +117,13 @@ spec:
           type: fd-server
           infrastructure: power-distribution # will default to infrastructure in app metadata if not provided
 
-          # The `message-bus`, `helics`, and `cpu-module` keys available
-          # in the app metadata can be overridden on a per host basis here.
-          # The only difference is for the `helics.federate` setting,
-          # which when defined in the host metadata specifies the name to
-          # use for the federate the device will be providing.
+          # The `message-bus`, `helics`, `cpu-module`, and `ground-truth-module`
+          # keys available in the app metadata can be overridden on a per host
+          # basis here. The only difference is for the `helics.federate`
+          # setting, which when defined in the host metadata specifies the name
+          # to use for the federate the device will be providing. If enabled
+          # globally, the `ground-truth-module` can be disabled on a per host
+          # basis by explicitly setting the value to null or false.
 
           helics:
             # Defaults to helics.broker in app metadata if not provided.
