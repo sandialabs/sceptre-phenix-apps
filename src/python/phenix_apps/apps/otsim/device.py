@@ -29,13 +29,18 @@ class FEP(Device):
   def process(self, devices):
     if self.processed: return
 
-    # TODO: track downstream device registers by device name (which should be
-    # unique across device types) so upstream server doesn't include a register
-    # twice if a downstream server provides access to the same device across
-    # multiple protocols. Would need to figure out how to handle what client to
-    # default to using if multiple protocols provide access downstream.
+    # TODO: track upstream device registers by device name (which should be
+    # unique across device types) so downstream server doesn't include a
+    # register twice if an upstream server provides access to the same device
+    # across multiple protocols. Would need to figure out how to handle what
+    # client to default to using if multiple protocols provide access upstream.
 
-    for name in self.md.get('connected_rtus', []):
+    # TODO: support configuring which registers are available downstream. Right
+    # now, all registers available upstream are made available downstream. Users
+    # may want to only make a subset of registers available downstream.
+
+    # Support legacy `connected_rtus` key if `upstream` key is not present.
+    for name in self.md.get('upstream', self.md.get('connected_rtus', [])):
       device = devices[name]
       assert device
 
@@ -52,8 +57,9 @@ class FEP(Device):
   def configure(self, config, known):
     protos = {}
 
-    for downstream in self.md.get('connected_rtus', []):
-      device = known[downstream]
+    # Support legacy `connected_rtus` key if `upstream` key is not present.
+    for upstream in self.md.get('upstream', self.md.get('connected_rtus', [])):
+      device = known[upstream]
 
       if 'modbus' in device.registers:
         client = Modbus()
@@ -72,23 +78,34 @@ class FEP(Device):
         config.append_to_root(client.root)
         protos['dnp3'] = True
 
-    # For now, assume upstream server is always DNP3.
-
     registers = []
     for regs in self.registers.values():
       registers += regs
 
-    server = DNP3()
-    server.init_xml_root('server', self.node)
-    server.init_outstation_xml()
-    server.registers_to_xml(registers)
+    downstream = self.md.get('downstream', None)
 
-    config.append_to_root(server.root)
+    # Default to using DNP3 for downstream side.
+    if not downstream or downstream == 'dnp3':
+      server = DNP3()
+      server.init_xml_root('server', self.node)
+      server.init_outstation_xml()
+      server.registers_to_xml(registers)
 
-    module = ET.Element('module', {'name': 'dnp3'})
-    module.text = 'ot-sim-dnp3-module {{config_file}}'
+      config.append_to_root(server.root)
+      protos['dnp3'] = True
+    elif downstream == 'modbus':
+      server = Modbus()
+      server.init_xml_root('server', self.node)
+      server.registers_to_xml(registers)
 
-    config.append_to_cpu(module)
+      config.append_to_root(server.root)
+      protos['modbus'] = True
+
+    if 'dnp3' in protos:
+      module = ET.Element('module', {'name': 'dnp3'})
+      module.text = 'ot-sim-dnp3-module {{config_file}}'
+
+      config.append_to_cpu(module)
 
     if 'modbus' in protos:
       module = ET.Element('module', {'name': 'modbus'})
