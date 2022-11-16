@@ -10,7 +10,7 @@ class Modbus(Protocol):
   def __init__(self):
     Protocol.__init__(self, 'modbus')
 
-    self.addrs = {'coil': 0, 'discrete': 20000, 'input': 30000, 'holding': 40000}
+    self.addrs = {'coil': 1, 'discrete': 10001, 'input': 30001, 'holding': 40001}
 
 
   def init_xml_root(self, mode, node, name='modbus-outstation'):
