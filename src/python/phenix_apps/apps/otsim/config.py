@@ -16,6 +16,24 @@ class Config:
     else:
       self.default_api = '0.0.0.0:9101'
 
+    if 'logs' in md:
+      self.logs = {}
+
+      if 'elastic' in md['logs']:
+        if 'endpoint' in md['logs']['elastic']:
+          self.logs['elastic'] = {
+            'default_endpoint': md['logs']['elastic'].get('endpoint', 'http://localhost:9200'),
+            'default_index':    md['logs']['elastic'].get('index', 'ot-sim-logs'),
+          }
+      elif 'loki' in md['logs']:
+        self.logs['loki'] = {
+          'default_endpoint': md['logs']['loki']
+        }
+      else:
+        self.logs = None
+    else:
+      self.logs = None
+
     if 'ground-truth-module' in md:
       self.ground_truth = {}
 
@@ -53,6 +71,49 @@ class Config:
       api = ET.SubElement(self.cpu, 'api-endpoint')
       api.text = self.default_api
 
+    if 'logs' in md:
+      if 'elastic' in md['logs']:
+        if 'endpoint' in md['logs']['elastic']:
+          index = md['logs']['elastic'].get('index')
+
+          if not index:
+            try:
+              index = self.logs['elastic']['default_index']
+            except:
+              index = None
+
+          logs = ET.SubElement(self.cpu, 'logs')
+
+          if index:
+            es = ET.SubElement(logs, 'elastic', {'index': index})
+          else:
+            es = ET.SubElement(logs, 'elastic')
+
+          es.text = md['logs']['elastic']['endpoint']
+      elif self.logs and 'elastic' in self.logs:
+        es = ET.SubElement(logs, 'elastic', {'index': self.logs['elastic']['default_index']})
+        es.text = self.logs['elastic']['default_endpoint']
+
+      if 'loki' in md['logs']:
+        logs = ET.SubElement(self.cpu, 'logs')
+        loki = ET.SubElement(logs, 'loki')
+
+        loki.text = md['logs']['loki']
+      elif self.logs and 'loki' in self.logs:
+        loki = ET.SubElement(logs, 'loki')
+        loki.text = self.logs['loki']['default_endpoint']
+    elif self.logs:
+      logs = ET.SubElement(self.cpu, 'logs')
+
+      if 'elastic' in self.logs:
+        es = ET.SubElement(logs, 'elastic', {'index': self.logs['elastic']['default_index']})
+        es.text = self.logs['elastic']['default_endpoint']
+
+      if 'loki' in self.logs:
+        loki = ET.SubElement(logs, 'loki')
+        loki.text = self.logs['loki']['default_endpoint']
+
+
     backplane = ET.SubElement(self.cpu, 'module', {'name': 'backplane'})
     backplane.text = 'ot-sim-message-bus {{config_file}}'
 
@@ -87,4 +148,4 @@ class Config:
 
   def to_file(self, path):
     with open(path, 'w') as f:
-      f.write(minidom.parseString(ET.tostring(self.root)).toprettyxml())
+      f.write(minidom.parseString(ET.tostring(self.root)).toprettyxml(indent='  '))
