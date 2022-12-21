@@ -2,7 +2,7 @@ import lxml.etree as ET
 
 
 class Config:
-  def __init__(self, md):
+  def __init__(self, md = {}):
     if 'message-bus' in md:
       self.default_pull = md['message-bus'].get('pull-endpoint', 'tcp://127.0.0.1:1234')
       self.default_pub  = md['message-bus'].get('pub-endpoint',  'tcp://127.0.0.1:5678')
@@ -47,7 +47,7 @@ class Config:
       self.ground_truth = None
 
 
-  def init_xml_root(self, md):
+  def init_xml_root(self, md = {}):
     self.root = ET.Element('ot-sim')
 
     msgbus = ET.SubElement(self.root, 'message-bus')
@@ -112,21 +112,24 @@ class Config:
         loki = ET.SubElement(logs, 'loki')
         loki.text = self.logs['loki']['default_endpoint']
 
-
     backplane = ET.SubElement(self.cpu, 'module', {'name': 'backplane'})
     backplane.text = 'ot-sim-message-bus {{config_file}}'
 
-    if 'ground-truth-module' in md:
-      # Might be null in config, which means disable it for this particular
-      # device even though it's enabled globally.
-      if md['ground-truth-module'] and 'elastic' in md['ground-truth-module']:
-        gt  = ET.SubElement(self.root, 'ground-truth')
-        es  = ET.SubElement(gt, 'elastic')
-        ep  = ET.SubElement(es, 'endpoint')
-        idx = ET.SubElement(es, 'index-base-name')
+    # Might be null in config, which means disable it for this particular device
+    # even though it's enabled globally.
+    if 'ground-truth-module' in md and md['ground-truth-module'] and 'elastic' in md['ground-truth-module']:
+      gt  = ET.SubElement(self.root, 'ground-truth')
+      es  = ET.SubElement(gt, 'elastic')
+      ep  = ET.SubElement(es, 'endpoint')
+      idx = ET.SubElement(es, 'index-base-name')
 
-        ep.text  = md['ground-truth-module']['elastic'].get('endpoint',        self.ground_truth['elastic']['default_endpoint'])
-        idx.text = md['ground-truth-module']['elastic'].get('index-base-name', self.ground_truth['elastic']['default_index_base_name'])
+      ep.text  = md['ground-truth-module']['elastic'].get('endpoint',        self.ground_truth['elastic']['default_endpoint'])
+      idx.text = md['ground-truth-module']['elastic'].get('index-base-name', self.ground_truth['elastic']['default_index_base_name'])
+
+      for name, value in md['ground-truth-module']['elastic'].get('labels', {}).items():
+        ET.SubElement(es, 'label', {'name': name}).text = value
+
+      ET.SubElement(self.cpu, 'module', {'name': 'ground-truth'}).text = 'ot-sim-ground-truth-module {{config_file}}'
     elif self.ground_truth and 'elastic' in self.ground_truth:
       gt  = ET.SubElement(self.root, 'ground-truth')
       es  = ET.SubElement(gt, 'elastic')
@@ -135,6 +138,8 @@ class Config:
 
       ep.text  = self.ground_truth['elastic']['default_endpoint']
       idx.text = self.ground_truth['elastic']['default_index_base_name']
+
+      ET.SubElement(self.cpu, 'module', {'name': 'ground-truth'}).text = 'ot-sim-ground-truth-module {{config_file}}'
 
 
   def append_to_root(self, child):

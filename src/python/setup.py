@@ -19,6 +19,7 @@ ENTRIES = {
     'console_scripts' : [
         'phenix-app-ot-sim = phenix_apps.apps.otsim.otsim:main',
         'phenix-app-protonuke = phenix_apps.apps.protonuke.protonuke:main',
+        'phenix-app-wind-turbine = phenix_apps.apps.wind_turbine.wind_turbine:main',
         'phenix-app-wireguard = phenix_apps.apps.wireguard.wireguard:main',
         'phenix-scheduler-single-node = phenix_apps.schedulers.single_node.single_node:main',
         'phenix-scorch-component-art = phenix_apps.apps.scorch.art.art:main',

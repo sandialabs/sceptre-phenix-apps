@@ -1,4 +1,4 @@
-import copy, os, sys
+import copy, os, re, sys
 
 from box import Box
 
@@ -90,12 +90,23 @@ class AppBase(object):
             if app.name == self.name:
                 return app
 
-    def extract_node(self, hostname):
+    def extract_node(self, hostname, wildcard = False):
         nodes = self.experiment.spec.topology.nodes
+        regex = re.compile(hostname)
+        extracted = []
 
         for node in nodes:
-            if node.general.hostname == hostname:
-                return node
+            if wildcard:
+                if regex.match(node.general.hostname):
+                    extracted.append(node)
+            else:
+                if node.general.hostname == hostname:
+                    return node
+
+        if wildcard:
+            return extracted
+        else:
+            return None
 
     def extract_annotated_topology_nodes(self, annotations):
         nodes = self.experiment.spec.topology.nodes

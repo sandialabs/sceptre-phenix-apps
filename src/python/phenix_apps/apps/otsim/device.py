@@ -6,7 +6,7 @@ from phenix_apps.apps.otsim.protocols.modbus import Modbus
 
 
 class Register:
-  def __init__(self, type, tag, md):
+  def __init__(self, type, tag, md = {}):
     self.type = type
     self.tag  = tag
     self.md   = md
