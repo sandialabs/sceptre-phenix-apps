@@ -53,6 +53,7 @@ setup(
     ],
 
     install_requires = [
+        'lxml~=4.9.2',
         'Mako~=1.1.3',
         'minimega',
         'python-box~=5.1.1',

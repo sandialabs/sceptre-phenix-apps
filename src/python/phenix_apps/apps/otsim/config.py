@@ -1,5 +1,4 @@
-import xml.dom.minidom       as minidom
-import xml.etree.ElementTree as ET
+import lxml.etree as ET
 
 
 class Config:
@@ -148,4 +147,4 @@ class Config:
 
   def to_file(self, path):
     with open(path, 'w') as f:
-      f.write(minidom.parseString(ET.tostring(self.root)).toprettyxml(indent='  '))
+      f.write(ET.tostring(self.root, pretty_print=True).decode())

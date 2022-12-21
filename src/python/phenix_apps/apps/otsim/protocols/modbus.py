@@ -1,8 +1,7 @@
 import ipaddress
 
-import xml.etree.ElementTree as ET
+import lxml.etree as ET
 
-from phenix_apps.apps.otsim.infrastructure     import DEFAULT_INFRASTRUCTURES
 from phenix_apps.apps.otsim.protocols.protocol import Protocol
 
 

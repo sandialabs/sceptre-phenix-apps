@@ -1,6 +1,6 @@
 import os
 
-import xml.etree.ElementTree as ET
+import lxml.etree as ET
 
 from phenix_apps.apps   import AppBase
 from phenix_apps.common import logger, utils

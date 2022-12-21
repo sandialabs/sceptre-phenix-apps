@@ -1,6 +1,6 @@
 import copy
 
-import xml.etree.ElementTree as ET
+import lxml.etree as ET
 
 from collections import defaultdict
 

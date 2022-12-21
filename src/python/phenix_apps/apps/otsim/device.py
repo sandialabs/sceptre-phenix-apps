@@ -1,4 +1,4 @@
-import xml.etree.ElementTree as ET
+import lxml.etree as ET
 
 from phenix_apps.apps.otsim.infrastructure   import merge_infrastructure_with_default
 from phenix_apps.apps.otsim.protocols.dnp3   import DNP3
