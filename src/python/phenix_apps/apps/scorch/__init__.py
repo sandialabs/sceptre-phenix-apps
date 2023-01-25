@@ -1,4 +1,4 @@
-import json, os, signal, sys, time
+import os, signal, sys, time
 
 from phenix_apps.common.settings import PHENIX_DIR
 
@@ -78,8 +78,9 @@ class ComponentBase(object):
         self.exp_dir    = self.experiment.spec.baseDir
         self.metadata   = self.extract_metadata()
 
-        self.files_dir = os.getenv('PHENIX_FILES_DIR', f'{PHENIX_DIR}/images/{self.exp_name}/files')
-        self.base_dir  = f'{self.files_dir}/scorch/run-{self.run}/{self.name}/loop-{self.loop}-count-{self.count}'
+        self.root_dir  = os.path.join(PHENIX_DIR, 'images')
+        self.files_dir = os.getenv('PHENIX_FILES_DIR', os.path.join(self.root_dir, self.exp_name, 'files'))
+        self.base_dir  = os.path.join(self.files_dir, f'scorch/run-{self.run}/{self.name}/loop-{self.loop}-count-{self.count}')
         os.makedirs(self.base_dir, exist_ok=True)
 
         def signal_handler(signum, stack):

@@ -26,6 +26,7 @@ ENTRIES = {
         'phenix-scorch-component-cc = phenix_apps.apps.scorch.cc.cc:main',
         'phenix-scorch-component-ettercap = phenix_apps.apps.scorch.ettercap.ettercap:main',
         'phenix-scorch-component-hoststats = phenix_apps.apps.scorch.hoststats.hoststats:main',
+        'phenix-scorch-component-mm = phenix_apps.apps.scorch.mm.mm:main',
         'phenix-scorch-component-snort = phenix_apps.apps.scorch.snort.snort:main',
         'phenix-scorch-component-tcpdump = phenix_apps.apps.scorch.tcpdump.tcpdump:main',
         'phenix-scorch-component-trafficgen = phenix_apps.apps.scorch.trafficgen.trafficgen:main',
