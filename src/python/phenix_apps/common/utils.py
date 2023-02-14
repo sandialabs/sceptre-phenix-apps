@@ -186,6 +186,9 @@ def expand_shorthand(short):
 
 
 def mm_send(mm, vm, src, dst):
+    if not os.path.exists(src):
+        raise ValueError(f'{src} not found locally')
+
     # Use PHENIX_DIR as base directory to ensure minimega has access to it. This
     # assumes PHENIX_DIR is mounted into the containers if containers are being
     # used.
@@ -261,18 +264,48 @@ def mm_exec_wait(mm, vm, cmd):
     mm.cc_filter(f'name={vm}')
     mm.cc_exec(cmd)
 
-    commands = mm.cc_commands()
-    last_cmd_id = commands[0]['Tabular'][-1][0]
+    last_cmd = mm_last_command(mm)
 
-    mm_wait_for_cmd(mm, last_cmd_id)
+    mm_wait_for_cmd(mm, last_cmd['id'])
 
-    resps = mm.cc_responses(last_cmd_id, raw='raw')
+    resps = mm.cc_responses(last_cmd['id'])
+    uuid  = mm_vm_uuid(mm, vm)
 
-    for resp in resps:
-        if resp['Response']:
-            return resp['Response']
+    # example response from mm.cc_responses:
+    # [{
+    #   'Host': 'kn-0',
+    #   'Response': '1/0ab5dbc3-8ca6-4b75-a503-b5a191995dae/stdout:\nlo               UNKNOWN        127.0.0.1/8 ::1/128 \n\n',
+    #   'Header': None,
+    #   'Tabular': None,
+    #   'Error': '',
+    #   'Data': None
+    # }]
 
-    return None
+    result = {
+        'id':       last_cmd['id'],
+        'cmd':      last_cmd['cmd'],
+        'stdout':   None,
+        'stderr':   None,
+        'exitcode': None, # TODO: once new minimega Python module is released
+    }
+
+    for row in resps:
+        if not row['Response']:
+            continue
+
+        resp  = row['Response']
+        parts = resp.split('\n\n')[:-1]
+
+        for part in parts:
+            tokens = part.split(':\n', 1)
+
+            if uuid in tokens[0]:
+                if 'stdout' in tokens[0]:
+                    result['stdout'] = tokens[1]
+                if 'stderr' in tokens[0]:
+                    result['stderr'] = tokens[1]
+
+    return result
 
 
 def mm_wait_for_cmd(mm, id):
@@ -293,3 +326,23 @@ def mm_wait_for_cmd(mm, id):
             if len(done) > 0:
                 waiting = False
                 break
+
+
+def mm_last_command(mm):
+    commands = mm.cc_commands()
+
+    return {
+        'id':  commands[0]['Tabular'][-1][0],
+        'cmd': mm.cc_commands()[0]['Tabular'][-1][2][1:-1],
+    }
+
+
+def mm_vm_uuid(mm, name):
+    info = mm.vm_info(summary='summary')
+
+    for host in info:
+        for vm in host['Tabular']:
+            if vm[1] == name:
+                return vm[4]
+
+    return None

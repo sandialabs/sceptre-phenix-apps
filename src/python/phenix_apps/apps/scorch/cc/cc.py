@@ -3,8 +3,6 @@ import os, subprocess, sys, uuid
 from phenix_apps.apps.scorch import ComponentBase
 from phenix_apps.common import utils
 
-from box import Box
-
 
 class CC(ComponentBase):
     def __init__(self):
@@ -30,16 +28,21 @@ class CC(ComponentBase):
 
 
     def __run(self, stage):
-        vms = self.metadata.get('vms', [])
+        nodes = self.extract_node_names()
+        vms   = self.metadata.get('vms', [])
 
         mm = self.mm_init()
 
         for vm in vms:
+            if vm.hostname not in nodes:
+                self.eprint(f'{vm.hostname} is not in the topology')
+                continue
+
             commands = vm.get(stage, [])
 
             if len(commands) == 0:
-                self.eprint(f'{vm.hostname} has no commands for stage {stage}')
-                os.exit(1)
+                self.print(f'{vm.hostname} has no commands for stage {stage}')
+                continue
 
             for cmd in commands:
                 if cmd.type == 'exec':
@@ -49,15 +52,22 @@ class CC(ComponentBase):
                     if validator:
                         wait = True # force waiting so validation can occur
 
-                    wait = cmd.get('wait', False)
-
-                    self.print(f"executing command '{cmd.args}' in VM {vm.hostname} using cc")
+                    self.print(f"executing command '{cmd.args}' in VM {vm.hostname}")
 
                     if wait:
                         results = utils.mm_exec_wait(mm, vm.hostname, cmd.args)
 
+                        self.print(f"command '{results['cmd']}' executed in VM {vm.hostname} using cc")
+
+                        if results['exitcode']:
+                            self.eprint(f"command '{results['cmd']}' returned a non-zero exit code of '{results['exitcode']}'")
+                            os.exit(1)
+
+                        self.print(f"results from '{results['cmd']}':")
+                        self.print(results['stdout'])
+
                         if validator:
-                            self.print(f'validating results from {vm.hostname}')
+                            self.print(f"validating results from '{results['cmd']}'")
 
                             tempfile = f'/tmp/{str(uuid.uuid4())}.sh'
 
@@ -65,7 +75,7 @@ class CC(ComponentBase):
                                 tf.write(validator)
 
                             proc = subprocess.run(
-                                ['sh', tempfile, vm.hostname], input=results, capture_output=True,
+                                ['bash', tempfile, vm.hostname], input=results['stdout'].encode(), capture_output=True,
                             )
 
                             os.remove(tempfile)
@@ -83,11 +93,17 @@ class CC(ComponentBase):
                     else:
                         mm.cc_filter(f'name={vm.hostname}')
                         mm.cc_exec(cmd.args)
+
+                        last_cmd = utils.mm_last_command(mm)
+                        self.print(f"command '{last_cmd['cmd']}' executed in VM {vm.hostname} using cc")
                 elif cmd.type == 'background':
                     self.print(f"backgrounding command '{cmd.args}' in VM {vm.hostname} using cc")
 
                     mm.cc_filter(f'name={vm.hostname}')
                     mm.cc_background(cmd.args)
+
+                    last_cmd = utils.mm_last_command(mm)
+                    self.print(f"command '{last_cmd['cmd']}' backgrounded in VM {vm.hostname}")
                 elif cmd.type == 'send':
                     args = cmd.args.split(':')
                     src  = None
@@ -99,7 +115,7 @@ class CC(ComponentBase):
                         src = args[0]
                         dst = args[1]
                     else:
-                        self.eprint(f'too many files provided for send command: {cmd.args}')
+                        self.eprint(f'too many files provided for send command for VM {vm.hostname}: {cmd.args}')
                         sys.exit(1)
 
                     if not os.path.isabs(src):
@@ -110,7 +126,12 @@ class CC(ComponentBase):
 
                     self.print(f"sending file '{src}' to VM {vm.hostname} at '{dst}' using cc")
 
-                    utils.mm_send(mm, vm.hostname, src, dst)
+                    try:
+                        utils.mm_send(mm, vm.hostname, src, dst)
+                        self.print(f"file '{src}' sent to VM {vm.hostname} at '{dst}'")
+                    except Exception as ex:
+                        self.eprint(f"error sending '{src}' to VM {vm.hostname}: {ex}")
+                        sys.exit(1)
                 elif cmd.type == 'recv':
                     args = cmd.args.split(':')
                     src  = None
@@ -123,12 +144,17 @@ class CC(ComponentBase):
                         src = args[0]
                         dst = args[1]
                     else:
-                        self.eprint(f'too many files provided for recv command: {cmd.args}')
+                        self.eprint(f'too many files provided for recv command for VM {vm.hostname}: {cmd.args}')
                         sys.exit(1)
 
                     self.print(f"receiving file '{src}' from VM {vm.hostname} to `{dst}` using cc")
 
-                    utils.mm_recv(mm, vm.hostname, src, dst)
+                    try:
+                        utils.mm_recv(mm, vm.hostname, src, dst)
+                        self.print(f"file '{src}' received from VM {vm.hostname} to `{dst}`")
+                    except Exception as ex:
+                        self.eprint(f"error receiving '{src}' from VM {vm.hostname}: {ex}")
+                        sys.exit(1)
 
 
 def main():

@@ -33,7 +33,7 @@ class TCPDump(ComponentBase):
                 sys.exit(1)
 
             res = utils.mm_exec_wait(mm, hostname, 'which tcpdump')
-            if not res:
+            if not res['stdout']:
                 self.eprint(f'tcpdump is not installed in VM {hostname}')
                 sys.exit(1)
 
