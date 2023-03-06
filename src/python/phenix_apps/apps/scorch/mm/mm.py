@@ -93,7 +93,7 @@ class MM(ComponentBase):
                     mm.capture_pcap_delete_bridge(bridge)
                     self.print(f'stopped pcap capture on bridge {bridge}')
 
-                    mm.file_get(os.path.relpath(self.root_dir, self.base_dir))
+                    mm.file_get(os.path.relpath(self.base_dir, self.root_dir))
 
                     if cap.get('convert', False):
                         self.print('Waiting for transfer of pcap files to head node to complete.')
@@ -248,7 +248,7 @@ class MM(ComponentBase):
                         mm.capture_pcap_delete_vm(vm.hostname)
                         self.print(f'stopped pcap capture(s) on VM {vm.hostname}')
 
-                        mm.file_get(os.path.relpath(self.root_dir, self.base_dir))
+                        mm.file_get(os.path.relpath(self.base_dir, self.root_dir))
 
                         if cap and cap.get('convert', False):
                             self.print('Waiting for pcap transfers to head node to complete.')
