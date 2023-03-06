@@ -100,7 +100,6 @@ class Infrastructure:
       endpoint = devices[topic]['endpoint']
 
       assert type in mapping
-      assert endpoint
 
       device   = mapping[type]
       tag_name = topic.split('/')[1]

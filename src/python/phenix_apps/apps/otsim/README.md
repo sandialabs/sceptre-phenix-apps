@@ -167,4 +167,14 @@ spec:
             - name: line-01-03
               type: branch
               endpoint: updates
+
+          logic:
+            period: 1s
+            processUpdates: true
+            program: |
+              foo = bar
+            variables:
+              foo:
+                tag: foo.bar
+                value: 0
 ```

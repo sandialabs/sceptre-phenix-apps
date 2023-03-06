@@ -2,6 +2,27 @@ import lxml.etree as ET
 
 
 class Logic:
+  @staticmethod
+  def parse_metadata(md):
+    if 'logic' not in md:
+      return None
+
+    if 'program' not in md['logic']:
+      return None
+
+    program         = md['logic']['program']
+    variables       = md['logic'].get('variables', {})
+    period          = md['logic'].get('period', '1s')
+    process_updates = md['logic'].get('processUpdates', False)
+
+    logic = Logic()
+
+    logic.init_xml_root()
+    logic.logic_to_xml(program, variables, period=period, process_updates=process_updates)
+
+    return logic
+
+
   def init_xml_root(self, name='logic-module'):
     self.root = ET.Element('logic', {'name': name})
 

@@ -8,6 +8,7 @@ from phenix_apps.common import logger, utils
 from phenix_apps.apps.otsim.config         import Config
 from phenix_apps.apps.otsim.device         import FEP, FieldDeviceClient, FieldDeviceServer
 from phenix_apps.apps.otsim.infrastructure import Infrastructure
+from phenix_apps.apps.otsim.logic          import Logic
 
 
 class OTSim(AppBase):
@@ -191,6 +192,16 @@ class OTSim(AppBase):
 
         config.append_to_cpu(module)
 
+      if 'logic' in md:
+        logic = Logic.parse_metadata(md)
+
+        if logic:
+          module = ET.Element('module', {'name': 'logic'})
+          module.text = 'ot-sim-logic-module {{config_file}}'
+
+          config.append_to_root(logic.root)
+          config.append_to_cpu(module)
+
       config_file = f'{self.otsim_dir}/{server.hostname}.xml'
 
       config.to_file(config_file)
@@ -214,6 +225,16 @@ class OTSim(AppBase):
       device.process(ot_devices)
       device.configure(config, ot_devices)
 
+      if 'logic' in fep.metadata:
+        logic = Logic.parse_metadata(fep.metadata)
+
+        if logic:
+          module = ET.Element('module', {'name': 'logic'})
+          module.text = 'ot-sim-logic-module {{config_file}}'
+
+          config.append_to_root(logic.root)
+          config.append_to_cpu(module)
+
       config_file = f'{self.otsim_dir}/{fep.hostname}.xml'
 
       config.to_file(config_file)
@@ -235,6 +256,16 @@ class OTSim(AppBase):
       device.configure(config, ot_devices)
 
       ot_devices[client.hostname] = device
+
+      if 'logic' in client.metadata:
+        logic = Logic.parse_metadata(client.metadata)
+
+        if logic:
+          module = ET.Element('module', {'name': 'logic'})
+          module.text = 'ot-sim-logic-module {{config_file}}'
+
+          config.append_to_root(logic.root)
+          config.append_to_cpu(module)
 
       config_file = f'{self.otsim_dir}/{client.hostname}.xml'
 
