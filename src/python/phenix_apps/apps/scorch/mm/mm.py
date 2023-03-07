@@ -113,19 +113,19 @@ class MM(ComponentBase):
                         self.print('Transfer of pcap files to head node has completed.')
 
                         # convert pcap files
-                        for f in os.listdir(self.base_dir):
-                            if f.endswith('.pcap'):
-                                self.print(f'Starting PCAP --> JSON conversion of {f}.')
+                        for file in os.listdir(self.base_dir):
+                            if file.endswith('.pcap') and not os.path.exists(f'{file}.jsonl'):
+                                self.print(f'starting PCAP --> JSON conversion of {file}')
 
-                                pcap_out = os.path.join(self.base_dir, f)
-                                json_out = pcap_out + '.jsonl'
+                                pcap_in  = os.path.join(self.base_dir, file)
+                                json_out = f'{pcap_in}.jsonl'
 
                                 subprocess.run(
-                                    f"bash -c 'tshark -r {pcap_out} -T ek > {json_out} 2>/dev/null'",
+                                    f"bash -c 'tshark -r {pcap_in} -T ek > {json_out} 2>/dev/null'",
                                     shell=True,
                                 )
 
-                                self.print(f'PCAP --> JSON conversion of {f} complete.')
+                                self.print(f'PCAP --> JSON conversion of {file} complete')
                 except Exception as ex:
                     self.eprint(f'unable to stop pcap capture on bridge {bridge}: {ex}')
                     sys.exit(1)
@@ -266,19 +266,19 @@ class MM(ComponentBase):
                                 if done: break
 
                             # convert pcap files
-                            for f in os.listdir(self.base_dir):
-                                if f.endswith('.pcap'):
-                                    self.print(f'starting PCAP --> JSON conversion of {f}')
+                            for file in os.listdir(self.base_dir):
+                                if file.endswith('.pcap') and not os.path.exists(f'{file}.jsonl'):
+                                    self.print(f'starting PCAP --> JSON conversion of {file}')
 
-                                    pcap_out = os.path.join(self.base_dir, f)
-                                    json_out = pcap_out + '.jsonl'
+                                    pcap_in  = os.path.join(self.base_dir, file)
+                                    json_out = f'{pcap_in}.jsonl'
 
                                     subprocess.run(
-                                        f"bash -c 'tshark -r {pcap_out} -T ek > {json_out} 2>/dev/null'",
+                                        f"bash -c 'tshark -r {pcap_in} -T ek > {json_out} 2>/dev/null'",
                                         shell=True,
                                     )
 
-                                    self.print(f'PCAP --> JSON conversion of {f} complete')
+                                    self.print(f'PCAP --> JSON conversion of {file} complete')
                     except Exception as ex:
                         self.eprint(f'unable to stop pcap capture(s) on vm {vm.hostname}: {ex}')
                         sys.exit(1)
