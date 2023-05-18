@@ -61,7 +61,7 @@ class CC(ComponentBase):
 
                         if results['exitcode']:
                             self.eprint(f"command '{results['cmd']}' returned a non-zero exit code of '{results['exitcode']}'")
-                            os.exit(1)
+                            sys.exit(1)
 
                         self.print(f"results from '{results['cmd']}':")
                         self.print(results['stdout'])
@@ -87,7 +87,7 @@ class CC(ComponentBase):
                                 else:
                                     self.eprint('results validation failed')
 
-                                os.exit(1)
+                                sys.exit(1)
                             else:
                                 self.print('results are valid')
                     else:
