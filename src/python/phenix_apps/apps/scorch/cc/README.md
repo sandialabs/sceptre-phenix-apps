@@ -14,6 +14,7 @@ metadata:
     configure:
     - type: exec # can be exec, background, send, or recv
       args: whoami # a simple string of args (not an array)
+      once: <bool> # only execute a command once (applicable for exec and background) (default: true)
       wait: <bool> # wait for cmd to be executed by VM (default: false)
       validator: <bash script to validate exec results>
     start: [] # same array of keys as above
@@ -24,6 +25,17 @@ metadata:
 > The validator is only used when `type = exec` and forces `wait = true`. The
 > validator script should be written to process STDIN. Anything the validator
 > script writes to STDERR will be available to the user if the validation fails.
+
+## Notes on the `exec` and `background` Type
+
+When a `cc` command is configured, minimega will send the command to a `miniccc`
+agent every time it connects or reconnects. This means a command may actually be
+executed more than once (for example, if a VM running the `miniccc` agent is
+rebooted). This is useful when `cc` is used for actions like setting IPs or
+default routes, but may not be useful for most of the actions executed as part
+of this component. The `once` setting can be used to limit the execution of an
+exec or background command to only one time (and this is the default for this
+setting).
 
 ## Notes on the `send` Type
 

@@ -48,6 +48,7 @@ class CC(ComponentBase):
                 if cmd.type == 'exec':
                     validator = cmd.get('validator', None)
                     wait      = cmd.get('wait', False)
+                    once      = cmd.get('once', True)
 
                     if validator:
                         wait = True # force waiting so validation can occur
@@ -55,7 +56,7 @@ class CC(ComponentBase):
                     self.print(f"executing command '{cmd.args}' in VM {vm.hostname}")
 
                     if wait:
-                        results = utils.mm_exec_wait(mm, vm.hostname, cmd.args)
+                        results = utils.mm_exec_wait(mm, vm.hostname, cmd.args, once=once)
 
                         self.print(f"command '{results['cmd']}' executed in VM {vm.hostname} using cc")
 
@@ -92,15 +93,25 @@ class CC(ComponentBase):
                                 self.print('results are valid')
                     else:
                         mm.cc_filter(f'name={vm.hostname}')
-                        mm.cc_exec(cmd.args)
+
+                        if once:
+                            mm.cc_exec_once(cmd.args)
+                        else:
+                            mm.cc_exec(cmd.args)
 
                         last_cmd = utils.mm_last_command(mm)
                         self.print(f"command '{last_cmd['cmd']}' executed in VM {vm.hostname} using cc")
                 elif cmd.type == 'background':
+                    once = cmd.get('once', True)
+
                     self.print(f"backgrounding command '{cmd.args}' in VM {vm.hostname} using cc")
 
                     mm.cc_filter(f'name={vm.hostname}')
-                    mm.cc_background(cmd.args)
+
+                    if once:
+                        mm.cc_background_once(cmd.args)
+                    else:
+                        mm.cc_background(cmd.args)
 
                     last_cmd = utils.mm_last_command(mm)
                     self.print(f"command '{last_cmd['cmd']}' backgrounded in VM {vm.hostname}")

@@ -83,11 +83,12 @@ class AppBase(object):
 
         return None
 
-    def extract_app(self):
+    def extract_app(self, name = None):
+        name = self.name if not name else name
         apps = self.experiment.spec.scenario.apps
 
         for app in apps:
-            if app.name == self.name:
+            if app.name == name:
                 return app
 
     def extract_node(self, hostname, wildcard = False):

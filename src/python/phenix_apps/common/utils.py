@@ -260,9 +260,13 @@ def mm_recv(mm, vm, src, dst):
             mm.clear_cc_mount(vm)
 
 
-def mm_exec_wait(mm, vm, cmd):
+def mm_exec_wait(mm, vm, cmd, once=True):
     mm.cc_filter(f'name={vm}')
-    mm.cc_exec(cmd)
+
+    if once:
+        mm.cc_exec_once(cmd)
+    else:
+        mm.cc_exec(cmd)
 
     last_cmd = mm_last_command(mm)
 
