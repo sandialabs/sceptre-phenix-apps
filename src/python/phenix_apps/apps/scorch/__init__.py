@@ -1,4 +1,4 @@
-import os, signal, sys, time
+import os, re, signal, sys, time
 
 from phenix_apps.common.settings import PHENIX_DIR
 
@@ -81,6 +81,7 @@ class ComponentBase(object):
         self.root_dir  = os.path.join(PHENIX_DIR, 'images')
         self.files_dir = os.getenv('PHENIX_FILES_DIR', os.path.join(self.root_dir, self.exp_name, 'files'))
         self.base_dir  = os.path.join(self.files_dir, f'scorch/run-{self.run}/{self.name}/loop-{self.loop}-count-{self.count}')
+
         os.makedirs(self.base_dir, exist_ok=True)
 
         def signal_handler(signum, stack):
@@ -135,6 +136,40 @@ class ComponentBase(object):
                 for cmp in md.components:
                     if cmp.name == self.name and cmp.type == self.type:
                         return cmp.get('metadata', None)
+
+    def extract_run_name(self):
+        apps = self.experiment.spec.scenario.apps
+
+        for app in apps:
+            if app.name == 'scorch':
+                md   = app.get('metadata', {})
+                runs = md.get('runs', [])
+
+                if len(runs) <= self.run:
+                    return str(self.run)
+
+                name = runs[self.run].get('name', str(self.run))
+
+                # name might be an empty string...
+                return name if name else str(self.run)
+
+    def extract_node(self, hostname, wildcard = False):
+        nodes = self.experiment.spec.topology.nodes
+        regex = re.compile(hostname)
+        extracted = []
+
+        for node in nodes:
+            if wildcard:
+                if regex.match(node.general.hostname):
+                    extracted.append(node)
+            else:
+                if node.general.hostname == hostname:
+                    return node
+
+        if wildcard:
+            return extracted
+        else:
+            return None
 
     def extract_node_names(self):
         nodes = []

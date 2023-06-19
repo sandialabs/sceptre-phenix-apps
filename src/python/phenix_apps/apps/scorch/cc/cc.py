@@ -55,20 +55,22 @@ class CC(ComponentBase):
 
                     self.print(f"executing command '{cmd.args}' in VM {vm.hostname}")
 
-                    if wait:
-                        results = utils.mm_exec_wait(mm, vm.hostname, cmd.args, once=once)
+                    script = self.__send_cmd_as_file(mm, vm.hostname, cmd.args)
 
-                        self.print(f"command '{results['cmd']}' executed in VM {vm.hostname} using cc")
+                    if wait:
+                        results = utils.mm_exec_wait(mm, vm.hostname, script, once=once)
+
+                        self.print(f"command '{cmd.args}' executed in VM {vm.hostname} using cc")
 
                         if results['exitcode']:
-                            self.eprint(f"command '{results['cmd']}' returned a non-zero exit code of '{results['exitcode']}'")
+                            self.eprint(f"command '{cmd.args}' returned a non-zero exit code of '{results['exitcode']}'")
                             sys.exit(1)
 
-                        self.print(f"results from '{results['cmd']}':")
+                        self.print(f"results from '{cmd.args}':")
                         self.print(results['stdout'])
 
                         if validator:
-                            self.print(f"validating results from '{results['cmd']}'")
+                            self.print(f"validating results from '{cmd.args}'")
 
                             tempfile = f'/tmp/{str(uuid.uuid4())}.sh'
 
@@ -95,26 +97,26 @@ class CC(ComponentBase):
                         mm.cc_filter(f'name={vm.hostname}')
 
                         if once:
-                            mm.cc_exec_once(cmd.args)
+                            mm.cc_exec_once(script)
                         else:
-                            mm.cc_exec(cmd.args)
+                            mm.cc_exec(script)
 
-                        last_cmd = utils.mm_last_command(mm)
-                        self.print(f"command '{last_cmd['cmd']}' executed in VM {vm.hostname} using cc")
+                        self.print(f"command '{cmd.args}' executed in VM {vm.hostname} using cc")
                 elif cmd.type == 'background':
                     once = cmd.get('once', True)
 
                     self.print(f"backgrounding command '{cmd.args}' in VM {vm.hostname} using cc")
 
+                    script = self.__send_cmd_as_file(mm, vm.hostname, cmd.args)
+
                     mm.cc_filter(f'name={vm.hostname}')
 
                     if once:
-                        mm.cc_background_once(cmd.args)
+                        mm.cc_background_once(script)
                     else:
-                        mm.cc_background(cmd.args)
+                        mm.cc_background(script)
 
-                    last_cmd = utils.mm_last_command(mm)
-                    self.print(f"command '{last_cmd['cmd']}' backgrounded in VM {vm.hostname}")
+                    self.print(f"command '{cmd.args}' backgrounded in VM {vm.hostname}")
                 elif cmd.type == 'send':
                     args = cmd.args.split(':')
                     src  = None
@@ -166,6 +168,36 @@ class CC(ComponentBase):
                     except Exception as ex:
                         self.eprint(f"error receiving '{src}' from VM {vm.hostname}: {ex}")
                         sys.exit(1)
+
+
+    def __send_cmd_as_file(self, mm, hostname, cmd):
+        cmd_file = f'run-{self.extract_run_name()}_{str(uuid.uuid4())}'
+        node     = self.extract_node(hostname)
+
+        if node.hardware.os_type.lower() == "windows":
+            cmd_file += '.ps1'
+        else:
+            cmd_file += '.sh'
+
+        cmd_src = os.path.join(self.root_dir, self.exp_name, cmd_file)
+        cmd_dst = os.path.join('/tmp/miniccc/files', self.exp_name, cmd_file)
+
+        with open(cmd_src, 'w') as f:
+            f.write(cmd)
+
+        mm.cc_filter(f'name={hostname}')
+        mm.cc_send(cmd_src)
+
+        # wait for file to be sent via cc
+        last_cmd = utils.mm_last_command(mm)
+        utils.mm_wait_for_cmd(mm, last_cmd['id'])
+
+        os.remove(cmd_src)
+
+        if node.hardware.os_type.lower() == "windows":
+            return f'powershell.exe -ExecutionPolicy Bypass -File {cmd_dst}'
+        else:
+            return f'bash {cmd_dst}'
 
 
 def main():
