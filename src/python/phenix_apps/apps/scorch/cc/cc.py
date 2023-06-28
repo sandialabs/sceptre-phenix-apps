@@ -62,12 +62,26 @@ class CC(ComponentBase):
 
                         self.print(f"command '{cmd.args}' executed in VM {vm.hostname} using cc")
 
-                        if results['exitcode']:
+                        node = self.extract_node(vm.hostname)
+
+                        # HACK: If Windows, use presence of stderr to determine
+                        # success/failure instead of exit code. Ugh...
+                        if node.hardware.os_type.lower() == "windows":
+                            if results['stderr']:
+                                self.eprint(f"command '{cmd.args}' resulted in output to STDERR (assuming failure)")
+                                self.print(f"STDERR Output: {results['stderr']}")
+
+                                sys.exit(1)
+                        elif results['exitcode']:
                             self.eprint(f"command '{cmd.args}' returned a non-zero exit code of '{results['exitcode']}'")
+
+                            if results['stderr']:
+                                self.print(f"STDERR Output: {results['stderr']}")
+
                             sys.exit(1)
 
-                        self.print(f"results from '{cmd.args}':")
-                        self.print(results['stdout'])
+                        if results['stdout']:
+                            self.print(f"STDOUT Output: {results['stdout']}")
 
                         if validator:
                             self.print(f"validating results from '{cmd.args}'")

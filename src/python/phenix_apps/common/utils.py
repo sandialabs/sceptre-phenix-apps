@@ -269,8 +269,18 @@ def mm_exec_wait(mm, vm, cmd, once=True):
         mm.cc_exec(cmd)
 
     last_cmd = mm_last_command(mm)
-
     mm_wait_for_cmd(mm, last_cmd['id'])
+
+    # we only expect a single response since scoped by VM
+    resp = mm.cc_exitcode(last_cmd['id'], vm)[0]
+
+    result = {
+        'id':       last_cmd['id'],
+        'cmd':      last_cmd['cmd'],
+        'exitcode': int(resp['Response']),
+        'stderr':   None,
+        'stdout':   None,
+    }
 
     resps = mm.cc_responses(last_cmd['id'])
     uuid  = mm_vm_uuid(mm, vm)
@@ -284,14 +294,6 @@ def mm_exec_wait(mm, vm, cmd, once=True):
     #   'Error': '',
     #   'Data': None
     # }]
-
-    result = {
-        'id':       last_cmd['id'],
-        'cmd':      last_cmd['cmd'],
-        'stdout':   None,
-        'stderr':   None,
-        'exitcode': None, # TODO: once new minimega Python module is released
-    }
 
     for row in resps:
         if not row['Response']:
