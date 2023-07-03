@@ -1,4 +1,4 @@
-import phenix.apps.sceptre.protocols.sunspec as sunspec
+import phenix_apps.apps.sceptre.protocols.sunspec as sunspec
 
 class Infrastructure:
     def __init__(self):
