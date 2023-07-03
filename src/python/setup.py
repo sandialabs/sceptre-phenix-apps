@@ -17,8 +17,10 @@ DATA = {
 
 ENTRIES = {
     'console_scripts' : [
+        'phenix-app-mgmt-tap = phenix_apps.apps.mgmt_tap.mgmt_tap:main',
         'phenix-app-ot-sim = phenix_apps.apps.otsim.otsim:main',
         'phenix-app-protonuke = phenix_apps.apps.protonuke.protonuke:main',
+        'phenix-app-sceptre = phenix_apps.apps.sceptre.sceptre:main',
         'phenix-app-wind-turbine = phenix_apps.apps.wind_turbine.wind_turbine:main',
         'phenix-app-wireguard = phenix_apps.apps.wireguard.wireguard:main',
         'phenix-scheduler-single-node = phenix_apps.schedulers.single_node.single_node:main',
