@@ -1,5 +1,5 @@
 import phenix_apps.common.error as error
-import phenix.apps.sceptre.configs.infrastructures as infra
+import phenix_apps.apps.sceptre.configs.infrastructures as infra
 
 
 def get_fdconfig_class(infrastructure: str) -> type:
