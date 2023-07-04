@@ -3,10 +3,7 @@ import copy, json, os, re, stat, sys
 from phenix_apps.apps   import AppBase
 from phenix_apps.common import error, logger, utils
 
-import phenix_apps.apps.sceptre.configs.configs as configs
-#, reg_map_gen
-#from phenix_apps.apps.sceptre.configs import configs, reg_map_gen
-
+from phenix_apps.apps.sceptre.configs import configs, reg_map_gen
 
 class Sceptre(AppBase):
     @staticmethod
