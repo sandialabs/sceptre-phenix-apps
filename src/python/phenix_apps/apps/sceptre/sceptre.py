@@ -5,7 +5,6 @@ from phenix_apps.common import error, logger, utils
 
 from phenix_apps.apps.sceptre.configs import configs, reg_map_gen
 
-
 class Sceptre(AppBase):
     @staticmethod
     def is_power_provider(provider):
