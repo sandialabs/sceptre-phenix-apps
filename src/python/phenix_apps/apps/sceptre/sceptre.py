@@ -25,7 +25,6 @@ class Sceptre(AppBase):
         os.makedirs(self.elk_dir,       exist_ok=True)
         self.mako_path = utils.abs_path(__file__, "templates/sceptre_start.mako")
         self.mako_templates_path = utils.abs_path(__file__, "templates")
-        logger.log('INFO', f'makopath: {self.mako_templates_path}')
         self.execute_stage()
         # We don't (currently) let the parent AppBase class handle this step
         # just in case app developers want to do any additional manipulation
@@ -1273,7 +1272,6 @@ class Sceptre(AppBase):
             with open(scada_file, "w") as file_:
                 utils.mako_serve_template(scada_mako, self.mako_templates_path, file_)
 
-            
         ######################## HMI pre-start ###################################
         # Create hmi files
         hmis = self.extract_nodes_type("hmi")
