@@ -25,6 +25,7 @@ class Sceptre(AppBase):
         os.makedirs(self.elk_dir,       exist_ok=True)
         self.mako_path = utils.abs_path(__file__, "templates/sceptre_start.mako")
         self.mako_templates_path = utils.abs_path(__file__, "templates")
+        logger.log('INFO', f'makopath: {self.mako_templates_path}')
         self.execute_stage()
         # We don't (currently) let the parent AppBase class handle this step
         # just in case app developers want to do any additional manipulation
@@ -83,14 +84,12 @@ class Sceptre(AppBase):
 
             # Create sceptre startup scheduler injections
             # Mirrors the phenix startup scheduler but is needed in order to run thigs as local user for UI automation
-            os.system(f"cp {self.mako_templates_path}/sceptre-startup-scheduler.cmd {self.startup_dir}/sceptre-startup-scheduler.cmd")            
             kwargs ={ "src": f"{self.startup_dir}/sceptre-startup-scheduler.cmd",
                 "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
                 "description": "sceptre startup scheduler",
             }
             self.add_inject(hostname=opc.hostname, inject=kwargs)
 
-            os.system(f"cp {self.mako_templates_path}/sceptre-startup.ps1 {self.startup_dir}/sceptre-startup.ps1")            
             kwargs ={ "src": f"{self.startup_dir}/sceptre-startup.ps1",
                 "dst": "sceptre/sceptre-startup.ps1",
                 "description": "sceptre startup script",
@@ -144,14 +143,12 @@ class Sceptre(AppBase):
 
             # Create sceptre startup scheduler injections
             # Mirrors the phenix startup scheduler but is needed in order to run thigs as local user for UI automation
-            os.system(f"cp {self.mako_templates_path}/sceptre-startup-scheduler.cmd {self.startup_dir}/sceptre-startup-scheduler.cmd")            
             kwargs ={ "src": f"{self.startup_dir}/sceptre-startup-scheduler.cmd",
                 "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
                 "description": "sceptre startup scheduler",
             }
             self.add_inject(hostname=hmi.hostname, inject=kwargs)
 
-            os.system(f"cp {self.mako_templates_path}/sceptre-startup.ps1 {self.startup_dir}/sceptre-startup.ps1")            
             kwargs ={ "src": f"{self.startup_dir}/sceptre-startup.ps1",
                 "dst": "sceptre/sceptre-startup.ps1",
                 "description": "sceptre startup script",
@@ -196,14 +193,12 @@ class Sceptre(AppBase):
 
             # Create sceptre startup scheduler injections
             # Mirrors the phenix startup scheduler but is needed in order to run thigs as local user for UI automation
-            os.system(f"cp {self.mako_templates_path}/sceptre-startup-scheduler.cmd {self.startup_dir}/sceptre-startup-scheduler.cmd")            
             kwargs ={ "src": f"{self.startup_dir}/sceptre-startup-scheduler.cmd",
                 "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
                 "description": "sceptre startup scheduler",
             }
             self.add_inject(hostname=scada_server.hostname, inject=kwargs)
 
-            os.system(f"cp {self.mako_templates_path}/sceptre-startup.ps1 {self.startup_dir}/sceptre-startup.ps1")            
             kwargs ={ "src": f"{self.startup_dir}/sceptre-startup.ps1",
                 "dst": "sceptre/sceptre-startup.ps1",
                 "description": "sceptre startup script",
@@ -228,14 +223,12 @@ class Sceptre(AppBase):
 
             # Create sceptre startup scheduler injections
             # Mirrors the phenix startup scheduler but is needed in order to run thigs as local user for UI automation
-            os.system(f"cp {self.mako_templates_path}/sceptre-startup-scheduler.cmd {self.startup_dir}/sceptre-startup-scheduler.cmd")            
             kwargs ={ "src": f"{self.startup_dir}/sceptre-startup-scheduler.cmd",
                 "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
                 "description": "sceptre startup scheduler",
             }
             self.add_inject(hostname=engineer_workstation.hostname, inject=kwargs)
 
-            os.system(f"cp {self.mako_templates_path}/sceptre-startup.ps1 {self.startup_dir}/sceptre-startup.ps1")            
             kwargs ={ "src": f"{self.startup_dir}/sceptre-startup.ps1",
                 "dst": "sceptre/sceptre-startup.ps1",
                 "description": "sceptre startup script",
@@ -270,14 +263,12 @@ class Sceptre(AppBase):
 
             # Create sceptre startup scheduler injections
             # Mirrors the phenix startup scheduler but is needed in order to run thigs as local user for UI automation
-            os.system(f"cp {self.mako_templates_path}/sceptre-startup-scheduler.cmd {self.startup_dir}/sceptre-startup-scheduler.cmd")            
             kwargs ={ "src": f"{self.startup_dir}/sceptre-startup-scheduler.cmd",
                 "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
                 "description": "sceptre startup scheduler",
             }
             self.add_inject(hostname=historian.hostname, inject=kwargs)
 
-            os.system(f"cp {self.mako_templates_path}/sceptre-startup.ps1 {self.startup_dir}/sceptre-startup.ps1")            
             kwargs ={ "src": f"{self.startup_dir}/sceptre-startup.ps1",
                 "dst": "sceptre/sceptre-startup.ps1",
                 "description": "sceptre startup script",
@@ -546,6 +537,19 @@ class Sceptre(AppBase):
 
     def pre_start(self):
         logger.log("INFO", f"Running pre_start for user application: {self.name}...")
+
+        # Write sceptre startup script injections
+        scheduler_file = f"{self.startup_dir}/sceptre-startup-scheduler.cmd"
+        scheduler_mako = "sceptre-startup-scheduler.mako"
+        with open(scheduler_file, "w") as file_:
+            utils.mako_serve_template(scheduler_mako, self.mako_templates_path, file_)
+        os.chmod(scheduler_file, 0o0777)
+        
+        startup_file = f"{self.startup_dir}/sceptre-startup.ps1"
+        startup_mako = "sceptre-startup.mako"
+        with open(startup_file, "w") as file_:
+            utils.mako_serve_template(startup_mako, self.mako_templates_path, file_)
+        os.chmod(startup_file, 0o777)
 
         fd_configs = []
         # Add hil tags that are listed in the provider metadata
@@ -1269,6 +1273,7 @@ class Sceptre(AppBase):
             with open(scada_file, "w") as file_:
                 utils.mako_serve_template(scada_mako, self.mako_templates_path, file_)
 
+            
         ######################## HMI pre-start ###################################
         # Create hmi files
         hmis = self.extract_nodes_type("hmi")
