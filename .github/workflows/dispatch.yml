@@ -11,6 +11,6 @@ jobs:
         uses: peter-evans/repository-dispatch@v2
         with:
           token: ${{ secrets.REPO_DISPATCH_PAT }}
-          repository: ${{ github.repository_owner }}/phenix
+          repository: ${{ github.repository_owner }}/sceptre-phenix
           event-type: apps-update
           client-payload: '{"repo": "${{ github.repository }}"}'
