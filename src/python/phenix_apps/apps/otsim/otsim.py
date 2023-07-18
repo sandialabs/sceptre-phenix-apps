@@ -39,10 +39,11 @@ class OTSim(AppBase):
             hostname = broker['hostname']
             iface    = None
 
-          if 'base-fed-count' in broker:
+          if any(key in broker for key in ['base-fed-count', 'dynamic']):
             if hostname not in self.brokers:
               self.brokers[hostname] = {
-                'feds':      int(broker['base-fed-count']),
+                'feds':      broker.get('base-fed-count', 0),
+                'dynamic':   broker.get('dynamic', False),
                 'log-level': broker.get('log-level', 'SUMMARY'),
                 'log-file':  broker.get('log-file', '/var/log/helics-broker.log'),
               }
@@ -280,10 +281,7 @@ class OTSim(AppBase):
       start_file = f'{self.otsim_dir}/{hostname}-helics-broker.sh'
 
       with open(start_file, 'w') as f:
-        utils.mako_serve_template(
-          'helics_broker.mako', templates, f,
-          feds=cfg['feds'], log_level=cfg['log-level'], log_file=cfg['log-file'],
-        )
+        utils.mako_serve_template('helics_broker.mako', templates, f, cfg=cfg)
 
       self.add_inject(hostname=hostname, inject={'src': start_file, 'dst': '/etc/phenix/startup/90-helics-broker.sh'})
 

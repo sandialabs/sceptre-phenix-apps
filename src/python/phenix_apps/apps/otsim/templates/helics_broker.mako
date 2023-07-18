@@ -1,1 +1,2 @@
-helics_broker -f ${feds} --ipv4 --loglevel ${log_level} --logfile ${log_file} --autorestart &
+<% type = '--dynamic' if cfg['dynamic'] else '-f{}'.format(cfg['feds']) %>\
+helics_broker ${type} --ipv4 --loglevel ${cfg['log-level']} --logfile ${cfg['log-file']} --autorestart &
