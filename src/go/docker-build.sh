@@ -14,7 +14,7 @@ USERNAME=builder
 
 
 docker build -t golang-phenix-apps:builder -f - . <<EOF
-FROM golang:1.18
+FROM golang:1.20.5
 
 RUN groupadd --gid $USER_UID $USERNAME \
   && useradd -s /bin/bash --uid $USER_UID --gid $USER_UID -m $USERNAME
