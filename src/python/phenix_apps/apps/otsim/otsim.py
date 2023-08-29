@@ -193,6 +193,9 @@ class OTSim(AppBase):
 
         config.append_to_cpu(module)
 
+        annotation = [{'broker': addr, 'fed-count': 1}]
+        self.add_annotation(server.hostname, 'helics/federate', annotation)
+
       if 'logic' in md:
         logic = Logic.parse_metadata(md)
 

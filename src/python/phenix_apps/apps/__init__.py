@@ -274,8 +274,52 @@ class AppBase(object):
 
         return {}
 
+    def extract_node_interface_ip(self, hostname, iface, include_mask = False):
+        node = self.extract_node(hostname)
+
+        if iface:
+            for i in node.network.interfaces:
+                if i['name'] == iface and 'address' in i:
+                    if include_mask:
+                        return i['address'], i['mask']
+                    else:
+                        return i['address']
+        elif len(node.network.interfaces) > 0:
+            i = node.network.interfaces[0]
+
+            if 'address' in i:
+                if include_mask:
+                    return i['address'], i['address']
+                else:
+                    return i['address']
+
+        return None
+
+    def extract_node_hostname_for_ip(self, address):
+        nodes = self.experiment.spec.topology.nodes
+
+        for node in nodes:
+            for i in node.network.interfaces:
+                if 'address' in i and i['address'] == address:
+                    return node.general.hostname
+
+        return None
+
     def add_node(self, node):
         self.experiment.spec.topology.nodes.append(node)
+
+    def add_annotation(self, hostname, key, value):
+        node = self.extract_node(hostname)
+
+        annotations = node.get('annotations', {})
+
+        # Could be a null entry in the JSON schema.
+        if not annotations:
+            annotations = {}
+
+        # This will override an existing annotation with the same key.
+        annotations[key] = value
+        node['annotations'] = annotations
 
     def add_inject(self, hostname, inject):
         node = self.extract_node(hostname)
