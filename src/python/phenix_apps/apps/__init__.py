@@ -296,6 +296,9 @@ class AppBase(object):
         return None
 
     def extract_node_hostname_for_ip(self, address):
+        if ':' in address:
+            address, _ = address.split(':', 1)
+
         nodes = self.experiment.spec.topology.nodes
 
         for node in nodes:

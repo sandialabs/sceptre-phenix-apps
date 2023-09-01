@@ -50,20 +50,26 @@ class OTSim(AppBase):
 
             self.brokers[hostname]['feds'] += 1
 
-          node = self.extract_node(hostname)
-          assert node
-
-          if iface:
-            for i in node.network.interfaces:
-              if i['name'] == iface and 'address' in i:
-                addr = i['address']
-                break
-          else:
-            if len(node.network.interfaces) > 0:
-              if 'address' in node.network.interfaces[0]:
-                addr = node.network.interfaces[0]['address']
-
+          addr = self.extract_node_interface_ip(hostname, iface)
           assert addr
+
+          # Check to see if helics app is being used. If so, check if ot-sim
+          # broker matches root broker. If not, append default port 24000 to
+          # address so sub broker is used.
+          helics_app = self.extract_app('helics')
+          if helics_app:
+            root_broker = helics_app.get('metadata', {}).get('broker', {}).get('root', None)
+
+            if root_broker:
+              if '|' in root_broker:
+                hostname, iface = root_broker.split('|', 1)
+                root_broker = self.extract_node_interface_ip(hostname, iface)
+              elif ':' in root_broker:
+                root_broker, _ = root_broker.split(':', 1)
+
+              if addr != root_broker:
+                addr += ':24000'
+
           return addr
         elif 'address' in broker:
           return broker['address']

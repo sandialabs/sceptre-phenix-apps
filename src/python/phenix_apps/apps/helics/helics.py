@@ -3,13 +3,6 @@ import os, sys
 from phenix_apps.apps   import AppBase
 from phenix_apps.common import logger, utils
 
-#  apps:
-#  - name: helics
-#    metadata:
-#      broker:
-#        root: <ip:port>    # optional location of root broker (assumed to already be in topology)
-#        log-level: summary # log level to apply to every broker created
-
 class Helics(AppBase):
     def __init__(self):
         AppBase.__init__(self, 'helics')
@@ -27,9 +20,36 @@ class Helics(AppBase):
     def pre_start(self):
         logger.log('INFO', f'Starting user application: {self.name}')
 
+        broker_md = self.metadata.get('broker', {})
+        root      = broker_md.get('root', None)
+
+        if not root:
+            logger.log('ERROR', 'no root broker provided, but required')
+            sys.exit(1)
+
+        if '|' in root: # hostname|iface
+            root_hostname, iface = root.split('|', 1)
+            root_ip = self.extract_node_interface_ip(root_hostname, iface)
+
+            if not root_ip:
+                logger.log('ERROR', f'root broker not found in topology: {root}')
+                sys.exit(1)
+        else: # ip[:port]
+            root_ip = root
+
+        if ':' in root_ip: # silently ignore port if provided
+            root_ip, _ = root_ip.split(':', 1)
+
+        root_hostname = self.extract_node_hostname_for_ip(root_ip)
+
+        if not root_hostname:
+            logger.log('ERROR', f'root broker not found in topology: {root}')
+            sys.exit(1)
+
         total_fed_count = 0
 
-        # broker hosts --> {endpoint: <ip:port>, fed-count: <num>}
+        # broker hosts --> ip:port --> fed-count
+        # hosts to create start scripts for, ip:port combos to create sub brokers for
         brokers = {}
         federates = self.extract_annotated_topology_nodes('helics/federate')
 
@@ -42,60 +62,76 @@ class Helics(AppBase):
 
                 total_fed_count += count
 
-                if ':' in broker:
-                    ip, _ = broker.split(':', 1)
-                else:
-                    ip = broker
+                if '|' in broker: # hostname|iface
+                    broker_hostname, iface = broker.split('|', 1)
+                    broker_ip = self.extract_node_interface_ip(broker_hostname, iface)
 
-                hostname = self.extract_node_hostname_for_ip(ip)
+                    if not broker_ip:
+                        logger.log('ERROR', f'broker not found in topology: {broker_hostname}')
+                        sys.exit(1)
+                else: # ip[:port]
+                    broker_ip = broker
 
-                entry = brokers.get(hostname, {'endpoint': broker, 'fed-count': 0})
-                entry['fed-count'] += count
+                if broker_ip == root_ip:
+                    # not connecting to sub broker
+                    continue
+
+                if ':' not in broker_ip:
+                    # default to port 24000 for sub broker
+                    broker_ip += ':24000'
+
+                hostname = self.extract_node_hostname_for_ip(broker_ip)
+
+                if not hostname:
+                    logger.log('ERROR', f'node not found for broker at {broker}')
+                    sys.exit(1)
+
+                entry = brokers.get(hostname, {broker_ip: 0})
+                entry[broker] += count
 
                 brokers[hostname] = entry
 
-        if len(brokers) > 1:
-            root_ip = self.metadata.get('broker', {}).get('root', '127.0.0.1')
+        log_dir = broker_md.get('log-dir', '/var/log')
 
-            if '|' in root_ip:
-                root_hostname, iface = root_ip.split('|', 1)
-                root_ip = self.extract_node_interface_ip(root_hostname, iface)
+        root_broker_config = {
+            'subs':      0,
+            'feds':      total_fed_count,
+            'endpoint':  root_ip,
+            'log-level': broker_md.get('log-level', 'summary'),
+            'log-file':  os.path.join(log_dir, 'helics-root-broker.log'),
+        }
 
-                if not root_ip:
-                    logger.log('ERROR', f'root broker not found in topology: {root_hostname}')
-                    sys.exit(1)
-            else:
-                root_hostname = self.extract_node_hostname_for_ip(root_ip)
+        # per-host broker configs, initialized with root broker
+        configs = {root_hostname: [root_broker_config]}
 
-                if not root_hostname:
-                    logger.log('ERROR', f'root broker IP not found in topology: {root_ip}')
-                    sys.exit(1)
+        for hostname, subs in brokers.items():
+            # just in case hostname is root broker, which was initialized above
+            broker_configs = configs.get(hostname, [])
 
-            # TODO: add root broker to topology if it doesn't already exist?
+            # individual sub brokers for host (there will usually just be one)
+            for endpoint, feds in subs.items():
+                root_broker_config['subs'] += 1
+
+                broker_configs.append({
+                    'feds':      feds,
+                    'parent':    root_ip,
+                    'endpoint':  endpoint,
+                    'log-level': broker_md.get('log-level', 'summary'),
+                    'log-file':  os.path.join(log_dir, 'helics-sub-broker.log'),
+                })
+
+            configs[hostname] = broker_configs
 
         templates = utils.abs_path(__file__, 'templates/')
 
-        for hostname, config in brokers.items():
+        for hostname, broker_configs in configs.items():
             start_file = f'{self.helics_dir}/{hostname}-broker.sh'
 
-            cfg = {
-                'feds': config['fed-count'],
-                'log-level': self.metadata.get('broker', {}).get('log-level', 'summary'),
-                'log-file': self.metadata.get('broker', {}).get('log-file', '/var/log/helics-broker.log'),
-            }
-
-            if len(brokers) > 1:
-                if root_hostname != hostname:
-                    cfg['parent'] = root_ip
-                    cfg['endpoint'] = config['endpoint']
-                else:
-                    cfg['feds'] = total_fed_count
-                    cfg['subs'] = len(brokers) - 1
-
             with open(start_file, 'w') as f:
-                utils.mako_serve_template('broker.mako', templates, f, cfg=cfg)
+                utils.mako_serve_template('broker.mako', templates, f, configs=broker_configs)
 
-            self.add_inject(hostname=hostname, inject={'src': start_file, 'dst': '/etc/phenix/startup/90-helics-broker.sh'})
+            dst = '/etc/phenix/startup/90-helics-broker.sh'
+            self.add_inject(hostname=hostname, inject={'src': start_file, 'dst': dst})
 
 
 def main():
