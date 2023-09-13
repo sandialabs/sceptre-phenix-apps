@@ -1,9 +1,9 @@
-import copy, json, os, re, stat, sys
+import copy, json, os, re, stat
 
 from phenix_apps.apps   import AppBase
 from phenix_apps.common import error, logger, utils
 
-from phenix_apps.apps.sceptre.configs import configs, reg_map_gen
+from phenix_apps.apps.sceptre.configs import configs
 
 class Sceptre(AppBase):
     @staticmethod
@@ -82,14 +82,16 @@ class Sceptre(AppBase):
             self.add_inject(hostname=opc.hostname, inject=kwargs)
 
             # Create sceptre startup scheduler injections
-            # Mirrors the phenix startup scheduler but is needed in order to run thigs as local user for UI automation
-            kwargs ={ "src": f"{self.startup_dir}/sceptre-startup-scheduler.cmd",
+            # Mirrors the phenix startup scheduler but is needed in order to run things as local user for UI automation
+            kwargs = {
+                "src": f"{self.startup_dir}/sceptre-startup-scheduler.cmd",
                 "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
                 "description": "sceptre startup scheduler",
             }
             self.add_inject(hostname=opc.hostname, inject=kwargs)
 
-            kwargs ={ "src": f"{self.startup_dir}/sceptre-startup.ps1",
+            kwargs = {
+                "src": f"{self.startup_dir}/sceptre-startup.ps1",
                 "dst": "sceptre/sceptre-startup.ps1",
                 "description": "sceptre startup script",
             }
@@ -103,14 +105,15 @@ class Sceptre(AppBase):
         fdf = self.extract_nodes_type("fep")
         for fd_ in fds + fdc + fdf:
             fd_directory = f"{self.sceptre_dir}/{fd_.hostname}"
-            
+
             # Create sceptre startup script injection
             kwargs = self.find_override(f"{fd_.hostname}_sceptre-start.sh")
             if kwargs is None:
                 kwargs = {"src": f"{self.startup_dir}/{fd_.hostname}-start.sh"}
             kwargs.update({
                 "dst": "/etc/phenix/startup/sceptre-start.sh",
-                "description": "startup",
+                "description": f"{fd_.hostname} startup script",
+                "permissions": "0744",
             })
             self.add_inject(hostname=fd_.hostname, inject=kwargs)
 
@@ -129,7 +132,7 @@ class Sceptre(AppBase):
 
         for hmi in hmis:
             hmi_directory = f"{self.sceptre_dir}/{hmi.hostname}"
-            
+
             # Create startup script injection
             kwargs = self.find_override(f"{hmi.hostname}_hmi.ps1")
             if kwargs is None:
@@ -141,14 +144,16 @@ class Sceptre(AppBase):
             self.add_inject(hostname=hmi.hostname, inject=kwargs)
 
             # Create sceptre startup scheduler injections
-            # Mirrors the phenix startup scheduler but is needed in order to run thigs as local user for UI automation
-            kwargs ={ "src": f"{self.startup_dir}/sceptre-startup-scheduler.cmd",
+            # Mirrors the phenix startup scheduler but is needed in order to run things as local user for UI automation
+            kwargs = {
+                "src": f"{self.startup_dir}/sceptre-startup-scheduler.cmd",
                 "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
                 "description": "sceptre startup scheduler",
             }
             self.add_inject(hostname=hmi.hostname, inject=kwargs)
 
-            kwargs ={ "src": f"{self.startup_dir}/sceptre-startup.ps1",
+            kwargs = {
+                "src": f"{self.startup_dir}/sceptre-startup.ps1",
                 "dst": "sceptre/sceptre-startup.ps1",
                 "description": "sceptre startup script",
             }
@@ -162,19 +167,18 @@ class Sceptre(AppBase):
                 msg = f"No metadata for {scada_server.hostname}"
                 logger.log("WARN", msg)
                 continue
-            metadata_dict = scada_server.metadata
 
             # Create SCADA project file injection
             kwargs = {
-                "src": f"{metadata_dict.project}",
+                "src": f"{scada_server.metadata.project}",
                 "dst": "Users/wwuser/Documents/Configs/Inject/myscada.mep",
                 "description": "SCADA project file",
             }
             self.add_inject(hostname=scada_server.hostname, inject=kwargs)
-            
+
             # Create automation injection
             kwargs = {
-                "src": f"{metadata_dict.automation}",
+                "src": f"{scada_server.metadata.automation}",
                 "dst": "myscada.exe",
                 "description": "Windows automation binary",
             }
@@ -191,14 +195,16 @@ class Sceptre(AppBase):
             self.add_inject(hostname=scada_server.hostname, inject=kwargs)
 
             # Create sceptre startup scheduler injections
-            # Mirrors the phenix startup scheduler but is needed in order to run thigs as local user for UI automation
-            kwargs ={ "src": f"{self.startup_dir}/sceptre-startup-scheduler.cmd",
+            # Mirrors the phenix startup scheduler but is needed in order to run things as local user for UI automation
+            kwargs = {
+                "src": f"{self.startup_dir}/sceptre-startup-scheduler.cmd",
                 "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
                 "description": "sceptre startup scheduler",
             }
             self.add_inject(hostname=scada_server.hostname, inject=kwargs)
 
-            kwargs ={ "src": f"{self.startup_dir}/sceptre-startup.ps1",
+            kwargs = {
+                "src": f"{self.startup_dir}/sceptre-startup.ps1",
                 "dst": "sceptre/sceptre-startup.ps1",
                 "description": "sceptre startup script",
             }
@@ -209,7 +215,7 @@ class Sceptre(AppBase):
 
         for engineer_workstation in engineer_workstations:
             engineer_directory = (f"{self.sceptre_dir}/{engineer_workstation.hostname}")
-            
+
             # Create putty startup script injection
             kwargs = self.find_override(f"{engineer_workstation.hostname}_putty.ps1")
             if kwargs is None:
@@ -221,14 +227,16 @@ class Sceptre(AppBase):
             self.add_inject(hostname=engineer_workstation.hostname, inject=kwargs)
 
             # Create sceptre startup scheduler injections
-            # Mirrors the phenix startup scheduler but is needed in order to run thigs as local user for UI automation
-            kwargs ={ "src": f"{self.startup_dir}/sceptre-startup-scheduler.cmd",
+            # Mirrors the phenix startup scheduler but is needed in order to run things as local user for UI automation
+            kwargs = {
+                "src": f"{self.startup_dir}/sceptre-startup-scheduler.cmd",
                 "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
                 "description": "sceptre startup scheduler",
             }
             self.add_inject(hostname=engineer_workstation.hostname, inject=kwargs)
 
-            kwargs ={ "src": f"{self.startup_dir}/sceptre-startup.ps1",
+            kwargs = {
+                "src": f"{self.startup_dir}/sceptre-startup.ps1",
                 "dst": "sceptre/sceptre-startup.ps1",
                 "description": "sceptre startup script",
             }
@@ -239,7 +247,7 @@ class Sceptre(AppBase):
 
         for historian in historians:
             historian_directory = f"{self.sceptre_dir}/{historian.hostname}"
-            
+
             # Create historian config injection
             kwargs = self.find_override(f"{historian.hostname}_historian_config.txt")
             if kwargs is None:
@@ -261,8 +269,9 @@ class Sceptre(AppBase):
             self.add_inject(hostname=historian.hostname, inject=kwargs)
 
             # Create sceptre startup scheduler injections
-            # Mirrors the phenix startup scheduler but is needed in order to run thigs as local user for UI automation
-            kwargs ={ "src": f"{self.startup_dir}/sceptre-startup-scheduler.cmd",
+            # Mirrors the phenix startup scheduler but is needed in order to run things as local user for UI automation
+            kwargs = {
+                "src": f"{self.startup_dir}/sceptre-startup-scheduler.cmd",
                 "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
                 "description": "sceptre startup scheduler",
             }
@@ -287,8 +296,8 @@ class Sceptre(AppBase):
                 msg = f"No metadata for {provider.hostname}"
                 logger.log("WARN", msg)
                 continue
-            metadata_dict = provider.metadata
-            simulator = metadata_dict.get("simulator", None)
+
+            simulator = provider.metadata.get("simulator", "")  # type: str
 
             # Create power world provider injections
             if simulator in ["PowerWorld", "PowerWorldHelics"]:
@@ -301,6 +310,7 @@ class Sceptre(AppBase):
                     "description": "PowerWorld_config",
                 })
                 self.add_inject(hostname=provider.hostname, inject=kwargs)
+
                 # objects
                 kwargs = self.find_override(f"{provider.hostname}_objects.txt")
                 if kwargs is None:
@@ -312,19 +322,19 @@ class Sceptre(AppBase):
                 self.add_inject(hostname=provider.hostname, inject=kwargs)
                 # case file
                 kwargs = {
-                    "src": f"{metadata_dict.case}",
+                    "src": f"{provider.metadata.case}",
                     "dst": "sceptre/case.PWB",
                     "description": "PowerWorld binary file",
                 }
                 self.add_inject(hostname=provider.hostname, inject=kwargs)
                 # oneline file
                 kwargs = {
-                    "src": f"{metadata_dict.oneline}",
+                    "src": f"{provider.metadata.oneline}",
                     "dst": "sceptre/oneline.pwd",
                     "description": "PowerWorld display file",
                 }
                 self.add_inject(hostname=provider.hostname, inject=kwargs)
-            
+
             # Create power world dynammics provider injections
             elif simulator == "PowerWorldDynamics":
                 # config
@@ -336,6 +346,7 @@ class Sceptre(AppBase):
                     "description": "PowerWorldDynamics_config",
                 })
                 self.add_inject(hostname=provider.hostname, inject=kwargs)
+
                 # objects
                 kwargs = self.find_override(f"{provider.hostname}_objects.txt")
                 if kwargs is None:
@@ -345,38 +356,53 @@ class Sceptre(AppBase):
                     "description": "PowerWorldDynamics_objects",
                 })
                 self.add_inject(hostname=provider.hostname, inject=kwargs)
-            
-            # Create simuulink provider injections
+
+            # Create Simulink provider injections
             elif simulator == "Simulink":
                 # solver
                 kwargs = {
-                    "src": f"{metadata_dict.solver}",
+                    "src": f"{provider.metadata.solver}",
                     "dst": "/etc/sceptre/simulinksolver",
                     "description": "Simulink solver binary",
+                    "permissions": "0777",
                 }
                 self.add_inject(hostname=provider.hostname, inject=kwargs)
+
                 # publish points
                 kwargs = {
-                    "src": f"{metadata_dict.publish_points}",
+                    "src": f"{provider.metadata.publish_points}",
                     "dst": "/etc/sceptre/publishPoints.txt",
                     "description": "Simulink solver publish points",
+                    "permissions": "0664",
                 }
                 self.add_inject(hostname=provider.hostname, inject=kwargs)
-                # solver ground truth
-                kwargs = {
-                    "src": f"{metadata_dict.gt}",
-                    "dst": "/etc/sceptre/simulinkgt",
-                    "description": "Simulink solver ground truth binary",
-                }
-                self.add_inject(hostname=provider.hostname, inject=kwargs)
-                # solver ground truth web template
-                kwargs = {
-                    "src": f"{metadata_dict.gt_template}",
-                    "dst": "/etc/sceptre/main.tmpl",
-                    "description": "Simulink solver ground truth web template",
-                }
-                self.add_inject(hostname=provider.hostname, inject=kwargs)
-            
+
+                # Ground Truth is the concept of having two versions of the
+                # same Simulink simulator, one of which can be modified,
+                # the other runs unmodified, thus providing "ground truth"
+                # as to what the system state should be before being mettled
+                # with (e.g. disruption scenarios).
+                #
+                # This may or may not work properly as of June 2023, YMMV.
+                if provider.metadata.get("gt"):
+                    # solver ground truth
+                    kwargs = {
+                        "src": f"{provider.metadata.gt}",
+                        "dst": "/etc/sceptre/simulinkgt",
+                        "description": "Simulink solver ground truth binary",
+                        "permissions": "0777",
+                    }
+                    self.add_inject(hostname=provider.hostname, inject=kwargs)
+
+                    # solver ground truth web template
+                    kwargs = {
+                        "src": f"{provider.metadata.gt_template}",
+                        "dst": "/etc/sceptre/main.tmpl",
+                        "description": "Simulink solver ground truth web template",
+                        "permissions": "0664",
+                    }
+                    self.add_inject(hostname=provider.hostname, inject=kwargs)
+
             # Create pypower provider injections
             elif simulator == "PyPower":
                 # config
@@ -388,14 +414,15 @@ class Sceptre(AppBase):
                     "description": "PyPower_config",
                 })
                 self.add_inject(hostname=provider.hostname, inject=kwargs)
+
                 # case file
                 kwargs = {
-                    "src": f"{metadata_dict.case}",
-                    "dst": f"/etc/sceptre/{os.path.basename(metadata_dict.case)}",
+                    "src": f"{provider.metadata.case}",
+                    "dst": f"/etc/sceptre/{os.path.basename(provider.metadata.case)}",
                     "description": "PyPower case file",
                 }
                 self.add_inject(hostname=provider.hostname, inject=kwargs)
-            
+
             # Create default provider injections
             else:
                 # config
@@ -468,7 +495,7 @@ class Sceptre(AppBase):
                     kwargs = {"src": startup_file}
                 kwargs.update({
                     "dst": "/etc/phenix/startup/helics-broker-start.sh",
-                    "descrption": "HELICS broker start",
+                    "description": "HELICS broker start",
                 })
                 self.add_inject(hostname=bkr.hostname, inject=kwargs)
 
@@ -492,7 +519,8 @@ class Sceptre(AppBase):
                     kwargs = {"src": startup_file}
                 kwargs.update({
                     "dst": "/etc/phenix/startup/elk-start.sh",
-                    "descrption": "vm_elk_startup",
+                    "description": "vm_elk_startup",
+                    "permissions": "0774",
                 })
                 self.add_inject(hostname=vm.hostname, inject=kwargs)
 
@@ -500,8 +528,7 @@ class Sceptre(AppBase):
         elk = self.extract_nodes_type("elk")
 
         if len(elk) > 1:
-            msg = ("There are multiple ELK boxes defined for this SCEPTRE"
-                   " experiment")
+            msg = "There are multiple ELK boxes defined for this SCEPTRE experiment"
             logger.log("ERROR", msg)
             raise error.AppError(msg)
 
@@ -543,7 +570,7 @@ class Sceptre(AppBase):
         with open(scheduler_file, "w") as file_:
             utils.mako_serve_template(scheduler_mako, self.mako_templates_path, file_)
         os.chmod(scheduler_file, 0o0777)
-        
+
         startup_file = f"{self.startup_dir}/sceptre-startup.ps1"
         startup_mako = "sceptre-startup.mako"
         with open(startup_file, "w") as file_:
@@ -570,7 +597,7 @@ class Sceptre(AppBase):
             provider_map[provider.hostname] = provider
             md = provider.metadata
             simulator = md.get("simulator", None)
-            pub_endpoint = md.publish_endpoint
+            pub_endpoint = md.get("publish_endpoint", "udp://*;239.0.0.1:40000")
             ipv4_address = provider.topology.network.interfaces[0].address
             srv_endpoint = f"tcp://{ipv4_address}:5555"
 
@@ -662,7 +689,9 @@ class Sceptre(AppBase):
 
             # get provider information
             provider = provider_map[fd_.metadata.provider]
-            pub_endpoint = provider.metadata.publish_endpoint
+            pub_endpoint = provider.metadata.get(
+                "publish_endpoint", "udp://*;239.0.0.1:40000"
+            )
 
             #get fd info from metadata
             try:
@@ -1012,9 +1041,11 @@ class Sceptre(AppBase):
             fd_directory = f"{self.sceptre_dir}/{fd_.hostname}"
             os.makedirs(fd_directory, exist_ok=True)
 
-            provider = provider_map[parsed.provider_name]
-            pub_endpoint = provider.metadata.publish_endpoint
             parsed = SceptreMetadataParser(fd_.metadata)
+            provider = provider_map[parsed.provider_name]
+            pub_endpoint = provider.metadata.get(
+                "publish_endpoint", "udp://*;239.0.0.1:40000"
+            )
 
             fd_interfaces = {}
             for _, iface in enumerate(fd_.topology.network.interfaces):
@@ -1031,7 +1062,7 @@ class Sceptre(AppBase):
                 ):
                     if not fd_interfaces.get("tcp", ""):
                         fd_interfaces['tcp'] = iface.address
- 
+
             for _, iface in enumerate(fd_.topology.network.interfaces):
                 # the provider publish_endpoint should look like 'udp://*;127.0.0.1:40000',
                 # but the rtu needs to bind specifically to the mgmt interface
@@ -1337,25 +1368,24 @@ class Sceptre(AppBase):
             iface = historian_ifaces[0]
 
             if historian.metadata:
-                metadata_dict = historian.metadata
-
-                if "primary" in metadata_dict and metadata_dict.primary:
-                    if metadata_dict.primary not in secondary_historian_ips:
-                        secondary_historian_ips[metadata_dict.primary] = [
+                if "primary" in historian.metadata and historian.metadata.primary:
+                    if historian.metadata.primary not in secondary_historian_ips:
+                        secondary_historian_ips[historian.metadata.primary] = [
                             iface.address
                         ]
                     else:
-                        secondary_historian_ips[metadata_dict.primary].append(
+                        secondary_historian_ips[historian.metadata.primary].append(
                             iface.address
                         )
             else:
-                secondary_historian_ips.historian.append(iface.address)
-        
+                secondary_historian_ips["historian"].append(iface.address)
+
         # Write historian files
         for historian in historians:
             historian_directory = f"{self.sceptre_dir}/{historian.hostname}"
             os.makedirs(historian_directory, exist_ok=True)
 
+            iface = historian_ifaces[0]
             hist_ip = iface.address
 
             # Get the IP address and OPC config object associated with the OPC system that
@@ -1389,16 +1419,15 @@ class Sceptre(AppBase):
                     secondary_ips = secondary_historian_ips[historian.hostname]
 
                 if historian.metadata:
-                    metadata_dict = historian.metadata
                     # A list of field "types" to include in the historian configuration, if empty
                     # the configuration will include all the fields it gets from OPC.  Is populated
                     # in a historians metadata.
                     hist_fields = []
 
-                    if "fields" in metadata_dict:
-                        hist_fields = metadata_dict.fields
+                    if "fields" in historian.metadata:
+                        hist_fields = historian.metadata.fields
 
-                    if metadata_dict.get("connecttoscada", None):
+                    if historian.metadata.get("connecttoscada", None):
                         hist_config = configs.HistorianConfig(
                             None, "", secondary_ips, True, hist_fields
                         )
@@ -1453,7 +1482,7 @@ class SceptreMetadataParser():
                                 continue
                             md[i].pop(k, None)
                     self.devices_by_protocol[p] = md
-        
+
         except Exception as e:
             raise error.AppError(f"Failed when parsing metadata.\nError: {e}")
 
