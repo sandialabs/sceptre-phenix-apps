@@ -1,5 +1,6 @@
 import phenix_apps.apps.sceptre.protocols.sunspec as sunspec
 
+
 class Infrastructure:
     def __init__(self):
         self.infrastructure_name = ""
@@ -12,24 +13,6 @@ class Infrastructure:
 
     def register(self, name: str) -> None:
         self.infrastructure_name = name
-
-    @staticmethod
-    def factory(infrastructure: str):
-        if infrastructure == 'power-transmission':
-            return PowerTransmissionInfrastructure()
-        if infrastructure == 'power-distribution':
-            return PowerDistributionInfrastructure()
-        if infrastructure == 'batch-process':
-            return BatchProcessInfrastructure()
-        if infrastructure == 'hvac':
-            return HVACInfrastructure()
-        if infrastructure == 'fuel':
-            return FuelInfrastructure()
-        if infrastructure == 'rtds':
-            return RTDSInfrastructure()
-        if infrastructure == 'waterway':
-            return WaterwayInfrastructure()
-        return None
 
     def get_infrastructure_name(self) -> str:
         return self.infrastructure_name
@@ -57,6 +40,7 @@ class Infrastructure:
 
     def add_integer_read_write_fields(self, device_type, fields) -> None:
         self.device_fields['integer-read-write'][device_type] = fields
+
 
 class PowerTransmissionInfrastructure(Infrastructure):
     def __init__(self):
@@ -116,7 +100,7 @@ class PowerTransmissionInfrastructure(Infrastructure):
                 'infrastructure': 'PowerTransmission',
                 'analog-read-write': kwargs.get('analog-read-write', [1, 103, 120, 123]),
             }
-        infra = infrastructure=PowerTransmissionInfrastructure.INFRA
+        infra = PowerTransmissionInfrastructure.INFRA
         return Device(device_type, device_name, protocol, reg_config,
                       infrastructure=infra, **device_kwargs)
 
@@ -248,9 +232,10 @@ class PowerDistributionInfrastructure(Infrastructure):
                             ['active']),
                       'binary-read-write'   : kwargs.get('binary-read-write',
                             ['active'])}
-        infra = infrastructure=PowerDistributionInfrastructure.INFRA
+        infra = PowerDistributionInfrastructure.INFRA
         return Device(device_type, device_name, protocol, reg_config,
                       infrastructure=infra, **device_kwargs)
+
 
 class BatchProcessInfrastructure(Infrastructure):
     def __init__(self):
@@ -333,7 +318,7 @@ class BatchProcessInfrastructure(Infrastructure):
                             ['open']),
                       'binary-read-write'   : kwargs.get('binary-read-write',
                             ['open'])}
-        infra = infrastructure=BatchProcessInfrastructure.INFRA
+        infra = BatchProcessInfrastructure.INFRA
         return Device(device_type, device_name, protocol, reg_config,
                       infrastructure=infra, **device_kwargs)
 
@@ -376,9 +361,10 @@ class HVACInfrastructure(Infrastructure):
                             ['turn_on']),
                       'binary-read'         : kwargs.get('binary-read',
                             ['on'])}
-        infra = infrastructure=HVACInfrastructure.INFRA
+        infra = HVACInfrastructure.INFRA
         return Device(device_type, device_name, protocol, reg_config,
                       infrastructure=infra, **device_kwargs)
+
 
 class FuelInfrastructure(Infrastructure):
     def __init__(self):
@@ -425,9 +411,10 @@ class FuelInfrastructure(Infrastructure):
                             ['open']),
                       'binary-read-write'   : kwargs.get('binary-read-write',
                             ['open'])}
-        infra = infrastructure=BatchProcessInfrastructure.INFRA
+        infra = BatchProcessInfrastructure.INFRA
         return Device(device_type, device_name, protocol, reg_config,
                       infrastructure=infra, **device_kwargs)
+
 
 class RTDSInfrastructure(Infrastructure):
     """Real-Time Dynamic Simulator (RTDS) infrastructure."""
@@ -456,6 +443,7 @@ class RTDSInfrastructure(Infrastructure):
                 'binary-read-write': kwargs.get('binary-read-write', ['closed']),
             }
             return Device(device_type, device_name, protocol, reg_config, **device_kwargs)
+
 
 class WaterwayInfrastructure(Infrastructure):
     def __init__(self):
@@ -486,14 +474,61 @@ class WaterwayInfrastructure(Infrastructure):
         elif type(device_type) == str and device_type.lower() == 'boat-sensor':
             device_kwargs = {'range'        : (0, 1000),
                       'analog-read'         : kwargs.get('analog-read',
-                            ['active', 'direction'])} 
+                            ['active', 'direction'])}
         elif type(device_type) == str and device_type.lower() == 'boat':
             device_kwargs = {'range'        : (0, 1000),
                       'analog-read'         : kwargs.get('analog-read',
-                            ['location', 'direction'])} 
+                            ['location', 'direction'])}
         infra = infrastructure=WaterwayInfrastructure.INFRA
         return Device(device_type, device_name, protocol, reg_config,
                       infrastructure=infra, **device_kwargs)
+
+
+class BatteryInfrastructure(Infrastructure):
+    """
+    Infrastructure for a specific Simulink model of a battery system.
+
+    TODO: There needs to be a better way of specifying this stuff
+    directly in the scenario file and not have to do a
+    infrastructure for every Simulink model.
+    """
+
+    MAPPING = {
+        "bmsscrtu": {
+            "analog-read": ["istack", "vstack", "socstack"],
+            "binary-read-write": ["disconnect"],
+        },
+        "bmsse": {
+            "analog-read": ["istack", "vstack", "socstack"],
+        },
+        "battstack": {
+            "analog-read": ["istack", "vstack"],
+        },
+        "cps": {
+            "analog-read": ["pinj", "qinj", "vbess", "ibess"],
+        },
+    }
+
+    def __init__(self):
+        super().__init__()
+        super().register("battery")
+        self.range = -32767.0, 32767.0
+
+    @staticmethod
+    def create_device(
+        device_type, device_name, protocol, reg_config, **kwargs
+    ):
+        if type(device_type) != str:
+            return None
+
+        if device_type not in BatteryInfrastructure.MAPPING:
+            return None
+
+        device_kwargs = BatteryInfrastructure.MAPPING[device_type]
+        device_kwargs["range"] = (-32767.0, 32767.0)
+
+        return Device(device_type, device_name, protocol, reg_config, **device_kwargs)
+
 
 class Device(Infrastructure):
     def __init__(self, device_type, device_name, protocol, reg_config, **kwargs):
@@ -530,6 +565,7 @@ class Device(Infrastructure):
                                 self.device_type, self.protocol, self.range,self.reg_config)
                 self.registers.append(fd_register)
 
+
 class Register:
     TYPE = {}
     TYPE['dnp3'] = {
@@ -550,16 +586,13 @@ class Register:
     }
     TYPE['bacnet'] = {
         'analog-read': 'analog-input', 'analog-read-write': 'analog-output',
-        'binary-read': 'binary-input', 'binary-read-write': 'binary-output'
-    }
+        'binary-read': 'binary-input', 'binary-read-write': 'binary-output'}
     TYPE['iec60870-5-104'] = {
         'analog-read': 'analog-input', 'analog-read-write': 'analog-output',
-        'binary-read': 'binary-input', 'binary-read-write': 'binary-output'
-    }
+        'binary-read': 'binary-input', 'binary-read-write': 'binary-output'}
     addresses = {'dnp3': 0, 'dnp3-serial': 0, 'bacnet': 0, 'iec60870-5-104': 0,
         'input-register': 30000, 'holding-register': 40000, 'discrete-input': 10000,
-        'coil': 0, 'float-point': 1000, 'single-point': 3000
-    }
+        'coil': 0, 'float-point': 1000, 'single-point': 3000}
 
     def __init__(self, devname, field, fieldtype, devtype, protocol, range_, reg_config):
         self.devname = devname
@@ -580,7 +613,7 @@ class Register:
                 type(self).addresses[self.regtype] += 1
         else:
             for config in reg_config:
-                if  self.fieldtype in config.keys() and self.devname == config["name"] and self.devtype == config["type"]:
+                if self.fieldtype in config.keys() and self.devname == config["name"] and self.devtype == config["type"]:
                     for item in config[self.fieldtype]:
                         if self.field == item['field'] and self.regtype == item['register_type']:
                             register_number = item["register_number"]
@@ -591,8 +624,7 @@ class Register:
                                 self.addr = type(self).addresses[self.regtype]
                                 type(self).addresses[self.regtype] = register_number
 
-
-            # DEFAULT: if somthing isnt right
+            # DEFAULT: if something isn't right
             if 'dnp3' in self.protocol or 'bacnet' in self.protocol or 'iec60870-5-104' in self.protocol:
                 self.addr = type(self).addresses[self.protocol]
                 type(self).addresses[self.protocol] += 1
