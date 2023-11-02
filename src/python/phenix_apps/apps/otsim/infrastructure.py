@@ -111,24 +111,24 @@ class Infrastructure:
         if isinstance(var_type, dict):
           var_type = var_type['type']
 
-        if var_type in ['analog-read', 'binary-read']:
-          sub = ET.Element('subscription')
+        sub = ET.Element('subscription')
 
-          key = ET.SubElement(sub, 'key')
-          key.text = f'{topic}.{var}'
+        key = ET.SubElement(sub, 'key')
+        key.text = f'{topic}.{var}'
 
-          tag = ET.SubElement(sub, 'tag')
-          tag.text = f'{tag_name}.{var}'
+        tag = ET.SubElement(sub, 'tag')
+        tag.text = f'{tag_name}.{var}'
 
-          typ = ET.SubElement(sub, 'type')
+        typ = ET.SubElement(sub, 'type')
 
-          if var_type == 'analog-read':
-            typ.text = 'double'
-          else:
-            typ.text = 'boolean'
+        if var_type in ['analog-read', 'analog-read-write']:
+          typ.text = 'double'
+        else:
+          typ.text = 'boolean'
 
-          doc.append(sub)
-        elif var_type in ['analog-read-write', 'binary-read-write']:
+        doc.append(sub)
+
+        if var_type in ['analog-read-write', 'binary-read-write']:
           # `endpoint` will be False if disabled, otherwise it will be the name
           # of the endpoint to send updates to (prepended with the destination
           # federate name).
