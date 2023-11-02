@@ -250,6 +250,9 @@ class WindTurbine(AppBase):
 
       config.append_to_cpu(module)
 
+      annotation = [{'broker': addr, 'fed-count': 1}]
+      self.add_annotation(node.hostname, 'helics/federate', annotation)
+
     md        = node.metadata.get('logic', tmpl.get('logic', {}))
     speed_tag = md.get('speedTag', 'speed.high')
     dir_tag   = md.get('directionTag', 'dir.high')
