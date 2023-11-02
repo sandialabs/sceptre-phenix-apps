@@ -179,6 +179,7 @@ class WindTurbine(AppBase):
     height    = md.get('hubHeight', 135)
     roughness = md.get('roughnessLength', 0.15)
     helics    = md.get('helicsTopic', None)
+    sbo       = md.get('dnp3SBO', False)
 
     turbine = ET.Element('wind-turbine')
     power   = ET.SubElement(turbine, 'power-output')
@@ -332,12 +333,12 @@ class WindTurbine(AppBase):
     dnp.init_outstation_xml()
 
     registers = [
-      Register('binary-read-write', 'turbine.emergency-stop', {'sbo': 'true'}),
-      Register('analog-read-write', 'yaw.dir-error', {'sbo': 'true'}),
-      Register('analog-read', 'yaw.current'),
-      Register('analog-read', 'yaw.setpoint'),
-      Register('analog-read', 'turbine.mw-output'),
-      Register('binary-read', 'feathered'),
+      Register('binary-read-write', 'turbine.emergency-stop', {'sbo': str(sbo).lower()}),
+      Register('analog-read-write', 'yaw.dir-error',          {'sbo': str(sbo).lower()}),
+      Register('analog-read',       'yaw.current'),
+      Register('analog-read',       'yaw.setpoint'),
+      Register('analog-read',       'turbine.mw-output'),
+      Register('binary-read',       'feathered'),
     ] + self.__anemometer_registers(anemo)
 
     dnp.registers_to_xml(registers)

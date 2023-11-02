@@ -46,6 +46,7 @@ spec:
               hubHeight: 135
               roughnessLength: 0.15
               helicsTopic: generator-$2_bus-2100.mw_setpoint
+              dnp3SBO: false
             logic:
               speedTag: speed.high
               directionTag: dir.high
