@@ -177,4 +177,20 @@ spec:
               foo:
                 tag: foo.bar
                 value: 0
+
+      - hostname: hmi
+        metadata:
+          type: fd-client
+          node-red:
+            flow: /phenix/injects/foobar/node-red-flow.json
+            endpoint:
+              host: 0.0.0.0
+              port: 1880
+            auth:
+              editor:
+                user: admin
+                pass: admin
+              ui:
+                user: foo
+                pass: bar
 ```

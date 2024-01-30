@@ -9,6 +9,7 @@ from phenix_apps.apps.otsim.config         import Config
 from phenix_apps.apps.otsim.device         import FEP, FieldDeviceClient, FieldDeviceServer
 from phenix_apps.apps.otsim.infrastructure import Infrastructure
 from phenix_apps.apps.otsim.logic          import Logic
+from phenix_apps.apps.otsim.nodered        import NodeRed
 
 
 class OTSim(AppBase):
@@ -276,6 +277,19 @@ class OTSim(AppBase):
 
           config.append_to_root(logic.root)
           config.append_to_cpu(module)
+
+      if 'node-red' in client.metadata:
+        nodered = NodeRed.parse_metadata(client.metadata)
+
+        module = ET.Element('module', {'name': 'node-red'})
+        module.text = 'ot-sim-node-red-module {{config_file}}'
+
+        config.append_to_root(nodered.root)
+        config.append_to_cpu(module)
+
+        inject = nodered.needs_inject()
+        if inject:
+          self.add_inject(hostname=client.hostname, inject=inject)
 
       config_file = f'{self.otsim_dir}/{client.hostname}.xml'
 
