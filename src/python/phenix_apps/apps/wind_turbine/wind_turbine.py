@@ -10,6 +10,7 @@ from phenix_apps.common import logger
 from phenix_apps.apps.otsim.config           import Config
 from phenix_apps.apps.otsim.device           import Register
 from phenix_apps.apps.otsim.logic            import Logic
+from phenix_apps.apps.otsim.nodered          import NodeRed
 from phenix_apps.apps.otsim.protocols.modbus import Modbus
 from phenix_apps.apps.otsim.protocols.dnp3   import DNP3
 
@@ -252,6 +253,24 @@ class WindTurbine(AppBase):
 
       annotation = [{'broker': addr, 'fed-count': 1}]
       self.add_annotation(node.hostname, 'helics/federate', annotation)
+
+
+    md = node.metadata.get('node-red', tmpl.get('node-red', None))
+    if md:
+      nodered = NodeRed()
+
+      nodered.init_xml_root(md, 'main-controller')
+      nodered.to_xml()
+
+      module = ET.Element('module', {'name': 'node-red'})
+      module.text = 'ot-sim-node-red-module {{config_file}}'
+
+      config.append_to_root(nodered.root)
+      config.append_to_cpu(module)
+
+      inject = nodered.needs_inject()
+      if inject:
+        self.add_inject(hostname=node.hostname, inject=inject)
 
     md        = node.metadata.get('logic', tmpl.get('logic', {}))
     speed_tag = md.get('speedTag', 'speed.high')

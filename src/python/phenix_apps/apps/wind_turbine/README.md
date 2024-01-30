@@ -51,6 +51,18 @@ spec:
               speedTag: speed.high
               directionTag: dir.high
               directionError: 0.04
+            node-red:
+              flow: /phenix/injects/foobar/node-red-flow.json
+              endpoint:
+                host: 0.0.0.0
+                port: 1880
+              auth:
+                editor:
+                  user: admin
+                  pass: admin
+                ui:
+                  user: foo
+                  pass: bar
             weather:
               columns:
               - name: wind_speed
