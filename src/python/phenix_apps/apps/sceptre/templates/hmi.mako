@@ -38,9 +38,7 @@ Show-Sleep(200)
 Echo ''
 Echo 'Opening MySCADA Interface...'
 % for scada_addr in scada_ips:
-% if scada_addr.split('.')[:-1] == hmi_ip.split('.')[:-1] or len(scada_ips) == 1:
 Start-Process -FilePath "C:\Program Files (x86)\Mozilla Firefox\firefox.exe" -ArgumentList ${scada_addr} -WindowStyle Maximized
-% endif
 % endfor
 Echo 'Done.'
 

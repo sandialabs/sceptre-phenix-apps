@@ -21,12 +21,12 @@ while (-Not (Phenix-StartupComplete)) {
 new-item -path "HKCU:\Software\SimonTatham\"
 new-item -path "HKCU:\Software\SimonTatham\PuTTY\"
 new-item -path "HKCU:\Software\SimonTatham\PuTTY\Sessions"
-new-item -path "HKCU:\Software\SimonTatham\PuTTY\Sessions\${fd.name}"
-    % for iface in fd.interfaces:
-        % if not iface.type_ == 'serial' and iface.vlan_alias.lower() != 'mgmt':
-new-itemproperty -path "HKCU:\Software\SimonTatham\PuTTY\Sessions\${fd.name}" -name Hostname -value ${iface.ipv4_address}
-new-itemproperty -path "HKCU:\Software\SimonTatham\PuTTY\Sessions\${fd.name}" -name Protocol -value telnet
-new-itemproperty -path "HKCU:\Software\SimonTatham\PuTTY\Sessions\${fd.name}" -name PortNumber -value 1337 -type DWord
+new-item -path "HKCU:\Software\SimonTatham\PuTTY\Sessions\${fd.hostname}"
+    % for iface in fd.topology.network.interfaces:
+        % if not iface.type == 'serial' and iface.vlan.lower() != 'mgmt':
+new-itemproperty -path "HKCU:\Software\SimonTatham\PuTTY\Sessions\${fd.hostname}" -name Hostname -value ${iface.address}
+new-itemproperty -path "HKCU:\Software\SimonTatham\PuTTY\Sessions\${fd.hostname}" -name Protocol -value telnet
+new-itemproperty -path "HKCU:\Software\SimonTatham\PuTTY\Sessions\${fd.hostname}" -name PortNumber -value 1337 -type DWord
 <% break %>
         % endif
     % endfor

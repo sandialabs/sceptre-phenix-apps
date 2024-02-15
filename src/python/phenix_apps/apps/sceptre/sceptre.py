@@ -226,6 +226,17 @@ class Sceptre(AppBase):
             })
             self.add_inject(hostname=engineer_workstation.hostname, inject=kwargs)
 
+            # Create auto putty connection startup script injection
+            if "connect_interval" in engineer_workstation.metadata:
+                kwargs = self.find_override(f"{engineer_workstation.hostname}_auto_winscp.ps1")
+                if kwargs is None:
+                    kwargs = {"src": f"{engineer_directory}/auto_winscp.ps1"}
+                kwargs.update({
+                    "dst": "/sceptre/startup/40-auto_winscp.ps1",
+                    "description": "engineer_workstation auto putty connections",
+                })
+                self.add_inject(hostname=engineer_workstation.hostname, inject=kwargs)
+
             # Create sceptre startup scheduler injections
             # Mirrors the phenix startup scheduler but is needed in order to run things as local user for UI automation
             kwargs = {
@@ -1306,9 +1317,25 @@ class Sceptre(AppBase):
         ######################## HMI pre-start ###################################
         # Create hmi files
         hmis = self.extract_nodes_type("hmi")
+        scada_servers = self.extract_nodes_type("scada-server")
 
         for hmi in hmis:
             hmi_ip = hmi.topology.network.interfaces[0].address
+            #add scada connection based on metadata or based on subnet if not metadata
+            hmi_scada_ips = []
+            if "connected_scadas" in hmi.metadata:
+                for hmi_scada_server in hmi.metadata.connected_scadas:
+                    for scada_server in scada_servers: 
+                        if hmi_scada_server == scada_server.hostname:
+                            hmi_scada_ips.append(scada_server.topology.network.interfaces[0].address)
+            else:
+                if len(scada_ips) == 1:
+                    hmi_scada_ips = scada_ips
+                else:
+                    for scada_ip in scada_ips:
+                        if scada_ip.split('.')[:-1] == hmi_ip.split('.')[:-1]:
+                            hmi_scada_ips.append(scada_ip)
+                    
             hmi_directory = f"{self.sceptre_dir}/{hmi.hostname}"
             os.makedirs(hmi_directory, exist_ok=True)
 
@@ -1320,33 +1347,39 @@ class Sceptre(AppBase):
                     hmi_mako,
                     self.mako_templates_path,
                     file_,
-                    scada_ips=scada_ips,
+                    scada_ips=hmi_scada_ips,
                     hmi_ip=hmi_ip,
                 )
 
         ######################## Engineer Workstation pre-start ###################################
         # Create engineer workstation files
-        rtus = self.extract_nodes_type("rtu")
+        rtus = self.extract_nodes_type("fd-server")
         eng_fd = []
 
-        for rtu in rtus:
-            eng_fd.append(rtu)
-
         engineer_workstations = self.extract_nodes_type(
-            "engineering-workstation"
+            "engineer-workstation"
         )
 
+        #get rtus that engineer workstation can connect to. Connect to all if none given. 
         for engineer_workstation in engineer_workstations:
+            if "connected_rtus" in engineer_workstation.metadata:
+                for engineer_rtu in engineer_workstation.metadata.connected_rtus:
+                    for rtu in rtus:
+                        if engineer_rtu == rtu.hostname:
+                            eng_fd.append(rtu)
+            else:
+                for rtu in rtus:
+                    eng_fd.append(rtu)
+
             engineer_directory = (
                 f"{self.sceptre_dir}/{engineer_workstation.hostname}"
             )
-
             os.makedirs(engineer_directory, exist_ok=True)
 
             # Wrtie engineer workstation putty injection
-            auto_engineer = f"{engineer_directory}/putty.ps1"
+            putty = f"{engineer_directory}/putty.ps1"
             engineer_mako = "putty.mako"
-            with open(auto_engineer, "w") as file_:
+            with open(putty, "w") as file_:
                 utils.mako_serve_template(
                     engineer_mako,
                     self.mako_templates_path,
@@ -1354,6 +1387,20 @@ class Sceptre(AppBase):
                     scada_ips=scada_ips,
                     eng_fd=eng_fd,
                 )
+
+            #automation script to actively create putty connection
+            if "connect_interval" in engineer_workstation.metadata:
+                auto_winscp = f"{engineer_directory}/auto_winscp.ps1"
+                auto_winscp_mako = "auto_winscp.mako"
+                with open(auto_winscp, "w") as file_:
+                    utils.mako_serve_template(
+                        auto_winscp_mako,
+                        self.mako_templates_path,
+                        file_,
+                        eng_fd=eng_fd,
+                        connect_interval=engineer_workstation.metadata.connect_interval
+                    )
+
 
         ######################## Historian pre-start ###################################
         # Determine primary/secondary historian

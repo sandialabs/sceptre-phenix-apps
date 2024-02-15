@@ -1,6 +1,6 @@
 % if os == 'linux':
     % for interface in ips:
-        % if interface['vlan'] and interface['vlan'].lower() == 'mgmt':
+        % if interface['vlan']:
 echo 'ListenAddress ${interface['address']}' >> /etc/ssh/sshd_config
         % endif
     % endfor
