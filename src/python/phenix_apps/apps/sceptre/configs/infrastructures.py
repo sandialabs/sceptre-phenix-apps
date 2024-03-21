@@ -590,7 +590,7 @@ class Register:
     TYPE['iec60870-5-104'] = {
         'analog-read': 'analog-input', 'analog-read-write': 'analog-output',
         'binary-read': 'binary-input', 'binary-read-write': 'binary-output'}
-    addresses = {'dnp3': 0, 'dnp3-serial': 0, 'bacnet': 0, 'iec60870-5-104': 0,
+    addresses = {'dnp3': 0, 'dnp3-serial': 0, 'bacnet': 0, 'iec60870-5-104': 1,
         'input-register': 30000, 'holding-register': 40000, 'discrete-input': 10000,
         'coil': 0, 'float-point': 1000, 'single-point': 3000}
 
@@ -634,6 +634,6 @@ class Register:
 
     @staticmethod
     def reset_addresses():
-        Register.addresses = {'dnp3': 0, 'dnp3-serial': 0, 'bacnet': 0, 'iec60870-5-104': 0, 'input-register': 30000,
+        Register.addresses = {'dnp3': 0, 'dnp3-serial': 0, 'bacnet': 0, 'iec60870-5-104': 1, 'input-register': 30000,
         'holding-register': 40000, 'discrete-input': 10000, 'coil': 0,
         'float-point': 1000, 'single-point': 3000}
