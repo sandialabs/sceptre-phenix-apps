@@ -34,7 +34,7 @@ OldDataSynchronizationDelay	60	Time period in seconds describing how often the c
 QualityRule	0	Use Good and Uncertain points (0), or Good points only (1)${'\r'}
 RealTimeWindow	60	Maximum delay, relative to current time, for which data will be considered real-time, when processing swinging door and late data (seconds)${'\r'}
 ReplicationConcurrentOperations	50	Limits the total number of retrieval client objects performing calculations in a retrieval based calculations for a time cycle${'\r'}
-ReplicationDefaultPrefix	HISTORIAN	Used for prefixing when configuring the Tier-2 tags${'\r'}
+ReplicationDefaultPrefix	${hist_name.upper()}	Used for prefixing when configuring the Tier-2 tags${'\r'}
 ReplicationTcpPort	32568	Replication TCP Port Address${'\r'}
 RevisionLogPath	C:\Historian\Data\Logs\Revision	File path of the write-ahead log for tier-2 insert/update transactions${'\r'}
 SimpleReplicationNamingScheme	<ReplicationDefaultPrefix>.<SourceTagName>	Naming scheme used for configuring simple replication tags${'\r'}
