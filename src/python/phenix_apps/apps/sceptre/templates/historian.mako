@@ -46,10 +46,6 @@ function CheckTimeout {
     }
 }   
 
-Echo 'Stop aahCfgSvc from running on startup...'
-Stop-Process -Name aahCfgSvc -Force
-Echo 'Done.'
-
 Echo 'Waiting for OPC TOP Server to deploy...'
 $countDown = $timeout
 While (!(Test-Path C:\Users\topserver.ps1) -and ($countDown -gt 0)) {
@@ -69,6 +65,78 @@ Do {
 CheckTimeout -count $countdown
 Echo 'Done.'
 
+Echo 'If historian is not HISTORIAN, delete HISTORIAN and add new historian - otherwise SMC eats all CPU later'
+% if historian_name != "HISTORIAN":
+$countDown = $timeout
+Do {
+    Start-Process -FilePath "C:\Program Files (x86)\Common Files\ArchestrA\aaSMC.exe"
+    Show-Sleep(5)
+    $countDown--
+    $proc = Get-Process mmc -ErrorAction SilentlyContinue
+} Until ($proc -or ($countDown -le 0))
+CheckTimeout -count $countDown 
+Echo "Done."
+
+$countDown = $timeout
+Do {
+    $no = Get-UIAWindow -Name "Wonderware Historian Configuration Editor" | Get-UIAButton -n "No"
+    $countDown--
+} Until ($no -or ($countDown -le 0))
+CheckTimeout -count $countDown
+$no | Invoke-UIAButtonClick | Out-Null
+
+Echo 'Remove old historian group HISTORIAN'
+$countDown = $timeout
+Do {
+    $hist = Get-UIAWindow -Name "SMC -*" | Get-UIAControl -Name "HISTORIAN"
+    $countDown--
+} Until ($hist -or ($countDown -le 0))
+CheckTimeout -count $countDown
+
+$countDown = $timeout
+Do {
+    $del = $hist[1] | Invoke-UIAControlContextMenu | Get-UIAMenuItem -Name "Delete*"
+    $countDown--
+} Until ($del -or ($countDown -le 0))
+CheckTimeout -count $countDown
+$del | Invoke-UIAMenuItemClick | Out-Null
+Start-Sleep -s 5
+
+$countDown = $timeout
+Do{    
+    $yes = Get-UIAWindow -Name "Delete Server" | Get-UIAButton -n "Yes"
+    $countDown--
+} Until ($yes -or ($countDown -le 0))
+CheckTimeout -count $countDown 
+$yes | Invoke-UIAButtonClick | Out-Null
+
+Echo 'Add new historian group for ${historian_name}'
+$countDown = $timeout
+Do {
+    $hist_group = Get-UIAWindow -Name "SMC -*" | Get-UIAControl -Name "Historian Group"
+    $hist_group | Invoke-UIAControlContextMenu | Get-UIAMenuItem -Name "New Historian Registration..." | Invoke-UIAMenuItemClick | Out-Null
+    $hist_name = Get-UIAWindow -Name "Registered Historian Properties" | Get-UIAEdit -Name "Historian:" | Set-UIATextBoxText "${historian_name}"
+    $domain = Get-UIAWindow -Name "Registered Historian Properties" | Get-UIAEdit -Name "Domain:" | Set-UIATextBoxText "${historian_name}"
+    $login = Get-UIAWindow -Name "Registered Historian Properties" | Get-UIAEdit -Name "Login Name:" | Set-UIATextBoxText "wwuser"
+    $pass = Get-UIAWindow -Name "Registered Historian Properties" | Get-UIAEdit -Name "Password:" | Set-UIATextBoxText "Admin1!"
+    $auth = Get-UIAWindow -Name "Registered Historian Properties" | Get-UIARAdioButton -AutomationId '20412' -Name "Use Windows authentication" | Invoke-UIAControlClick | Out-Null
+    $ok = Get-UIAWindow -Name "Registered Historian Properties" | Get-UIAButton -Name "OK"
+    $countDown--
+} Until ($ok -or ($countDown -le 0))
+CheckTimeout -count $countDown 
+$ok | Invoke-UIAButtonClick | Out-Null
+Start-Sleep -s 5
+Echo 'Done.'
+
+Echo 'Close SMC...'
+$countDown = $timeout
+Do {
+    $exit = Get-UIAWindow -Name "SMC -*" | Get-UIAButton -Name "Close" 
+} Until ($exit -or ($countDown -le 0))
+CheckTimeout -count $countDown
+$exit | Invoke-UIAButtonClick | Out-Null
+%endif
+
 Echo 'Open historian configuration wizard...'
 $countDown = $timeout
 Do {
@@ -83,48 +151,48 @@ Echo "Done."
 Echo 'Import historian configuration...'
 $countDown = $timeout
 Do {
-    $hist = Get-UIAWindow -Name "Historian Database Export/Import Utility*" | Get-UIAButton -Name "Next >"
+    $hist_ie = Get-UIAWindow -Name "Historian Database Export/Import Utility*" | Get-UIAButton -Name "Next >"
     Start-Sleep -s 1
     $countDown--
-} Until ($hist -or ($countdown -le 0))
+} Until ($hist_ie -or ($countdown -le 0))
 CheckTimeout -count $countDown
-$hist | Invoke-UIAButtonClick | Out-Null
+$hist_ie | Invoke-UIAButtonClick | Out-Null
 
 $countDown = $timeout
 Do {
-    $hist = Get-UIAWindow -Name "Historian Database Export/Import Utility*" | Get-UIAEdit -Name "File Name:" | Set-UIATextBoxText "C:\Users\wwuser\Documents\Configs\Inject\historian_config.txt"
-    Start-Sleep -s 1
+    $file = Get-UIAWindow -Name "Historian Database Export/Import Utility*" | Get-UIAEdit -Name "File Name:" | Set-UIATextBoxText "C:\Users\wwuser\Documents\Configs\Inject\historian_config.txt"
+    Start-Sleep -s 1 
     $countDown--
-} Until ($hist -or ($countdown -le 0))
+} Until ($file -or ($countdown -le 0))
 CheckTimeout -count $countDown
 
 $countDown = $timeout
 Do {
-    $hist = Get-UIAWindow -Name "Historian Database Export/Import Utility*" | Get-UIAButton -Name "Next >"
+    $next1 = Get-UIAWindow -Name "Historian Database Export/Import Utility*" | Get-UIAButton -Name "Next >"
     Start-Sleep -s 1
     $countDown--
-} Until ($hist -or ($countdown -le 0))
+} Until ($next1 -or ($countdown -le 0))
 CheckTimeout -count $countDown
-$hist | Invoke-UIAButtonClick | Out-Null
+$next1 | Invoke-UIAButtonClick | Out-Null
 
 $countDown = $timeout
 Do {
-    $hist = Get-UIAWindow -Name "Historian Database Export/Import Utility*" | Get-UIAButton -Name "Next >"
+    $next2 = Get-UIAWindow -Name "Historian Database Export/Import Utility*" | Get-UIAButton -Name "Next >"
     Show-Sleep(5)
     $countDown--
-} Until ($hist -or ($countdown -le 0))
+} Until ($next2 -or ($countdown -le 0))
 CheckTimeout -count $countDown
-$hist | Invoke-UIAButtonClick | Out-Null
+$next2 | Invoke-UIAButtonClick | Out-Null
 
 $countDown = $timeout
 Do {
-    $hist = Get-UIAWindow -Name "Historian Database Export/Import Utility*" | Get-UIAButton -Name "Finish"
+    $finish = Get-UIAWindow -Name "Historian Database Export/Import Utility*" | Get-UIAButton -Name "Finish"
     Start-Sleep -s 1
     $countDown--
-} Until ($hist -or ($countdown -le 0))
+} Until ($finish -or ($countdown -le 0))
 CheckTimeout -count $countDown
-$hist | Invoke-UIAButtonClick | Out-Null
-Echo "Done."
+$finish | Invoke-UIAButtonClick | Out-Null
+Echo 'Done.'
 
 Echo 'Opening System Management Console...'
 $countDown = $timeout
@@ -135,63 +203,64 @@ Do {
     $proc = Get-Process mmc -ErrorAction SilentlyContinue
 } Until ($proc -or ($countDown -le 0))
 CheckTimeout -count $countDown 
-Echo "Done."
-
-% if historian_name != "HISTORIAN":
-Echo 'Add new historian group for ${historian_name}'
-$countDown = $timeout
-Do {
-    $no = Get-UIAWindow -Name "Wonderware Historian Configuration Editor" | Get-UIAButton -n "No"
-    $countDown--
-} Until ($proc -or ($countDown -le 0))
-CheckTimeout -count $countDown
-$no | Invoke-UIAButtonClick | Out-Null
-
-$countDown = $timeout
-Do {
-    $stat = Get-UIAWindow -Name "SMC -*" | Get-UIAControl -Name "Historian Group"
-    $stat | Invoke-UIAControlContextMenu | Get-UIAMenuItem -Name "New Historian Registration..." | Invoke-UIAMenuItemClick | Out-Null
-    $stat = Get-UIAWindow -Name "Registered Historian Properties" | Get-UIAEdit -Name "Historian:" | Set-UIATextBoxText "${historian_name}"
-    $stat = Get-UIAWindow -Name "Registered Historian Properties" | Get-UIAEdit -Name "Domain:" | Set-UIATextBoxText "${historian_name}"
-    $stat = Get-UIAWindow -Name "Registered Historian Properties" | Get-UIAEdit -Name "Login Name:" | Set-UIATextBoxText "wwuser"
-    $stat = Get-UIAWindow -Name "Registered Historian Properties" | Get-UIAEdit -Name "Password:" | Set-UIATextBoxText "Admin1!"
-    $stat = Get-UIAWindow -Name "Registered Historian Properties" | Get-UIARAdioButton -AutomationId '20412' -Name "Use Windows authentication" | Invoke-UIAControlClick | Out-Null
-    $ok = Get-UIAWindow -Name "Registered Historian Properties" | Get-UIAButton -Name "OK"
-    $countDown--
-} Until ($ok -or ($countDown -le 0))
-CheckTimeout -count $countDown 
-$ok | Invoke-UIAButtonClick | Out-Null
 Echo 'Done.'
 
-Echo 'Remove old historian group HISTORIAN'
+% if historian_name != "HISTORIAN":
+Echo 'Add right historian name to IDAS'
 $countDown = $timeout
 Do {
-    $stat = Get-UIAWindow -Name "SMC -*" | Get-UIAControl -Name "HISTORIAN"
-    $stat | Invoke-UIAControlContextMenu | Get-UIAMenuItem -Name "Delete" | Invoke-UIAMenuItemClick | Out-Null
+    $hist_group = Get-UIAWindow -Name "SMC -*" | Get-UIAControl -name "Historian Group" | Invoke-UIAControlClick -DoubleClick | Out-Null
+    $hist_name = Get-UIAWindow -Name "SMC -*" | Get-UIAControl -name "${historian_name}" | Invoke-UIAControlClick -DoubleClick | Out-Null
+    $config_edit = Get-UIAWindow -Name "SMC -*" | Get-UIAControl -name "Configuration Editor" | Invoke-UIAControlClick -DoubleClick | Out-Null
+    $system_config = Get-UIAWindow -Name "SMC -*" | Get-UIAControl -name "System Configuration" | Invoke-UIAControlClick -DoubleClick | Out-Null
+    $data_acq = Get-UIAWindow -Name "SMC -*" | Get-UIAControl -name "Data Acquisition" | Invoke-UIAControlClick -DoubleClick | Out-Null
+    $idas = Get-UIAWindow -Name "SMC -*" | Get-UIAControl -name "IDAS - historian" | Invoke-UIAControlContextMenu | Get-UIAMenuItem -Name "Properties" | Invoke-UIAMenuItemClick | Out-Null
+    $modify = Get-UIAWindow -Name "IDAS - *" | Get-UIAButton -Name "Modify*" | Invoke-UIAButtonClick | Out-Null
+    $yes =  Get-UIAButton -Name "Yes" | Invoke-UIAButtonClick | Out-Null
+    $idas_name = Get-UIAWindow -Name "IDAS - *" | Get-UIAEdit -Name "IDAS Node*" | Set-UIATextBoxText "${historian_name}"
+    $ok = Get-UIAWindow -Name "IDAS - *" |  Get-UIAButton -Name "OK" | Invoke-UIAButtonClick | Out-Null
+    $conf = Get-UIAWindow -Name "SMC -*" | Get-UIAControl -Name "Configuration Editor"
+    $conf | Invoke-UIAControlContextMenu | Get-UIAMenuItem -Name "Commit Pending Changes..." | Invoke-UIAMenuItemClick | Out-Null
     Start-Sleep -s 1
-    $yes = Get-UIAWindow -Name "Delete Server" | Get-UIAButton -n "Yes"
-    $countDown--
-} Until ($yes -or ($countDown -le 0))
-CheckTimeout -count $countDown 
-$yes | Invoke-UIAButtonClick | Out-Null
+    $commit = Get-UIAWindow -Name "SMC -*" | Get-UIAButton -n "Commit"
+} Until ($commit -or ($countDown -le 0))
+CheckTimeout -count $countDown
+$commit | Invoke-UIAButtonClick | Out-Null
 
-$stat = Get-UIAWindow -Name "SMC -*" | Get-UIAControl -name "${historian_name}" | Invoke-UIAControlClick -DoubleClick | Out-Null
-Start-Sleep -s 2
-$stat = Get-UIAWindow -Name "SMC -*" | Get-UIAControl -name "Management Console" | Invoke-UIAControlClick -DoubleClick | Out-Null
+$countDown = $timeout
+Do {
+    $commit = Get-UIAWindow -Name "SMC -*" | Get-UIAButton -n "OK"
+    Start-Sleep -s 1
+    $countDown--
+} Until ($commit -or ($countDown -le 0))
+CheckTimeout -count $countDown
+$commit | Invoke-UIAButtonClick | Out-Null
+Echo 'Done.'
+
+Echo 'Opening Management Console'
+$countDown = $timeout
+Do {
+    $mgmt_console = Get-UIAWindow -Name "SMC -*" | Get-UIAControl -name "Management Console"
+}Until ($mgmt_console -or ($countDown -le 0))
+CheckTimeout -count $countDown
+$mgmt_console | Invoke-UIAControlClick -DoubleClick | Out-Null
+
+$countDown = $timeout
+Do {
+    Start-Sleep -s 1
+    $countDown--
+    $stat = Get-UIAWindow -Name "SMC -*" | Get-UIAControl -Name "Status"
+} Until ($stat -or ($countDown -le 0))
+CheckTimeout -count $countDown 
+$stat | Invoke-UIAButtonClick | Out-Null
 Echo 'Done.'
 % endif
 
 Echo 'Starting Historian...'
 $countDown = $timeout
 Do {
-    If ($countDown -eq ($timeout-2)){
-        Stop-Process -Name aahCfgSvc -Force
-    }
-    Start-Sleep -s 1
-    $countDown-- 
-    
-    $stat = Get-UIAWindow -Name "SMC -*" | Get-UIAControl -Name "Status"
-    $stat | Invoke-UIAControlContextMenu | Get-UIAMenuItem -Name "Start Historian" | Invoke-UIAMenuItemClick | Out-Null
+    $status = Get-UIAWindow -Name "SMC -*" | Get-UIAControl -Name "Status"
+    $status | Invoke-UIAControlContextMenu | Get-UIAMenuItem -Name "Start Historian" | Invoke-UIAMenuItemClick | Out-Null
     Start-Sleep -s 1
     $ok = Get-UIAWindow -Name "Start Historian" | Get-UIAButton -n "OK"
 } Until ($ok -or ($countDown -le 0))
@@ -390,7 +459,8 @@ Echo "Done."
 
 #TODO Fix to check for success. Due to nested windows it always returned false even on success"
 Echo 'Set server name'
-Get-UIAWindow -Name "Trend*" | Get-UIAEdit -Name "Server:" | Set-UIATextBoxText "HISTORIAN"
+Get-UIAWindow -Name "Trend*" | Get-UIAEdit -Name "Server:" | Set-UIATextBoxText "${historian_name}"
+Start-Sleep -s 1
 Get-UIAWindow -Name "Trend*" | Get-UIACheckBox -Name "Use Integrated security" | Invoke-UIAControlClick | Out-Null
 Get-UIAWindow -Name "Trend*" | Get-UIAControl -Name "Add" | Invoke-UIAButtonClick | Out-Null
 $close = Get-UIAWindow -Name "Trend*" | Get-UIAControl -Name "Close" 
