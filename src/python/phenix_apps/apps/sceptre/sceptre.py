@@ -1354,7 +1354,6 @@ class Sceptre(AppBase):
         ######################## Engineer Workstation pre-start ###################################
         # Create engineer workstation files
         rtus = self.extract_nodes_type("fd-server")
-        eng_fd = []
 
         engineer_workstations = self.extract_nodes_type(
             "engineer-workstation"
@@ -1362,6 +1361,7 @@ class Sceptre(AppBase):
 
         #get rtus that engineer workstation can connect to. Connect to all if none given. 
         for engineer_workstation in engineer_workstations:
+            eng_fd = []
             if "connected_rtus" in engineer_workstation.metadata:
                 for engineer_rtu in engineer_workstation.metadata.connected_rtus:
                     for rtu in rtus:
@@ -1405,15 +1405,8 @@ class Sceptre(AppBase):
         ######################## Historian pre-start ###################################
         # Determine primary/secondary historian
         secondary_historian_ips = {"historian": []}
-        historian_ifaces = []
 
         for historian in historians:
-            for iface in historian.topology.network.interfaces:
-                if iface.vlan != "mgmt":
-                    historian_ifaces.append(iface)
-
-            iface = historian_ifaces[0]
-
             if historian.metadata:
                 if "primary" in historian.metadata and historian.metadata.primary:
                     if historian.metadata.primary not in secondary_historian_ips:
@@ -1429,12 +1422,17 @@ class Sceptre(AppBase):
 
         # Write historian files
         for historian in historians:
+            historian_ifaces = []
             historian_directory = f"{self.sceptre_dir}/{historian.hostname}"
             os.makedirs(historian_directory, exist_ok=True)
 
+            for iface in historian.topology.network.interfaces:
+                if iface.vlan != "mgmt":
+                    historian_ifaces.append(iface)
+
             iface = historian_ifaces[0]
             hist_ip = iface.address
-
+            
             # Get the IP address and OPC config object associated with the OPC system that
             # is on the same subnet as this historian instance
             opc_config_ip = ""
