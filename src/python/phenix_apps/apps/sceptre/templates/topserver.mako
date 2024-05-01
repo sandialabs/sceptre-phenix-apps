@@ -157,6 +157,18 @@ Do {
 } Until (($qc.ProcessName -eq "opcquickclient") -or ($countDown -le -0))
 Start-Sleep -s 10
 
+%if primary_opc==False:
+# Close the Quick Client software
+$qc | Send-Keys '%{F4}'
+Do {
+    Start-Sleep -s 1
+    $countDown--
+    $close_win = Get-UIAWindow -Name "OPC Quick Client" | Get-UIAButton -n "No"
+} Until ($close_win -or ($countDown -le -0))
+Start-Sleep -s 2
+$close_win | Invoke-UIAButtonClick | Out-Null
+%endif
+
 Echo 'Informing SCADA server that TOP Server configuration is complete...'
 % for scada_addr in scada_ips:
 % if scada_addr.split('.')[:-1] == opc_ip.split('.')[:-1]:
