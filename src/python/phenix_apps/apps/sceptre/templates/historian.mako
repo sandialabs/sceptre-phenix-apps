@@ -82,7 +82,6 @@ Do {
     $no = Get-UIAWindow -Name "Wonderware Historian Configuration Editor" | Get-UIAButton -n "No"
     $countDown--
 } Until ($no -or ($countDown -le 0))
-CheckTimeout -count $countDown
 $no | Invoke-UIAButtonClick | Out-Null
 
 Echo 'Remove old historian group HISTORIAN'
