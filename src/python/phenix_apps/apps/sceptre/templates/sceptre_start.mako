@@ -6,7 +6,7 @@ echo 'ListenAddress ${interface['address']}' >> /etc/ssh/sshd_config
     % endfor
 service ssh restart
 sleep 10s
-    % if 'simulink-provider' in sceptre:
+    % if 'simulink-provider' in name.lower() or metadata.get('simulator', '').lower() == 'simulink':
 cd /etc/sceptre/
         % if 'helics-federate' in metadata.get('labels', []):
 bennu-simulink-provider-helics --config /etc/sceptre/helics.json 2>&1 > /etc/sceptre/log/provider.log &
@@ -14,8 +14,10 @@ bennu-simulink-provider-helics --config /etc/sceptre/helics.json 2>&1 > /etc/sce
 bennu-simulink-provider --server-endpoint '${server_endpoint}' --publish-endpoint '${publish_endpoint}' 2>&1 > /etc/sceptre/log/provider.log &
         % endif
 ./simulinksolver -tf inf 2>&1 > /etc/sceptre/log/solver.log &
+        % if metadata.get('gt'):
 ./simulinkgt -addr :8080 -file groundTruth.txt -tmpl main.tmpl 2>&1 > /etc/sceptre/log/gt.log &
-    % elif any(x in sceptre for x in ['provider', 'helics-provider']):
+        % endif
+    % elif any(x in name.lower() for x in ['provider', 'helics-provider']) or metadata.get('simulator', '').lower().startswith('powerworld') or metadata.get('simulator', '').lower() == 'pypower':
         % if needsleep:
 sleep 60s
         % endif
@@ -25,15 +27,15 @@ if [ $? -eq 0 ]; then
 else
   pybennu-power-solver start -c /etc/sceptre/config.ini -e pybennu -d
 fi
-    % elif sceptre == 'openplc':
+    % elif name.lower() == 'openplc':
 cd /root/OpenPLC_v2
 ./iec2c st_files/openplc.st
 mv -f POUS.c POUS.h LOCATED_VARIABLES.h VARIABLES.csv Config0.c Config0.h Res0.c ./core/
 ./build_core.sh
-    % elif sceptre == 'sunspec':
+    % elif name.lower() == 'sunspec':
 echo -e "LD_LIBRARY_PATH=/usr/local/lib\nGOBENNU_CONFIG_FILE=/etc/sceptre/config.xml" > /etc/gobennu-environment
 systemctl start gobennu
-    % elif sceptre == 'field-device':
+    % elif name.lower() == 'field-device':
 echo "[Hashes]
 reghash = `sha256sum /usr/bin/bennu-field-deviced | awk '{print $1}'`
 shellhashA = `sed 's/\x5f\x53\x48\x45\x4c\x4c\x5f\x30/\x5f\x53\x48\x45\x4c\x4c\x5f\x31/g' /usr/bin/bennu-field-deviced > /tmp/foo && sha256sum /tmp/foo | awk '{print $1}' && rm /tmp/foo`
@@ -47,7 +49,7 @@ sleep 60s
 bennu-field-deviced --c restart --env default --file /etc/sceptre/config.xml
         % endif
     % endif
-% elif os == 'windows' and 'provider' in sceptre:
+% elif os == 'windows' and ('provider' in name.lower() or metadata.get('simulator', '').lower().startswith('powerworld') or metadata.get('simulator', '').lower() == 'pypower'):
 function Phenix-StartupComplete {
   $key = Get-Item -LiteralPath 'HKLM:\Software\phenix' -ErrorAction SilentlyContinue
 

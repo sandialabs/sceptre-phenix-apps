@@ -66,18 +66,29 @@ host for the current scorch run, loop, and count.
 
 ## Example Configuration
 
-```
+```yaml
 components:
   - name: disable-eth0
     type: cc
     metadata:
       vms:
-      - hostname: foobar
-        start:
-        - type: exec
-          args: ip link set eth0 down
-          wait: true
-        stop:
-        - type: exec
-          args: ip link set eth0 up
+        - hostname: foobar
+          start:
+            - type: exec
+              args: ip link set eth0 down
+              wait: true
+          stop:
+            - type: exec
+              args: ip link set eth0 up
+  - name: receive-files
+    type: cc
+    metadata:
+      vms:
+        - hostname: foobar
+          stop:
+            # This will retrieve a file at path "/root/some_file.txt"
+            # in the VM foobar and place "some_file.txt" in the SCORCH
+            # output directory.
+            - type: recv
+              args: /root/some_file.txt
 ```
