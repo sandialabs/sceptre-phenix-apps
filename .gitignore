@@ -1,0 +1,17 @@
+.venv
+
+# Editors
+.vscode
+.idea
+
+# pyenv
+.python-version
+
+*.egg-info
+__pycache__
+
+build
+dist
+
+.DS_Store
+.vagrant
