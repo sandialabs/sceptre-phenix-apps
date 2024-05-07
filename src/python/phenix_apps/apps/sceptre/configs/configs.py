@@ -23,7 +23,7 @@ def get_fdconfig_class(infrastructure: str) -> type:
         raise error.AppError(f"Infrastructure: {infrastructure} not supported")
 
     class FieldDeviceConfig(base_class):
-        def __init__(self, provider, name: str, interfaces, devices_by_protocol, publish_endpoint, server_endpoint, reg_config, counter):
+        def __init__(self, provider, name: str, interfaces, devices_by_protocol, publish_endpoint, server_endpoint, device_subtype, reg_config, counter):
             super().__init__()
             if name in reg_config.keys():
                 self.reg_config = reg_config[name]
@@ -36,6 +36,7 @@ def get_fdconfig_class(infrastructure: str) -> type:
             self.protocols = self.__generate_protocols(devices_by_protocol, base_class)
             self.server_endpoint = server_endpoint
             self.publish_endpoint = publish_endpoint
+            self.device_subtype = device_subtype
             self.counter = counter
 
         def __generate_protocols(self, devices_by_protocol: dict, base_class: type) -> list:

@@ -709,6 +709,7 @@ class Sceptre(AppBase):
                 srv_name = fd_.metadata.get("server_hostname", None)
                 fd_logic = fd_.metadata.get("logic", None)
                 fd_cycle_time = fd_.metadata.get("cycle_time", None)
+                subtype = fd_.metadata.get("subtype", "single")
                 parsed = SceptreMetadataParser(fd_.metadata)
 
                 if self.is_power_provider(provider):
@@ -766,6 +767,7 @@ class Sceptre(AppBase):
                 devices_by_protocol=parsed.devices_by_protocol,
                 publish_endpoint=pub_endpoint,
                 server_endpoint=srv_endpoint,
+                device_subtype=subtype,
                 reg_config=reg_config,
                 counter=fd_counter,
             )
