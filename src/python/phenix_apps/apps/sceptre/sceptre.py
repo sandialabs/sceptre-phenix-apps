@@ -1407,6 +1407,13 @@ class Sceptre(AppBase):
         secondary_historian_ips = {"historian": []}
 
         for historian in historians:
+            historian_ifaces = []
+            for iface in historian.topology.network.interfaces:
+                if iface.vlan != "mgmt":
+                    historian_ifaces.append(iface)
+
+            iface = historian_ifaces[0]
+
             if historian.metadata:
                 if "primary" in historian.metadata and historian.metadata.primary:
                     if historian.metadata.primary not in secondary_historian_ips:
