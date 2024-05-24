@@ -1,8 +1,11 @@
-import os, subprocess, sys, time
-
+import os
+import subprocess
+import sys
+import time
 from datetime import datetime
 
 from phenix_apps.apps.scorch import ComponentBase
+from phenix_apps.common import utils
 
 
 class MM(ComponentBase):
@@ -213,7 +216,7 @@ class MM(ComponentBase):
                         self.eprint(f'interface to capture traffic on not provided for vm {vm.hostname}')
                         sys.exit(1)
 
-                    now = datetime.utcnow()
+                    now = utils.utc_now()
                     filename = os.path.basename(cap.get('filename', f'{vm.hostname}-{iface}-{now:%Y-%m-%dT%H:%M:%SZ}.pcap'))
 
                     if not filename.lower().endswith('.pcap'):

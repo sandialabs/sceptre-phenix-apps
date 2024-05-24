@@ -1,62 +1,54 @@
 # tcpdump Component
 
 ```
-type: tcpdump
-exe:  phenix-scorch-component-tcpdump
+type:   tcpdump
+exe:    phenix-scorch-component-tcpdump
+stages: start, stop
 ```
 
-It is assumed that the `tcpdump` executable is present in any VMs this component
-will be executed against.
+It is assumed that the `tcpdump` executable is present in any VMs this component will be executed against.
 
 ## Metadata Options
 
-```
+```yaml
 metadata:
-  convertToJSON: <bool>
+  convertToJSON: <bool>  # Default: false
   vms:
-  - hostname: <hostname of VM from topology to run tcpdump on>
-    iface: <name of interface in VM to capture traffic from>
-    options: <any additional options to pass to tcpdump>
-    filter: <tcpdump filter expression>
-  filebeat.inputs:
-  - type: log
-    enabled: true
-    paths:
-    - *.pcap.jsonl
-    processors:
-    - decode_json_fields:
-        fields:
-        - message
-        target: scorch.tcpdump
-    - drop_event:
+    - hostname: <string>  # (REQUIRED) Hostname of VM from topology to run tcpdump on
+      iface: <string>  # (REQUIRED) Name of interface in VM to capture traffic from
+      options: <string>  # (Optional) Any additional options to pass to tcpdump
+      filter: <string>  # (Optional) tcpdump filter expression
+  filebeat.inputs:  # NOTE: if filebeat is configured, ensure convertToJSON is true
+    - type: log
+      enabled: true
+      paths:
+      - *.pcap.jsonl
+      processors:
+      - decode_json_fields:
+          fields:
+            - message
+          target: scorch.tcpdump
+      - drop_event:
         when:
           has_fields:
-          - scorch.tcpdump.index._type
-    - drop_fields:
-        fields: ['message']
-    - timestamp:
-        field: scorch.tcpdump.timestamp
-        layouts:
-        - 'UNIX_MS'
+            - scorch.tcpdump.index._type
+      - drop_fields:
+          fields: ['message']
+      - timestamp:
+          field: scorch.tcpdump.timestamp
+          layouts:
+            - 'UNIX_MS'
 ```
 
-No defaults exist for the `hostname` and `iface` options. They must be provided.
-As of right now, the `iface` value must represent the name of the interface in
-the VM. In the future, it will also support the name of the interface referenced
-in the phenix topology file for the VM.
+No defaults exist for the `hostname` and `iface` options. They must be provided. As of right now, the `iface` value must represent the name of the interface in the VM. In the future, it will also support the name of the interface referenced in the phenix topology file for the VM.
 
 The `filter` and `options` VM options are optional.
 
-The `tcpdump` component code automatically adds the `-i <iface>`, `-U`, and `-w
-<path>` options to the command before being executed.
+The `tcpdump` component code automatically adds the `-i <iface>`, `-U`, and `-w <path>` options to the command before being executed.
 
-The `convertToJSON` option is important if Filebeat is going to be used to
-process the results of the traffic capture to send to Elastic. By default it is
-disabled since it can take a while to complete.
+The `convertToJSON` option is important if Filebeat is going to be used to process the results of the traffic capture to send to Elastic. By default it is disabled since it can take a while to complete.
 
-The `filebeat.inputs` section above can be blindly copied into user's own config
-and used as-is, or users can choose to change target field names if the ones
-used above aren't suitable.
+The `filebeat.inputs` section above can be blindly copied into user's own config and used as-is, or users can choose to change target field names if the ones used above aren't suitable.
 
 > In the future, user components will have the ability to modify the
 > `filebeat.inputs` section of component metadata directly so users don't have
@@ -64,15 +56,35 @@ used above aren't suitable.
 
 ## Example Configuration
 
-```
+```yaml
 components:
-  - name: test-validator
+  - name: tcpdump-example
     type: tcpdump
     metadata:
       convertToJSON: true
       vms:
-      - hostname: sniffer
-        iface: eth1
-        options: -c 10
-        filter: port 80
+        - hostname: sniffer
+          iface: eth1
+          options: -c 10
+          filter: port 80
+      filebeat.inputs:  # NOTE: if filebeat is configured, ensure convertToJSON is true
+        - type: log
+          enabled: true
+          paths:
+          - *.pcap.jsonl
+          processors:
+          - decode_json_fields:
+              fields:
+                - message
+              target: scorch.tcpdump
+          - drop_event:
+            when:
+              has_fields:
+                - scorch.tcpdump.index._type
+          - drop_fields:
+              fields: ['message']
+          - timestamp:
+              field: scorch.tcpdump.timestamp
+              layouts:
+                - 'UNIX_MS'
 ```

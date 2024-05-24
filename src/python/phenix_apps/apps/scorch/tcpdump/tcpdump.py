@@ -3,6 +3,7 @@ import subprocess, sys
 from phenix_apps.apps.scorch import ComponentBase
 from phenix_apps.common import logger, utils
 
+# TODO: merge tcpdump's functionality into the 'pcap' component
 
 class TCPDump(ComponentBase):
     def __init__(self):

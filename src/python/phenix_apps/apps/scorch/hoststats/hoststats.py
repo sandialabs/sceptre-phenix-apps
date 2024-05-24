@@ -1,7 +1,11 @@
-import json, os, signal, threading, time
+import json
+import os
+import signal
+import threading
+import time
 
 from phenix_apps.apps.scorch import ComponentBase
-from phenix_apps.common import logger, utils
+from phenix_apps.common import logger
 
 
 class HostStats(ComponentBase):
@@ -75,11 +79,9 @@ class HostStats(ComponentBase):
 
 
     def __get_resdata(self):
-        mm = self.mm_init()
-
         resdata  = []
         host_vms = {}
-        vm_info  = mm.vm_info()
+        vm_info  = self.mm.vm_info()
 
         try:
             for host in vm_info:
@@ -91,8 +93,9 @@ class HostStats(ComponentBase):
         except TypeError:
             pass
 
-        host_info = mm.host()
+        host_info = self.mm.host()
 
+        self.print(f"getting host data for {len(vm_info)} hosts")
         try:
             for host in host_info:
                 host_dict = {}
@@ -106,7 +109,7 @@ class HostStats(ComponentBase):
                 host_dict['Load_5']  = float(loads[1])
                 host_dict['Load_15'] = float(loads[2])
 
-                host_dict['timestamp'] = int(time.time()*1000)
+                host_dict['timestamp'] = int(time.time()*1000)  # milliseconds
                 host_dict['vm_list']   = host_vms.get(host_dict['compute_name'], [])
 
                 resdata.append(host_dict)
@@ -114,7 +117,7 @@ class HostStats(ComponentBase):
             return []
 
         # print current data so users can see it in UI modal in real-time
-        print(resdata, flush=True)
+        self.print(resdata)
         return resdata
 
 
