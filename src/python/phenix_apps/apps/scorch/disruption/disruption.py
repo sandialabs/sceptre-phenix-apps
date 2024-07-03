@@ -10,9 +10,9 @@ from phenix_apps.common import logger, utils
 # TODO: allow dos attacks to be executed on Windows
 
 
-class Scenario(ComponentBase):
+class Disruption(ComponentBase):
     def __init__(self):
-        ComponentBase.__init__(self, 'scenario')
+        ComponentBase.__init__(self, 'disruption')
         self.execute_stage()
 
     def _kill_dos_processes(self):
@@ -24,7 +24,7 @@ class Scenario(ComponentBase):
 
     def _kill_phys_process(self):
         opc_host = self.metadata.physical.opc_hostname
-        self.print(f"killing python.exe process on {opc_host} (for physical scenario)")
+        self.print(f"killing python.exe process on {opc_host} (for physical disruption)")
         utils.mm_kill_process(self.mm, f"name={opc_host}", "python.exe", os_type='windows')
 
     def _build_dos_cmd(self, start_delay: float) -> str:
@@ -44,7 +44,7 @@ class Scenario(ComponentBase):
 
         return cmd
 
-    def _run_physical_scenario(self) -> float:
+    def _run_physical_disruption(self) -> float:
         timer_start = timeit.default_timer()
 
         opc_host = self.metadata.physical.opc_hostname
@@ -66,15 +66,15 @@ class Scenario(ComponentBase):
         if scn_timeout > run_duration:
             scn_timeout = run_duration - 1.0
 
-        # Run physical scenario
-        self.print(f"Running scenario command on {opc_host}: {scn_cmd} (timeout={scn_timeout})")
+        # Run physical disruption
+        self.print(f"Running disruption command on {opc_host}: {scn_cmd} (timeout={scn_timeout})")
         scn_output = self.run_and_check_command(opc_host, scn_cmd, timeout=scn_timeout, debug=False)
         if not scn_output["stdout"]:
-            self.eprint(f"Failed to run 'cyber_physical' scenario: no stdout from command (output={scn_output})")
+            self.eprint(f"Failed to run 'cyber_physical' disruption: no stdout from command (output={scn_output})")
             sys.exit(1)
 
         elapsed = timeit.default_timer() - timer_start
-        self.print(f"Finished running physical scenario in {elapsed:.2f} seconds")
+        self.print(f"Finished running physical disruption in {elapsed:.2f} seconds")
         self.print(f"=== Physical command output ===\n{scn_output['stdout']}\n=== End physical command output ===")
 
         return elapsed
@@ -82,8 +82,8 @@ class Scenario(ComponentBase):
     def configure(self):
         logger.log('INFO', f'Configuring user component: {self.name}')
 
-        if self.metadata.current_scenario in ["dos", "cyber_physical"]:
-            self.print(f"Running checks for '{self.metadata.current_scenario}' scenario")
+        if self.metadata.current_disruption in ["dos", "cyber_physical"]:
+            self.print(f"Running checks for '{self.metadata.current_disruption}' disruption")
 
             a_host = self.metadata.dos.attacker.hostname
             self.ensure_vm_running(a_host)
@@ -123,7 +123,7 @@ class Scenario(ComponentBase):
         # (really, it belongs more in an "execution" stage).
         # The "art" scorch component does this as well, with everything in "start" stage.
 
-        # record scenario start time
+        # record disruption start time
         base_start = utils.utc_now()
 
         # Round up to nearest second
@@ -135,18 +135,18 @@ class Scenario(ComponentBase):
         # wait until we've reached the rounded up time
         sleep((rounded_start - base_start).total_seconds())
         start_fmt = rounded_start.isoformat()
-        self.print(f"scenario start time: {start_fmt}")
-        Path(self.base_dir, "scenario_start_time.txt").write_text(start_fmt)
+        self.print(f"disruption start time: {start_fmt}")
+        Path(self.base_dir, "disruption_start_time.txt").write_text(start_fmt)
 
         run_duration = float(self.metadata.run_duration)
 
-        self.print(f"Running '{self.metadata.current_scenario}' scenario (loop={self.loop}, run_duration={run_duration})")
+        self.print(f"Running '{self.metadata.current_disruption}' disruption (loop={self.loop}, run_duration={run_duration})")
 
-        if self.metadata.current_scenario == "baseline":
+        if self.metadata.current_disruption == "baseline":
             self.print(f"baseline: sleeping for {run_duration} seconds...")
             sleep(run_duration)
 
-        elif self.metadata.current_scenario == "dos":
+        elif self.metadata.current_disruption == "dos":
             start_delay = float(self.metadata.dos.start_delay)
             attack_duration = float(self.metadata.dos.attack_duration)
             cmd = self._build_dos_cmd(start_delay)
@@ -161,7 +161,7 @@ class Scenario(ComponentBase):
             timer_start = timeit.default_timer()
             output = self.run_and_check_command(a_host, cmd, timeout=timeout, debug=False)
             if not output["stdout"]:
-                self.eprint(f"Failed to run 'dos' scenario: no stdout from command (output={output})")
+                self.eprint(f"Failed to run 'dos' disruption: no stdout from command (output={output})")
                 sys.exit(1)
 
             elapsed = timeit.default_timer() - timer_start
@@ -173,20 +173,20 @@ class Scenario(ComponentBase):
                 self.print(f"{remaining:.2f} seconds remaining out of configured run_duration {run_duration}, sleeping for that many seconds...")
                 sleep(remaining)
 
-        elif self.metadata.current_scenario == "physical":
+        elif self.metadata.current_disruption == "physical":
             start_delay = float(self.metadata.physical.start_delay)
 
             self.print(f"sleeping for {start_delay} seconds")
             sleep(start_delay)
 
-            elapsed = self._run_physical_scenario()
+            elapsed = self._run_physical_disruption()
 
             remaining = run_duration - elapsed - start_delay
             if remaining > 0.1:
                 self.print(f"{remaining:.2f} seconds remaining out of configured run_duration {run_duration}, sleeping for that many seconds...")
                 sleep(remaining)
 
-        elif self.metadata.current_scenario == "cyber_physical":
+        elif self.metadata.current_disruption == "cyber_physical":
             start_delay = float(self.metadata.physical.start_delay)
 
             # Kick off DoS process, have it sleep for number of seconds that puts it between line outage and load shedding
@@ -201,29 +201,29 @@ class Scenario(ComponentBase):
             self.print(f"sleeping for {start_delay} seconds")
             sleep(start_delay)
 
-            # Run physical scenario
+            # Run physical disruption
             # open breaker for generator 1
             # ... wait 2 seconds
             # open transmission line T4 (T4SE and T4RE)
             # ... wait 7 seconds
             # apply 60% load shedding to loads 5 and 6
-            elapsed = self._run_physical_scenario()
+            elapsed = self._run_physical_disruption()
 
             remaining = run_duration - elapsed - start_delay
             if remaining > 0.1:
                 self.print(f"{remaining:.2f} seconds remaining out of configured run_duration {run_duration}, sleeping for that many seconds...")
                 sleep(remaining)
         else:
-            raise ValueError(f"Invalid scenario: {self.metadata.current_scenario}")
+            raise ValueError(f"Invalid disruption: {self.metadata.current_disruption}")
 
-        self.print(f"'{self.metadata.current_scenario}' scenario complete!")
+        self.print(f"'{self.metadata.current_disruption}' disruption complete!")
 
-        # record scenario stop time
+        # record disruption stop time
         stop_time = utils.utc_now().isoformat()
-        self.print(f"scenario stop time: {stop_time}")
-        Path(self.base_dir, "scenario_stop_time.txt").write_text(stop_time)
+        self.print(f"disruption stop time: {stop_time}")
+        Path(self.base_dir, "disruption_stop_time.txt").write_text(stop_time)
 
-        if self.metadata.current_scenario in ["dos", "cyber_physical"]:
+        if self.metadata.current_disruption in ["dos", "cyber_physical"]:
             self._kill_dos_processes()
 
             self.print("saving attacker results")
@@ -235,10 +235,10 @@ class Scenario(ComponentBase):
                 ]
             )
 
-        if self.metadata.current_scenario in ["physical", "cyber_physical"]:
+        if self.metadata.current_disruption in ["physical", "cyber_physical"]:
             self._kill_phys_process()
 
-            self.print("saving physical scenario results")
+            self.print("saving physical disruption results")
             self.recv_file(
                 vm=self.metadata.physical.opc_hostname,
                 src=[
@@ -249,17 +249,17 @@ class Scenario(ComponentBase):
                 ]
             )
 
-            # verify scenario executed correctly
-            self.print("verifying scenario results")
+            # verify disruption executed correctly
+            self.print("verifying disruption results")
             fname = Path(self.metadata.physical.results_path).name
             scn_path = Path(self.base_dir, fname)
-            self.print(f"scenario results path: {scn_path}")
+            self.print(f"disruption results path: {scn_path}")
             results = utils.read_json(scn_path)
-            assert results["scenario_duration"] > 1.0
+            assert results["disruption_duration"] > 1.0
             self.print(f"{type(results['stages'])}")
             for stage in results["stages"].values():
                 if stage.get("method", "") != "opc" and not stage["successful"]:
-                    self.eprint(f"failed scenario stage '{stage['name']}': {stage['status']}")
+                    self.eprint(f"failed disruption stage '{stage['name']}': {stage['status']}")
                     sys.exit(1)
 
         self.mm.clear_cc_filter()
@@ -269,7 +269,7 @@ class Scenario(ComponentBase):
     def cleanup(self):
         logger.log('INFO', f'Cleaning up user component: {self.name}')
 
-        if self.metadata.current_scenario in ["dos", "cyber_physical"]:
+        if self.metadata.current_disruption in ["dos", "cyber_physical"]:
             # ensure processes are killed for an aborted run
             self._kill_dos_processes()
 
@@ -290,11 +290,11 @@ class Scenario(ComponentBase):
             sleep(1.0)
             self.mm.clear_cc_filter()
 
-        if self.metadata.current_scenario in ["physical", "cyber_physical"]:
+        if self.metadata.current_disruption in ["physical", "cyber_physical"]:
             self._kill_phys_process()
 
             opc_host = self.metadata.physical.opc_hostname
-            self.print(f"deleting physical scenario results on {opc_host})")
+            self.print(f"deleting physical disruption results on {opc_host})")
             utils.mm_delete_file(self.mm, f"name={opc_host}", self.metadata.physical.results_path, os_type='windows')
             utils.mm_delete_file(self.mm, f"name={opc_host}", self.metadata.physical.log_path, os_type='windows')
 
@@ -305,7 +305,7 @@ class Scenario(ComponentBase):
 
 
 def main():
-    Scenario()
+    Disruption()
 
 
 if __name__ == '__main__':

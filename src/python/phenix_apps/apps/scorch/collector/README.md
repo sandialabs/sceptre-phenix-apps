@@ -9,13 +9,13 @@ stages: stop
 ```
 
 ## Notes
-- Supported components: `rtds`, `vmstats`, `hoststats`, `iperf`, `scenario`, `qos`, `pcap`
+- Supported components: `rtds`, `vmstats`, `hoststats`, `iperf`, `disruption`, `qos`, `pcap`
 
 ### Known issues
-- This component is currently highly dependant on the `rtds` and `scenario` components. It assumes that the `rtds` component is configured to use Elasticsearch, and will use the Elasticsearch configuration from the `rtds` component's metadata.
+- This component is currently highly dependant on the `rtds` and `disruption` components. It assumes that the `rtds` component is configured to use Elasticsearch, and will use the Elasticsearch configuration from the `rtds` component's metadata.
 - This component currently has a lot of assumptions baked in for the HARMONIE environment and should be used with caution.
 - It assumes stage names match stage types, e.g. it expects that the `pcap` stage has `name: pcap` and `type: pcap`.
-- It will attempt to collect data from all components supported (`rtds`, `vmstats`, `hoststats`, `iperf`, `scenario`, `qos`, `pcap`), regardless of if they're actually defined or enabled in the Scenario. Ensure all components are defined in your scenario.
+- It will attempt to collect data from all components supported (`rtds`, `vmstats`, `hoststats`, `iperf`, `disruption`, `qos`, `pcap`), regardless of if they're actually defined or enabled in the experiment's [Scenario](https://phenix.sceptre.dev/latest/configuration/#scenario). Ensure all components are defined in your experiment's scenario.
 
 ### Features
 The role of the collector should be to:

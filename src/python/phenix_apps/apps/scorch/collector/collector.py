@@ -87,10 +87,10 @@ class Collector(ComponentBase):
             self.print("copying iperf data")
             shutil.copytree(iperf_src, iperf_dest)
 
-        # scenario: attack_results, scenario_results, scenario_*
-        s_src = self._comp_dir("scenario")
-        s_dest = Path(results_dir, "scenario")
-        self.print("copying scenario data")
+        # disruption: attack_results, scenario_results, scenario_*
+        s_src = self._comp_dir("disruption")
+        s_dest = Path(results_dir, "disruption")
+        self.print("copying disruption data")
         shutil.copytree(s_src, s_dest)
 
         # qos: what values were applied
@@ -98,23 +98,23 @@ class Collector(ComponentBase):
         self.print("copying qos data")
         utils.copy_file(qos_file, meta_dir)
 
-        # Use duration for the configured scenario
-        scenario_metadata = self._get_component("scenario").metadata
-        configured_duration = float(scenario_metadata.run_duration)
+        # Use duration for the configured disruption
+        disruption_metadata = self._get_component("disruption").metadata
+        configured_duration = float(disruption_metadata.run_duration)
 
-        # scenario start time
-        start_time_fmt = Path(s_src, "scenario_start_time.txt").read_text()
+        # disruption start time
+        start_time_fmt = Path(s_src, "disruption_start_time.txt").read_text()
         start_time = datetime.fromisoformat(start_time_fmt)
         assert start_time.tzinfo.tzname(start_time) == "UTC"
         start_time_kibana = utils.kibana_format_time(start_time)
-        self.print(f"scenario start time: {start_time_fmt} (kibana format: '{start_time_kibana}')")
+        self.print(f"disruption start time: {start_time_fmt} (kibana format: '{start_time_kibana}')")
 
-        # scenario stop time
-        actual_stop_time_fmt = Path(s_src, "scenario_stop_time.txt").read_text()
+        # disruption stop time
+        actual_stop_time_fmt = Path(s_src, "disruption_stop_time.txt").read_text()
         actual_stop_time = datetime.fromisoformat(actual_stop_time_fmt)
         assert actual_stop_time.tzinfo.tzname(actual_stop_time) == "UTC"
         actual_stop_time_kibana = utils.kibana_format_time(actual_stop_time)
-        self.print(f"scenario stop time (actual): {actual_stop_time_fmt} (kibana format: '{actual_stop_time_kibana}')")
+        self.print(f"disruption stop time (actual): {actual_stop_time_fmt} (kibana format: '{actual_stop_time_kibana}')")
 
         # clamp the stop time to be start_time + configured duration
         stop_time_modified = start_time + timedelta(seconds=configured_duration)  # type: datetime
@@ -122,12 +122,12 @@ class Collector(ComponentBase):
         assert stop_time_modified.tzinfo.tzname(actual_stop_time) == "UTC"
         stop_time_modified_fmt = stop_time_modified.isoformat()
         stop_time_modified_kibana = utils.kibana_format_time(stop_time_modified)
-        self.print(f"scenario stop time (modified): {stop_time_modified_fmt} (kibana format: '{stop_time_modified_kibana}')")
+        self.print(f"disruption stop time (modified): {stop_time_modified_fmt} (kibana format: '{stop_time_modified_kibana}')")
 
-        # duration of the scenario (stop - start)
+        # duration of the disruption (stop - start)
         duration_actual = (actual_stop_time - start_time).total_seconds()
-        self.print(f"scenario duration (actual)     : {duration_actual}")
-        self.print(f"scenario duration (configured) : {configured_duration}")
+        self.print(f"disruption duration (actual)     : {duration_actual}")
+        self.print(f"disruption duration (configured) : {configured_duration}")
         if duration_actual < configured_duration:
             self.eprint(f"actual duration of {duration_actual:.2f} was less than the configured duration of {configured_duration}, something might have gone wrong...")
             sys.exit(1)
@@ -146,7 +146,7 @@ class Collector(ComponentBase):
 
         expected_cap_duration = float(pcap_metadata["merged.pcap"]["Capture duration (seconds)"])
         if (expected_cap_duration + 6.0) < configured_duration:
-            self.eprint(f"Capture duration {expected_cap_duration} seconds is more than 6.0 seconds less than configured scenario duration of {configured_duration} seconds")
+            self.eprint(f"Capture duration {expected_cap_duration} seconds is more than 6.0 seconds less than configured disruption duration of {configured_duration} seconds")
             sys.exit(1)
 
         # Read power provider config (RTDS)
@@ -165,10 +165,10 @@ class Collector(ComponentBase):
         # Record (experiment_record.json)
         self.print("generating experiment record")
 
-        current_scenario = str(scenario_metadata.current_scenario)  # baseline, dos, physical
-        permutation = int(scenario_metadata.permutation)
+        current_disruption = str(disruption_metadata.current_disruption)  # baseline, dos, physical
+        permutation = int(disruption_metadata.permutation)
         record["experiment"] = {
-            "scenario": current_scenario,
+            "disruption": current_disruption,
             "permutation": permutation,
             "iteration": self.count,
             "start": start_time_fmt,
@@ -194,36 +194,36 @@ class Collector(ComponentBase):
             "count": self.count,
         }
 
-        # scenarios
-        record["scenario"] = {}
+        # disruptions
+        record["disruption"] = {}
 
-        if current_scenario not in ["baseline", "dos", "physical", "cyber_physical"]:
-            self.eprint(f"bad scenario name: {current_scenario}")
+        if current_disruption not in ["baseline", "dos", "physical", "cyber_physical"]:
+            self.eprint(f"bad disruption name: {current_disruption}")
             sys.exit(1)
 
-        if current_scenario == "baseline":
-            record["scenario"]["baseline"] = {}
+        if current_disruption == "baseline":
+            record["disruption"]["baseline"] = {}
 
-        if current_scenario in ["dos", "cyber_physical"]:
-            dos_config = scenario_metadata.dos
+        if current_disruption in ["dos", "cyber_physical"]:
+            dos_config = disruption_metadata.dos
             ares_name = Path(dos_config.get("results_path", "attacker_results.json")).name
             dos_att_results = utils.read_json(Path(s_src, ares_name))
 
-            record["scenario"]["dos"] = {
+            record["disruption"]["dos"] = {
                 "configuration": dict(dos_config),
                 "results": dos_att_results,
             }
-            record["scenario"]["dos"]["configuration"]["attacker"]["ip"] = self.extract_node_ip(
+            record["disruption"]["dos"]["configuration"]["attacker"]["ip"] = self.extract_node_ip(
                 name=dos_config.attacker.hostname,
                 iface=dos_config.attacker.get("interface", "eth0")
             )
 
-        if current_scenario in ["physical", "cyber_physical"]:
-            scn_res_name = Path(scenario_metadata.physical.results_path).name
+        if current_disruption in ["physical", "cyber_physical"]:
+            scn_res_name = Path(disruption_metadata.physical.results_path).name
             scn_results = utils.read_json(Path(s_src, scn_res_name))
 
-            record["scenario"]["physical"] = {
-                **dict(scenario_metadata.physical),
+            record["disruption"]["physical"] = {
+                **dict(disruption_metadata.physical),
                 "results": scn_results,
             }
 
