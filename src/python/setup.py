@@ -19,6 +19,7 @@ DATA = {
 
 ENTRIES = {
     'console_scripts' : [
+        'phenix-app-caldera = phenix_apps.apps.caldera.caldera:main',
         'phenix-app-helics = phenix_apps.apps.helics.helics:main',
         'phenix-app-ot-sim = phenix_apps.apps.otsim.otsim:main',
         'phenix-app-protonuke = phenix_apps.apps.protonuke.protonuke:main',
