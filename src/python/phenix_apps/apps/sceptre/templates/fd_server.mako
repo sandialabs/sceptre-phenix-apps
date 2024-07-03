@@ -68,6 +68,7 @@ def intercambio(dictionary, string):
             <rpoll-rate>2</rpoll-rate>
             <endpoint>tcp://${fd_config.ipaddr}:2404</endpoint>
             <event-logging>${fd_config.name}-104-outstation.log</event-logging>
+            <subtype>${fd_config.device_subtype}</subtype>
     % else:
             <NOT IMPLEMENTED ERROR!>
     % endif

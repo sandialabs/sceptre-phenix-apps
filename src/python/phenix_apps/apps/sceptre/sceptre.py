@@ -721,6 +721,7 @@ class Sceptre(AppBase):
                 srv_name = fd_.metadata.get("server_hostname", None)
                 fd_logic = fd_.metadata.get("logic", None)
                 fd_cycle_time = fd_.metadata.get("cycle_time", None)
+                subtype = fd_.metadata.get("subtype", "single")
                 parsed = SceptreMetadataParser(fd_.metadata)
 
                 if provider.metadata.get("simulator", "") in [
@@ -780,6 +781,7 @@ class Sceptre(AppBase):
                 devices_by_protocol=parsed.devices_by_protocol,
                 publish_endpoint=pub_endpoint,
                 server_endpoint=srv_endpoint,
+                device_subtype=subtype,
                 reg_config=reg_config,
                 counter=fd_counter,
             )
@@ -1383,6 +1385,13 @@ class Sceptre(AppBase):
         secondary_historian_ips = {"historian": []}
 
         for historian in historians:
+            historian_ifaces = []
+            for iface in historian.topology.network.interfaces:
+                if iface.vlan != "mgmt":
+                    historian_ifaces.append(iface)
+
+            iface = historian_ifaces[0]
+
             if historian.metadata:
                 if "primary" in historian.metadata and historian.metadata.primary:
                     if historian.metadata.primary not in secondary_historian_ips:
