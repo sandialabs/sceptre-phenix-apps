@@ -39,6 +39,7 @@ plugins:
 - manx
 - modbus
 - ot
+- phenix
 - response
 - sandcat
 - stockpile
