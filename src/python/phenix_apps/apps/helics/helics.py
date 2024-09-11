@@ -29,10 +29,11 @@ class Helics(AppBase):
 
         if '|' in root: # hostname|iface
             root_hostname, iface = root.split('|', 1)
+
             root_ip = self.extract_node_interface_ip(root_hostname, iface)
 
             if not root_ip:
-                logger.log('ERROR', f'root broker not found in topology: {root}')
+                logger.log('ERROR', f'root broker not found in topology: {root_hostname}')
                 sys.exit(1)
         else: # ip[:port]
             root_ip = root
@@ -46,6 +47,9 @@ class Helics(AppBase):
             logger.log('ERROR', f'root broker not found in topology: {root}')
             sys.exit(1)
 
+        if not self.is_booting(root_hostname):
+            logger.log('ERROR', f'root broker is marked do not boot: {root_hostname}')
+
         total_fed_count = 0
 
         # broker hosts --> ip:port --> fed-count
@@ -54,7 +58,10 @@ class Helics(AppBase):
         federates = self.extract_annotated_topology_nodes('helics/federate')
 
         for fed in federates:
-            configs = fed['annotations'].get('helics/federate', [])
+            if not self.is_booting(fed.general.hostname):
+                continue
+
+            configs = fed.annotations.get('helics/federate', [])
 
             for config in configs:
                 broker = config.get('broker', '127.0.0.1')
@@ -85,6 +92,9 @@ class Helics(AppBase):
                 if not hostname:
                     logger.log('ERROR', f'node not found for broker at {broker}')
                     sys.exit(1)
+
+                if not self.is_booting(hostname):
+                    logger.log('ERROR', f'broker node is marked do not boot: {hostname}')
 
                 entry = brokers.get(hostname, {broker_ip: 0})
                 entry[broker] += count

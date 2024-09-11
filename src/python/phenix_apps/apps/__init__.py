@@ -356,6 +356,12 @@ class AppBase(object):
             # injection dictionary in a list.
             node['injections'] = [inject]
 
+    def is_booting(self, hostname):
+        node = self.extract_node(hostname)
+        dnb  = node.general.get('do_not_boot', False)
+
+        return not dnb
+
     def is_fully_scheduled(self):
         schedules = self.experiment.spec.schedules
 
