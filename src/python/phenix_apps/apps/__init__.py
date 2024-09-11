@@ -338,6 +338,19 @@ class AppBase(object):
         annotations[key] = value
         node['annotations'] = annotations
 
+    def add_label(self, hostname, key, value):
+        node = self.extract_node(hostname)
+
+        labels = node.get('labels', {})
+
+        # Could be a null entry in the JSON schema.
+        if not labels:
+            labels = {}
+
+        # This will override an existing label with the same key.
+        labels[key] = value
+        node['labels'] = labels
+
     def add_inject(self, hostname, inject):
         node = self.extract_node(hostname)
 
