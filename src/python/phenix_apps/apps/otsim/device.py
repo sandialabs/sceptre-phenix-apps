@@ -82,10 +82,13 @@ class FEP(Device):
     for regs in self.registers.values():
       registers += regs
 
-    downstream = self.md.get('downstream', None)
+    downstream = self.md.get('downstream', [])
+
+    if not isinstance(downstream, list):
+      downstream = [downstream]
 
     # Default to using DNP3 for downstream side.
-    if not downstream or downstream == 'dnp3':
+    if not downstream or 'dnp3' in downstream:
       server = DNP3()
       server.init_xml_root('server', self.node)
       server.init_outstation_xml()
@@ -93,7 +96,8 @@ class FEP(Device):
 
       config.append_to_root(server.root)
       protos['dnp3'] = True
-    elif downstream == 'modbus':
+
+    if 'modbus' in downstream:
       server = Modbus()
       server.init_xml_root('server', self.node)
       server.registers_to_xml(registers)
