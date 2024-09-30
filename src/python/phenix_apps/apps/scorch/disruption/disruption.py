@@ -255,7 +255,7 @@ class Disruption(ComponentBase):
             scn_path = Path(self.base_dir, fname)
             self.print(f"disruption results path: {scn_path}")
             results = utils.read_json(scn_path)
-            assert results["disruption_duration"] > 1.0
+            assert results["scenario_duration"] > 1.0
             self.print(f"{type(results['stages'])}")
             for stage in results["stages"].values():
                 if stage.get("method", "") != "opc" and not stage["successful"]:
