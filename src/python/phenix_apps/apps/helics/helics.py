@@ -55,9 +55,9 @@ class Helics(AppBase):
 
         total_fed_count = 0
 
-        # broker hosts --> ip:port --> fed-count
+        # broker hosts --> ip:port --> ['fed_count', 'log_level']
         # hosts to create start scripts for, ip:port combos to create sub brokers for
-        brokers = {}
+        brokers   = {}
         federates = self.extract_annotated_topology_nodes('helics/federate')
 
         for fed in federates:
@@ -72,6 +72,7 @@ class Helics(AppBase):
             for config in configs:
                 broker = config.get('broker', '127.0.0.1')
                 count  = config.get('fed-count', 1)
+                level  = config.get('log-level', 'SUMMARY')
 
                 total_fed_count += count
 
@@ -105,8 +106,12 @@ class Helics(AppBase):
                 self.add_label(hostname, 'group', 'helics')
                 self.add_label(hostname, 'helics', 'broker')
 
-                entry = brokers.get(hostname, {broker_ip: 0})
-                entry[broker] += count
+                entry = brokers.get(hostname, {broker_ip: [0, None]})
+                entry[broker][0] += count
+
+                # only overwrite the log level if it wasn't already set
+                if entry[broker][1] == None:
+                    entry[broker][1] = level
 
                 brokers[hostname] = entry
 
@@ -128,14 +133,17 @@ class Helics(AppBase):
             broker_configs = configs.get(hostname, [])
 
             # individual sub brokers for host (there will usually just be one)
-            for endpoint, feds in subs.items():
+            for endpoint, fedinfo in subs.items():
                 root_broker_config['subs'] += 1
 
+                count = fedinfo[0]
+                level = fedinfo[1]
+
                 broker_configs.append({
-                    'feds':      feds,
+                    'feds':      count,
                     'parent':    root_ip,
                     'endpoint':  endpoint,
-                    'log-level': broker_md.get('log-level', 'summary'),
+                    'log-level': level,
                     'log-file':  os.path.join(log_dir, 'helics-sub-broker.log'),
                 })
 
