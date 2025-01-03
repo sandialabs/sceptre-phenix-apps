@@ -75,6 +75,15 @@ class OTSim(AppBase):
         elif 'address' in broker:
           return broker['address']
 
+  def __process_scan_rate_metadata(self, md):
+    if 'helics' in md:
+      if 'scan-rate' in md['helics']:
+        return md['helics']['scan-rate']
+      else:
+        return 5
+    else:
+      return None
+    
 
   def __init_defaults(self):
     self.default_infrastructure = self.metadata.get('infrastructure', 'power-distribution')
@@ -228,9 +237,14 @@ class OTSim(AppBase):
 
     # Preload all the FEPs so they can force downstream FEPs to process their
     # configs during their own processing.
-    for fep in feps:
-      ot_devices[fep.hostname] = FEP(fep)
+    scan_rate_from_md = self.__process_scan_rate_metadata(self.metadata)
 
+    for fep in feps:
+      if scan_rate_from_md is not None: 
+        ot_devices[fep.hostname] = FEP(fep, {"scan-rate": scan_rate_from_md})
+      else: 
+        ot_devices[fep.hostname] = FEP(fep)
+       
     for fep in feps:
       config  = Config(self.metadata)
       injects = config.init_xml_root(fep.metadata)
