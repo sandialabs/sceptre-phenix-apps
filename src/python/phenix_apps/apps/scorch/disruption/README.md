@@ -75,7 +75,7 @@ components:
 
 ## Notes and Considerations
  * for a cyber_physical experiment, if overall run_time is shorter than combined dos.start_delay plus dos.attack_duration or physical.start_delay plus 5 minutes (whichever is longer), then phenix will fail because dos did not have enough time to export results or physical is not finished.
- * for a cyber_physical experiment, if dos.start_delay is longer than the overall run_time, there is no no check shorten dos.start_delay in relation to dos.attack_duration. There is only a check to shorten dos.attack_duration.
+ * for a cyber_physical experiment, if dos.start_delay is longer than the overall run_time, there is no check shorten dos.start_delay in relation to dos.attack_duration. There is only a check to shorten dos.attack_duration.
  * for a cyber_physical/dos/physical experiment, if combined dos.start_delay plus dos.attack_duration or physical.start_delay plus 5 minutes exactly equal the overall run_duration, then phenix will fail because dos and physical will not have enough time to wrap up.
  * for a cyber_physical/physical experiment, there is no check to see if physical.start_delay is larger than the overall run_duration
  * for a cyber_physical/physical experiment, there is hard requirement that run_duration must be slightly longer than the physical.start_delay plus the physical run duration or the experiment will fail. Physical run duration is varied and cannot be extended or shortened from this configuration.
