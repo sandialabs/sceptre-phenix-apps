@@ -186,7 +186,7 @@ class Disruption(ComponentBase):
             self.print(f"sleeping for {physical_start_delay} seconds")
             sleep(physical_start_delay)
 
-            # attack duration
+            # physical duration
             elapsed = self._run_physical_disruption(physical_start_delay)
 
             # sleep until experiment run_duration time is up, physical ended early
@@ -212,7 +212,6 @@ class Disruption(ComponentBase):
 
             # Kick off DoS process, have it sleep for number of seconds that puts it between line outage and load shedding
             # delay: 6.0 = 2.0 + 4.0 + 60.0 = 66.0
-            #dos_start_delay = 2.0 + 4.0 + start_delay  # 66.0
             # using config data dos_start_delay instead
 
             # run dos attack with start delay as a background process
