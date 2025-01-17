@@ -100,9 +100,13 @@ class OTSim(AppBase):
       # handle `self.default_endpoint` being set to False
       if self.default_endpoint and '/' not in self.default_endpoint:
         self.default_endpoint = f'{self.default_fed}/{self.default_endpoint}'
+      
+      self.end_time = str(self.metadata['helics'].get('end-time', 36000))
+
     else:
       self.default_fed      = 'OpenDSS'
       self.default_endpoint = 'OpenDSS/updates'
+      self.end_time = str(36000)
 
 
   def pre_start(self):
@@ -175,6 +179,9 @@ class OTSim(AppBase):
         broker    = ET.SubElement(io, 'broker-endpoint')
         federate  = ET.SubElement(io, 'federate-name')
         log_level = ET.SubElement(io, 'federate-log-level')
+        end_time  = ET.SubElement(io, 'end-time')
+        
+        end_time.text = self.end_time
 
         if 'helics' in md:
           if 'broker' in md['helics']:
@@ -195,14 +202,15 @@ class OTSim(AppBase):
           else:
             federate.text  = server.hostname
             log_level.text = 'SUMMARY'
+
         else:
           addr = self.__process_helics_broker_metadata(self.metadata)
           assert addr
-
+          
           broker.text    = addr
           federate.text  = server.hostname
           log_level.text = 'SUMMARY'
-
+        
         infrastructure.io_module_xml(io, infra, devices)
 
         config.append_to_root(io)
