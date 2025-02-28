@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from setuptools import setup, find_packages
 
 import phenix_apps
@@ -26,9 +28,15 @@ ENTRIES = {
         'phenix-scheduler-single-node = phenix_apps.schedulers.single_node.single_node:main',
         'phenix-scorch-component-art = phenix_apps.apps.scorch.art.art:main',
         'phenix-scorch-component-cc = phenix_apps.apps.scorch.cc.cc:main',
+        'phenix-scorch-component-collector = phenix_apps.apps.scorch.collector.collector:main',
         'phenix-scorch-component-ettercap = phenix_apps.apps.scorch.ettercap.ettercap:main',
         'phenix-scorch-component-hoststats = phenix_apps.apps.scorch.hoststats.hoststats:main',
+        'phenix-scorch-component-iperf = phenix_apps.apps.scorch.iperf.iperf:main',
         'phenix-scorch-component-mm = phenix_apps.apps.scorch.mm.mm:main',
+        'phenix-scorch-component-pcap = phenix_apps.apps.scorch.pcap.pcap:main',
+        'phenix-scorch-component-qos = phenix_apps.apps.scorch.qos.qos:main',
+        'phenix-scorch-component-rtds = phenix_apps.apps.scorch.rtds.rtds:main',
+        'phenix-scorch-component-disruption = phenix_apps.apps.scorch.disruption.disruption:main',
         'phenix-scorch-component-snort = phenix_apps.apps.scorch.snort.snort:main',
         'phenix-scorch-component-tcpdump = phenix_apps.apps.scorch.tcpdump.tcpdump:main',
         'phenix-scorch-component-trafficgen = phenix_apps.apps.scorch.trafficgen.trafficgen:main',
@@ -45,15 +53,17 @@ setup(
     entry_points    = ENTRIES,
     name            = 'phenix-apps',
     platforms       = 'Linux',
-    python_requires = '>=3.7',
-    url             = 'https://github.com/sandia-minimega/phenix-apps',
+    python_requires = '>=3.8',
+    url             = 'https://github.com/sandialabs/sceptre-phenix-apps/',
     version         = phenix_apps.__version__,
 
     classifiers = [
         'Development Status :: 4 - Beta',
         'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
         'Operating System :: POSIX :: Linux',
-        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
     ],
 
     install_requires = [
@@ -61,6 +71,9 @@ setup(
         'Mako~=1.1.3',
         'minimega',
         'python-box~=5.1.1',
+        'elasticsearch~=8.12.0',
+        'requests==2.31.0',
+        'python-dateutil==2.8.2',
     ],
 
     long_description = long_description,

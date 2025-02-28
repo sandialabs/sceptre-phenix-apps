@@ -111,8 +111,11 @@ class OTSim(AppBase):
       md    = server.metadata
       infra = md.get('infrastructure', self.default_infrastructure)
 
-      config = Config(self.metadata)
-      config.init_xml_root(server.metadata)
+      config  = Config(self.metadata)
+      injects = config.init_xml_root(server.metadata)
+
+      for inject in injects: # will at least be an empty list
+        self.add_inject(hostname=server.hostname, inject=inject)
 
       device = FieldDeviceServer(server, infra)
       device.process(mappings)
@@ -229,8 +232,11 @@ class OTSim(AppBase):
       ot_devices[fep.hostname] = FEP(fep)
 
     for fep in feps:
-      config = Config(self.metadata)
-      config.init_xml_root(fep.metadata)
+      config  = Config(self.metadata)
+      injects = config.init_xml_root(fep.metadata)
+
+      for inject in injects: # will at least be an empty list
+        self.add_inject(hostname=fep.hostname, inject=inject)
 
       device = ot_devices[fep.hostname]
       device.process(ot_devices)
@@ -259,8 +265,11 @@ class OTSim(AppBase):
     # have already been configured.
 
     for client in clients:
-      config = Config(self.metadata)
-      config.init_xml_root(client.metadata)
+      config  = Config(self.metadata)
+      injects = config.init_xml_root(client.metadata)
+
+      for inject in injects: # will at least be an empty list
+        self.add_inject(hostname=client.hostname, inject=inject)
 
       device = FieldDeviceClient(client)
       device.process(ot_devices)

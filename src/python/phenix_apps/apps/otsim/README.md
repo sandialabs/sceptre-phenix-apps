@@ -47,6 +47,11 @@ spec:
         cpu-module:
           api-endpoint: 0.0.0.0:9101 # this is the default; can be set to null to disable globally
                                      # can also be set per device via host metadata
+          api:                                # can also be set per device via host metadata
+            endpoint: 0.0.0.0:9001            # this is the default if not provided
+            tls-key: /path/to/tls.key         # must be provided or API will be started without TLS
+            tls-certificate: /path/to/tls.crt # must be provided or API will be started without TLS
+            ca-certificate: /path/to/ca.crt   # not required; only used for mTLS authentication
         ground-truth-module:
           elastic:
             endpoint: http://localhost:9200 # endpoint for ElasticSearch cluster

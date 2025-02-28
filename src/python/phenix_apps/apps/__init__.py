@@ -308,8 +308,22 @@ class AppBase(object):
 
         return None
 
-    def add_node(self, node):
-        self.experiment.spec.topology.nodes.append(node)
+    def add_node(self, new_node, overwrite = False):
+        found = None
+
+        for idx, node in enumerate(self.experiment.spec.topology.nodes):
+            if node.general.hostname == new_node['general']['hostname']:
+                found = idx
+                break
+
+        # If we didn't find an existing node, just append the new node.
+        # If there is an existing node and the overwrite arg is set,
+        # overwrite it with the new node, otherwise do nothing. Check
+        # if found is None since found (idx) could be 0.
+        if found is None:
+            self.experiment.spec.topology.nodes.append(new_node)
+        elif overwrite:
+            self.experiment.spec.topology.nodes[found] = Box(new_node)
 
     def add_annotation(self, hostname, key, value):
         node = self.extract_node(hostname)
@@ -323,6 +337,19 @@ class AppBase(object):
         # This will override an existing annotation with the same key.
         annotations[key] = value
         node['annotations'] = annotations
+
+    def add_label(self, hostname, key, value):
+        node = self.extract_node(hostname)
+
+        labels = node.get('labels', {})
+
+        # Could be a null entry in the JSON schema.
+        if not labels:
+            labels = {}
+
+        # This will override an existing label with the same key.
+        labels[key] = value
+        node['labels'] = labels
 
     def add_inject(self, hostname, inject):
         node = self.extract_node(hostname)
@@ -341,6 +368,12 @@ class AppBase(object):
             # There was no injection list, so we put the
             # injection dictionary in a list.
             node['injections'] = [inject]
+
+    def is_booting(self, hostname):
+        node = self.extract_node(hostname)
+        dnb  = node.general.get('do_not_boot', False)
+
+        return not dnb
 
     def is_fully_scheduled(self):
         schedules = self.experiment.spec.schedules

@@ -10,10 +10,23 @@ class Config:
       self.default_pull = 'tcp://127.0.0.1:1234'
       self.default_pub  = 'tcp://127.0.0.1:5678'
 
+    self.default_api = {}
+
     if 'cpu-module' in md:
-      self.default_api = md['cpu-module'].get('api-endpoint', '0.0.0.0:9101')
+      if 'api' in md['cpu-module']:
+        self.default_api['endpoint'] = md['cpu-module']['api'].get('endpoint', '0.0.0.0:9101')
+        self.default_api['tls-key']  = md['cpu-module']['api'].get('tls-key')
+        self.default_api['tls-cert'] = md['cpu-module']['api'].get('tls-certificate')
+        self.default_api['ca-cert']  = md['cpu-module']['api'].get('ca-certificate')
+      else:
+        endpoint = md['cpu-module'].get('api-endpoint', '0.0.0.0:9101')
+
+        if endpoint:
+          self.default_api['endpoint'] = endpoint
+        else: # allow disablement of API endpoint if `api-endpoint` is null
+          self.default_api = None
     else:
-      self.default_api = '0.0.0.0:9101'
+      self.default_api['endpoint'] = '0.0.0.0:9101'
 
     if 'logs' in md:
       self.logs = {}
@@ -50,6 +63,8 @@ class Config:
   def init_xml_root(self, md = {}):
     self.root = ET.Element('ot-sim')
 
+    injects = []
+
     msgbus = ET.SubElement(self.root, 'message-bus')
     pull   = ET.SubElement(msgbus, 'pull-endpoint')
     pub    = ET.SubElement(msgbus, 'pub-endpoint')
@@ -64,11 +79,58 @@ class Config:
     self.cpu = ET.SubElement(self.root, 'cpu')
 
     if 'cpu-module' in md:
-      api = ET.SubElement(self.cpu, 'api-endpoint')
-      api.text = md['cpu-module'].get('api-endpoint', self.default_api)
+      if 'api' in md['cpu-module']:
+        api = ET.SubElement(self.cpu, 'api')
+
+        endpoint = ET.SubElement(api, 'endpoint')
+        endpoint.text = md['cpu-module']['api'].get('endpoint', self.default_api['endpoint'])
+
+        if 'tls-key' in md['cpu-module']['api'] and 'tls-certificate' in md['cpu-module']['api']:
+          tlskey = ET.SubElement(api, 'tls-key')
+          tlskey.text = '/etc/ot-sim/certs/api.key'
+
+          injects.append({'src': md['cpu-module']['api']['tls-key'], 'dst': '/etc/ot-sim/certs/api.key'})
+
+          tlscert = ET.SubElement(api, 'tls-certificate')
+          tlscert.text = '/etc/ot-sim/certs/api.crt'
+
+          injects.append({'src': md['cpu-module']['api']['tls-certificate'], 'dst': '/etc/ot-sim/certs/api.crt'})
+
+        if 'ca-certificate' in md['cpu-module']['api']:
+          cacert = ET.SubElement(api, 'ca-certificate')
+          cacert.text = '/etc/ot-sim/certs/api.ca.crt'
+
+          injects.append({'src': md['cpu-module']['api']['ca-certificate'], 'dst': '/etc/ot-sim/certs/api.ca.crt'})
+      else:
+        endpoint = md['cpu-module'].get('api-endpoint', self.default_api['endpoint'])
+
+        if endpoint: # allow disablement of API endpoint if `api-endpoint` is null
+          api = ET.SubElement(self.cpu, 'api')
+
+          apiendpoint = ET.SubElement(api, 'endpoint')
+          apiendpoint.text = endpoint
     elif self.default_api:
-      api = ET.SubElement(self.cpu, 'api-endpoint')
-      api.text = self.default_api
+      api = ET.SubElement(self.cpu, 'api')
+
+      apiendpoint = ET.SubElement(api, 'endpoint')
+      apiendpoint.text = self.default_api['endpoint']
+
+      if 'tls-key' in self.default_api and 'tls-cert' in self.default_api:
+        tlskey = ET.SubElement(api, 'tls-key')
+        tlskey.text = '/etc/ot-sim/certs/api.key'
+
+        injects.append({'src': self.default_api['tls-key'], 'dst': '/etc/ot-sim/certs/api.key'})
+
+        tlscert = ET.SubElement(api, 'tls-certificate')
+        tlscert.text = '/etc/ot-sim/certs/api.crt'
+
+        injects.append({'src': self.default_api['tls-cert'], 'dst': '/etc/ot-sim/certs/api.crt'})
+
+      if 'ca-cert' in self.default_api:
+        cacert = ET.SubElement(api, 'ca-certificate')
+        cacert.text = '/etc/ot-sim/certs/api.ca.crt'
+
+        injects.append({'src': self.default_api['ca-cert'], 'dst': '/etc/ot-sim/certs/api.ca.crt'})
 
     if 'logs' in md:
       if 'elastic' in md['logs']:
@@ -140,6 +202,8 @@ class Config:
       idx.text = self.ground_truth['elastic']['default_index_base_name']
 
       ET.SubElement(self.cpu, 'module', {'name': 'ground-truth'}).text = 'ot-sim-ground-truth-module {{config_file}}'
+
+    return injects
 
 
   def append_to_root(self, child):

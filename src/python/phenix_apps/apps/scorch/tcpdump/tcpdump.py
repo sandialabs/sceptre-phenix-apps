@@ -3,6 +3,7 @@ import subprocess, sys
 from phenix_apps.apps.scorch import ComponentBase
 from phenix_apps.common import logger, utils
 
+# TODO: merge tcpdump's functionality into the 'pcap' component
 
 class TCPDump(ComponentBase):
     def __init__(self):
@@ -44,7 +45,7 @@ class TCPDump(ComponentBase):
 
             mm.cc_filter(f'name={hostname}')
             mm.cc_exec(f'ip link set {iface} up')
-            mm.cc_background(f'tcpdump {options} -i {iface} -U -w /dump.pcap {filter}')
+            mm.cc_background(f'tcpdump {options} -i {iface} -U -w /dump-{iface}.pcap {filter}')
 
         logger.log('INFO', f'Started user component: {self.name}')
 
@@ -65,20 +66,25 @@ class TCPDump(ComponentBase):
 
         for vm in vms:
             hostname = vm.get('hostname', None)
+            iface    = vm.get('iface',    None)
 
             if not hostname:
                 self.eprint('no hostname provided for VM config')
                 sys.exit(1)
 
-            pcap_out = f'{self.base_dir}/{hostname}.pcap'
-            json_out = f'{self.base_dir}/{hostname}.pcap.jsonl'
+            if not iface:
+                self.eprint('no interface name provided for VM config')
+                sys.exit(1)
+
+            pcap_out = f'{self.base_dir}/{hostname}-{iface}.pcap'
+            json_out = f'{self.base_dir}/{hostname}-{iface}.pcap.jsonl'
 
             utils.mm_exec_wait(mm, hostname, 'pkill tcpdump')
 
             self.print(f'copying PCAP file from node {hostname}...')
 
-            utils.mm_recv(mm, hostname, '/dump.pcap', pcap_out)
-            mm.cc_exec('rm /dump.pcap')
+            utils.mm_recv(mm, hostname, f'/dump-{iface}.pcap', pcap_out)
+            mm.cc_exec(f'rm /dump-{iface}.pcap')
 
             self.print(f'done copying PCAP file from node {hostname}')
 
