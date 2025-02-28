@@ -17,6 +17,8 @@ bennu-simulink-provider --server-endpoint '${server_endpoint}' --publish-endpoin
         % if metadata.get('gt'):
 ./simulinkgt -addr :8080 -file groundTruth.txt -tmpl main.tmpl 2>&1 > /etc/sceptre/log/gt.log &
         % endif
+    % elif metadata.get('simulator','').lower() == 'alicanto':
+pybennu-alicanto -c /etc/sceptre/alicanto.json -d DEBUG
     % elif any(x in name.lower() for x in ['provider', 'helics-provider']) or metadata.get('simulator', '').lower().startswith('powerworld') or metadata.get('simulator', '').lower() == 'pypower':
         % if needsleep:
 sleep 60s
