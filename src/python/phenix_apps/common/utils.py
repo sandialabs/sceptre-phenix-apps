@@ -384,7 +384,7 @@ def mm_exec_wait(
         if not row['Response']:
             continue
 
-        resp  = row['Response']
+        resp = row['Response']
 
         if uuid not in resp:
             eprint(f"UUID '{uuid}' not in response: {repr(resp)}")

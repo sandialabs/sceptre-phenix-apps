@@ -13,12 +13,14 @@ with open("README.md", "r") as fh:
 DATA = {
     'phenix_apps': [
         'apps/*/templates/*.mako',
+        'apps/scorch/*/templates/*.mako',
     ],
 }
 
 
 ENTRIES = {
     'console_scripts' : [
+        'phenix-app-caldera = phenix_apps.apps.caldera.caldera:main',
         'phenix-app-helics = phenix_apps.apps.helics.helics:main',
         'phenix-app-ot-sim = phenix_apps.apps.otsim.otsim:main',
         'phenix-app-protonuke = phenix_apps.apps.protonuke.protonuke:main',
@@ -27,6 +29,7 @@ ENTRIES = {
         'phenix-app-wireguard = phenix_apps.apps.wireguard.wireguard:main',
         'phenix-scheduler-single-node = phenix_apps.schedulers.single_node.single_node:main',
         'phenix-scorch-component-art = phenix_apps.apps.scorch.art.art:main',
+        'phenix-scorch-component-caldera = phenix_apps.apps.scorch.caldera.caldera:main',
         'phenix-scorch-component-cc = phenix_apps.apps.scorch.cc.cc:main',
         'phenix-scorch-component-collector = phenix_apps.apps.scorch.collector.collector:main',
         'phenix-scorch-component-ettercap = phenix_apps.apps.scorch.ettercap.ettercap:main',

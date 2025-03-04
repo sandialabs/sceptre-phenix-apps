@@ -27,7 +27,7 @@ class Disruption(ComponentBase):
         self.print(f"killing python.exe process on {opc_host} (for physical disruption)")
         utils.mm_kill_process(self.mm, f"name={opc_host}", "python.exe", os_type='windows')
 
-    def _build_dos_cmd(self, start_delay: float) -> str:
+    def _build_dos_cmd(self, start_delay: float, dos_run_duration: float) -> str:
         t_ips = []
         for target in self.metadata.dos.targets:
             t_iface = target.get("interface", "eth0")
@@ -36,7 +36,7 @@ class Disruption(ComponentBase):
         cmd = (
             f"{self.metadata.dos.attacker.script_path} "
             f"--wait-for {start_delay} "
-            f"--run-for {float(self.metadata.dos.attack_duration)} "
+            f"--run-for {dos_run_duration} "
             f"--target-ips {' '.join(t_ips)} "
             f"--interface {self.metadata.dos.attacker.get('interface', 'eth0')} "
             f"--results-file {self.metadata.dos.attacker.results_path}"
@@ -149,12 +149,17 @@ class Disruption(ComponentBase):
         elif self.metadata.current_disruption == "dos":
             start_delay = float(self.metadata.dos.start_delay)
             attack_duration = float(self.metadata.dos.attack_duration)
-            cmd = self._build_dos_cmd(start_delay)
 
-            timeout = start_delay + attack_duration + 5.0  # type: float
+            timeout = attack_duration + start_delay + 5.0 # type: float
+            tmp_run_duration = run_duration - 60.0
             # ensure timeout doesn't exceed experiment duration
-            if timeout > run_duration:
-                timeout = run_duration - 1.0
+            if timeout > tmp_run_duration:
+                timeout = tmp_run_duration - start_delay - 1.0
+                timeout = float(abs(timeout))
+            else:
+                timeout = attack_duration
+
+            cmd = self._build_dos_cmd(start_delay, timeout)
 
             a_host = self.metadata.dos.attacker.hostname
             self.print(f"Running DoS command on {a_host}: {cmd} (timeout={timeout})")
@@ -174,32 +179,47 @@ class Disruption(ComponentBase):
                 sleep(remaining)
 
         elif self.metadata.current_disruption == "physical":
-            start_delay = float(self.metadata.physical.start_delay)
+            # run physical attack with start delay
+            physical_start_delay = float(self.metadata.physical.start_delay)
+            
+            # start delay
+            self.print(f"sleeping for {physical_start_delay} seconds")
+            sleep(physical_start_delay)
 
-            self.print(f"sleeping for {start_delay} seconds")
-            sleep(start_delay)
+            # physical duration
+            elapsed = self._run_physical_disruption(physical_start_delay)
 
-            elapsed = self._run_physical_disruption()
-
-            remaining = run_duration - elapsed - start_delay
+            # sleep until experiment run_duration time is up, physical ended early
+            remaining = run_duration - elapsed - physical_start_delay
             if remaining > 0.1:
                 self.print(f"{remaining:.2f} seconds remaining out of configured run_duration {run_duration}, sleeping for that many seconds...")
                 sleep(remaining)
 
         elif self.metadata.current_disruption == "cyber_physical":
-            start_delay = float(self.metadata.physical.start_delay)
+            # get config data
+            physical_start_delay = float(self.metadata.physical.start_delay)
+            dos_start_delay = float(self.metadata.dos.start_delay)
+            dos_attack_duration = float(self.metadata.dos.attack_duration)
+
+            # make sure total dos attack run time does not exceed total run_duration
+            dos_run_duration = dos_attack_duration + dos_start_delay + 5.0
+            tmp_run_duration = run_duration - 60.0
+            if dos_run_duration > tmp_run_duration:
+                dos_run_duration = tmp_run_duration - dos_start_delay - 1.0
+                dos_run_duration = float(abs(dos_run_duration))
+            else:
+                dos_run_duration = dos_attack_duration
 
             # Kick off DoS process, have it sleep for number of seconds that puts it between line outage and load shedding
             # delay: 6.0 = 2.0 + 4.0 + 60.0 = 66.0
-            dos_start_delay = 2.0 + 4.0 + start_delay  # 66.0
+            # using config data dos_start_delay instead
+
+            # run dos attack with start delay as a background process
             self.print(f"Kicking off DoS script in background with start delay of {dos_start_delay}")
-            dos_cmd = self._build_dos_cmd(dos_start_delay)
+            dos_cmd = self._build_dos_cmd(dos_start_delay, dos_run_duration)
             self.mm.cc_filter(f"name={self.metadata.dos.attacker.hostname}")
             self.mm.cc_background(dos_cmd)
             self.mm.clear_cc_filter()
-
-            self.print(f"sleeping for {start_delay} seconds")
-            sleep(start_delay)
 
             # Run physical disruption
             # open breaker for generator 1
@@ -207,12 +227,21 @@ class Disruption(ComponentBase):
             # open transmission line T4 (T4SE and T4RE)
             # ... wait 7 seconds
             # apply 60% load shedding to loads 5 and 6
-            elapsed = self._run_physical_disruption()
 
-            remaining = run_duration - elapsed - start_delay
-            if remaining > 0.1:
-                self.print(f"{remaining:.2f} seconds remaining out of configured run_duration {run_duration}, sleeping for that many seconds...")
-                sleep(remaining)
+            # physical start delay sleep
+            self.print(f"sleeping for {physical_start_delay} seconds")
+            sleep(physical_start_delay)
+
+            # run physical attack not as a background process
+            physical_elapsed_time = self._run_physical_disruption()
+
+            # calculate how early everything finished and how much sleep time is needed
+            remaining_time = run_duration - physical_elapsed_time - physical_start_delay
+
+            # sleep until experiment run_duration time is up, physical or dos ended early
+            if remaining_time > 0.1:
+                self.print(f"{remaining_time:.2f} seconds remaining out of configured run_duration {run_duration}, sleeping for that many seconds...")
+                sleep(remaining_time)
         else:
             raise ValueError(f"Invalid disruption: {self.metadata.current_disruption}")
 
@@ -310,3 +339,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
