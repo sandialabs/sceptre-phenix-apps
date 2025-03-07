@@ -289,7 +289,7 @@ class AppBase(object):
 
             if 'address' in i:
                 if include_mask:
-                    return i['address'], i['address']
+                    return i['address'], i['mask']
                 else:
                     return i['address']
 
