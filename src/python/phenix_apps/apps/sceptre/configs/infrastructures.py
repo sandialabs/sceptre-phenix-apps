@@ -390,9 +390,9 @@ class FuelInfrastructure(Infrastructure):
         elif type(device_type) == str and device_type.lower() == 'pump':
             device_kwargs = {'range'        : (0, 1000),
                       'analog-read'         : kwargs.get('analog-read',
-                            ['flow']),
+                            ['flow', 'voltage_in']),
                       'analog-read-write'   : kwargs.get('analog-read-write',
-                            ['flow']),
+                            ['flow', 'voltage_in']),
                       'binary-read'         : kwargs.get('binary-read',
                             ['active', 'control']),
                       'binary-read-write'   : kwargs.get('binary-read-write',
