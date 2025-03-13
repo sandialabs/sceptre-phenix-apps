@@ -328,7 +328,8 @@ class AppBase(object):
                     ]
                 },
                 'network': {
-                    'interfaces': self.create_interfaces(md.get('interfaces', [])
+                    'interfaces':
+                        self.create_interfaces(md.get('interfaces', [])
                 }
             }
         return node
