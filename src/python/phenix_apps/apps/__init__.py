@@ -333,7 +333,7 @@ class AppBase(object):
             }
         return node
 
-    def create_interfaces(self, ifaces)
+    def create_interfaces(self, ifaces):
         interfaces = []
         for idx, iface in enumerate(ifaces):
             ip = ipaddress.ip_interface(iface.get('address', '0.0.0.0/24'))
