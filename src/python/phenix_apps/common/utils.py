@@ -242,7 +242,7 @@ def mm_send(mm: minimega.minimega, vm: str, src: str, dst: str) -> None:
                 os.makedirs(dst_dir)
 
             if os.path.isdir(src):
-                shutil.copytree(src, vm_dst)
+                shutil.copytree(src, vm_dst, dirs_exist_ok=True)
             else:
                 shutil.copyfile(src, vm_dst)
         finally:
