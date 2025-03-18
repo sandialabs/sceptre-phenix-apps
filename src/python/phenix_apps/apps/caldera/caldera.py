@@ -102,7 +102,7 @@ class Caldera(AppBase):
                 config_file = f'{self.app_dir}/{hostname}-config.yml'
 
                 with open(config_file, 'w') as f:
-                    utils.mako_serve_template('default_config.mako', templates, f, addr=addr)
+                    utils.mako_serve_template('default_config.mako', templates, f)
 
             inject = {
                 'src': config_file,
