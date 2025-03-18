@@ -14,24 +14,19 @@ class MM(ComponentBase):
 
         self.execute_stage()
 
-
     def configure(self):
         self.__run('configure')
-
 
     def start(self):
         self.__run('start')
 
-
     def stop(self):
         self.__run('stop')
-
 
     def cleanup(self):
         self.__run('cleanup')
 
-
-    def __run(self, stage):
+    def __run(self, stage: str) -> None:
         mm = self.mm_init()
 
         commands = self.metadata.get(stage, [])
@@ -83,13 +78,13 @@ class MM(ComponentBase):
                 cap = cmd.get('capture', None)
 
                 if not cap:
-                    self.eprint(f'no bridge capture details provided')
+                    self.eprint('no bridge capture details provided')
                     sys.exit(1)
 
                 bridge = cap.get('bridge', None)
 
                 if not bridge:
-                    self.eprint(f'bridge to stop capture traffic on not provided')
+                    self.eprint('bridge to stop capture traffic on not provided')
                     sys.exit(1)
                 try:
                     self.print(f'stopping pcap capture on bridge {bridge}')
@@ -132,6 +127,8 @@ class MM(ComponentBase):
                 except Exception as ex:
                     self.eprint(f'unable to stop pcap capture on bridge {bridge}: {ex}')
                     sys.exit(1)
+            else:
+                self.eprint(f"Unknown command type '{cmd.type}'")
 
         vms = self.metadata.get('vms', [])
 
@@ -285,6 +282,8 @@ class MM(ComponentBase):
                     except Exception as ex:
                         self.eprint(f'unable to stop pcap capture(s) on vm {vm.hostname}: {ex}')
                         sys.exit(1)
+                else:
+                    self.eprint(f"Unknown command type for VM '{vm.hostname}': {cmd.type}")
 
 
 def main():

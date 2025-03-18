@@ -5,26 +5,46 @@ type: cc
 exe:  phenix-scorch-component-cc
 ```
 
+> NOTE: miniccc must be installed and running on the target VM(s).
+
 ## Metadata Options
 
-```
+```yaml
 metadata:
+  # Commands (types) to run for a particular stage (configure, start, stop, cleanup)
+  # NOTE: The stage-level types differ from the VM-level types
+  configure:
+    - type: reset  # delete all miniccc commands and responses
+  start: [] # same array of keys as above
+  stop: [] # same array of keys as above
+  cleanup: [] # same array of keys as above
+
+  # Commands to run for specific VMs, for a particular stage
   vms:
-  - hostname:
-    configure:
-    - type: exec # can be exec, background, send, or recv
-      args: whoami # a simple string of args (not an array)
-      once: <bool> # only execute a command once (applicable for exec and background) (default: true)
-      wait: <bool> # wait for cmd to be executed by VM (default: false)
-      validator: <bash script to validate exec results>
-    start: [] # same array of keys as above
-    stop: [] # same array of keys as above
-    cleanup: [] # same array of keys as above
+    - hostname:
+      configure:
+        - type: exec # can be exec, background, send, recv
+          args: whoami # a simple string of args (not an array)
+          once: <bool> # only execute a command once (applicable for exec and background) (default: true)
+          wait: <bool> # wait for cmd to be executed by VM (default: false)
+          validator: <bash script to validate exec results>
+      start: [] # same array of keys as above
+      stop: [] # same array of keys as above
+      cleanup: [] # same array of keys as above
 ```
 
 > The validator is only used when `type = exec` and forces `wait = true`. The
 > validator script should be written to process STDIN. Anything the validator
 > script writes to STDERR will be available to the user if the validation fails.
+
+## Types
+- VM-specific command types
+  - `exec`: execute a command (`cc exec`)
+  - `background`: execute a command in the background (component will continue)
+  - `send`: send a file (Host -> VM)
+  - `recv`: receive a file (VM -> Host)
+- Stage-level command types
+  - `reset`: reset miniccc state, by clearing filter and deleting all commands and responses. **WARNING**: THIS WILL INTERFERE WITH OPERATION OF MANY COMPONENTS! Reset should only be used at the start or end of a run or a loop (use with special care in loops!).
 
 ## Notes on the `exec` and `background` Type
 
@@ -68,6 +88,13 @@ host for the current scorch run, loop, and count.
 
 ```yaml
 components:
+  - name: reset_miniccc
+    type: cc
+    metadata:
+      configure:
+        - reset
+      cleanup:
+        - reset
   - name: disable-eth0
     type: cc
     metadata:
