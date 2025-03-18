@@ -333,16 +333,16 @@ class ComponentBase(object):
     ) -> bool:
         if os_type == "linux":
             # "ps -e" cuts off full command name, need "f" to get full command
-            ps_list = self.run_and_check_command(vm, "ps -ef", timeout=5.0, poll_rate=0.5)["stdout"]
+            ps_list = self.run_and_check_command(vm, "ps -ef", timeout=15.0, poll_rate=0.5)["stdout"]
         elif os_type == "windows":
-            ps_list = self.run_and_check_command(vm, "tasklist", timeout=7.0, poll_rate=0.5)["stdout"]
+            ps_list = self.run_and_check_command(vm, "tasklist", timeout=15.0, poll_rate=0.5)["stdout"]
         else:
             raise ValueError(f"unknown os_type '{os_type}' for VM {vm}")
 
         if process.lower() in ps_list.lower():
             return True
         else:
-            self.eprint(f"process {process} is not running on {vm}")
+            self.eprint(f"process '{process}' is not running on '{vm}'")
             return False
 
     def configure(self):
