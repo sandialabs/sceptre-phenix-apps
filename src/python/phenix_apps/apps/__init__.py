@@ -309,7 +309,27 @@ class AppBase(object):
 
     # create a node based on yaml and default values
     def create_node(self, md, hname, image = 'miniccc.qc2',
-                    os = 'linux', cpu = 2, memory = 4096):
+                    os_type = 'linux', vcpus = 2, memory = 4096):
+        '''
+        can take a minimal node definition in md, ex:
+        - hostname: hosty
+          os_type: linux
+          vcpus: 4
+          memory: 8192
+          image: miniccc.qc2
+          interfaces:
+            - name: IF0
+              address: 172.16.0.10/24
+              gateway: 172.16.0.1
+              vlan: MGMT
+            - name: IF1
+              address: 1.2.3.4/24
+              gateway: 1.2.3.1
+              vlan: INT
+
+        md is not required, node can be constructed from named arguments
+        '''
+
         hostname = md.get('hostname', hname)
         node = self.extract_node(hostname, wildcard=False)
         if not node:
@@ -320,8 +340,8 @@ class AppBase(object):
                     'vm_type'  : 'kvm'
                 },
                 'hardware': {
-                    'os_type' : md.get('os', os),
-                    'vcpus'   : md.get('cpu', cpu),
+                    'os_type' : md.get('os_type', os),
+                    'vcpus'   : md.get('vcpus', cpu),
                     'memory'  : md.get('memory', memory),
                     'drives'  : [
                         {'image': md.get('image', image)},
@@ -335,6 +355,18 @@ class AppBase(object):
         return node
 
     def create_interfaces(self, ifaces):
+        '''
+        can take a minimal interface definitions in ifaces, ex:
+        - name: IF0
+          address: 172.16.0.10/24
+          gateway: 172.16.0.1
+          vlan: MGMT
+        - name: IF1
+          address: 1.2.3.4/24
+          gateway: 1.2.3.1
+          vlan: INT
+        '''
+
         interfaces = []
         for idx, iface in enumerate(ifaces):
             ip = ipaddress.ip_interface(iface.get('address', '0.0.0.0/24'))
