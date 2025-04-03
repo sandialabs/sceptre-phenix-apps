@@ -1373,7 +1373,7 @@ class Sceptre(AppBase):
                 with open(auto_winscp, "w") as file_:
                     utils.mako_serve_template(
                         auto_winscp_mako,
-                        self.mako_templates_path,
+                        self.mako_path,
                         file_,
                         eng_fd=eng_fd,
                         connect_interval=engineer_workstation.metadata.connect_interval
