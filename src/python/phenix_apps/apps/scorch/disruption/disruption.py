@@ -187,7 +187,7 @@ class Disruption(ComponentBase):
             sleep(physical_start_delay)
 
             # physical duration
-            elapsed = self._run_physical_disruption(physical_start_delay)
+            elapsed = self._run_physical_disruption()
 
             # sleep until experiment run_duration time is up, physical ended early
             remaining = run_duration - elapsed - physical_start_delay
