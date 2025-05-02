@@ -38,6 +38,7 @@ class Sceptre(AppBase):
         # Note, asset_dir must be declared in the scenario.yaml to work correctly
         overrideFile = f"{self.asset_dir}/injects/override/{filename}"
         if os.path.exists(overrideFile):
+            logger.log("INFO", f"Overriding '{filename}' with '{overrideFile}'")
             return {"src": overrideFile}
         return None
 
@@ -337,19 +338,21 @@ class Sceptre(AppBase):
         ######################## Provider configure ###################################
         providers = self.extract_nodes_type("provider")
         if not providers:
-            msg = "No SCEPTRE providers have been configured for this experiment."
+            msg = "No SCEPTRE providers have been configured for this experiment"
             logger.log("ERROR", msg)
-            raise error.AppError(msg)
+            raise error.AppError(msg) from None
 
         for provider in providers:
-            vm_directory = f"{self.sceptre_dir}/{provider.hostname}"
             if "metadata" not in provider:
-                msg = f"No metadata for {provider.hostname}"
-                logger.log("WARN", msg)
+                logger.log("WARN", f"No metadata for provider '{provider.hostname}', skipping...")
                 continue
 
-            # NOTE: simulator is considored case-sensitive in many places
+            vm_directory = f"{self.sceptre_dir}/{provider.hostname}"
+
+            # NOTE: names are case-sensitive, used here, in power_daemon.py in bennu, and in Phenix schemas
             simulator = provider.metadata.get("simulator", "")  # type: str
+            if not simulator:
+                logger.log("WARN", f"No simulator specified for provider '{provider.hostname}', will fall back to default config")
 
             # Create power world provider injections
             if simulator in ["PowerWorld", "PowerWorldHelics"]:
@@ -372,6 +375,7 @@ class Sceptre(AppBase):
                     "description": "PowerWorld objects",
                 })
                 self.add_inject(hostname=provider.hostname, inject=kwargs)
+
                 # case file
                 kwargs = {
                     "src": f"{provider.metadata.case}",
@@ -379,6 +383,7 @@ class Sceptre(AppBase):
                     "description": "PowerWorld binary file",
                 }
                 self.add_inject(hostname=provider.hostname, inject=kwargs)
+
                 # oneline file
                 kwargs = {
                     "src": f"{provider.metadata.oneline}",
@@ -455,7 +460,7 @@ class Sceptre(AppBase):
                     }
                     self.add_inject(hostname=provider.hostname, inject=kwargs)
 
-            # Create pypower provider injections
+            # Create PyPower provider injections
             elif simulator == "PyPower":
                 # config
                 kwargs = self.find_override(f"{provider.hostname}_config.ini")
@@ -483,7 +488,7 @@ class Sceptre(AppBase):
                     kwargs = {"src": f"{vm_directory}/config.ini"}
                 kwargs.update({
                     "dst": "/etc/sceptre/config.ini",
-                    "description": "vm_config",
+                    "description": "Provider config",
                 })
                 self.add_inject(hostname=provider.hostname, inject=kwargs)
 
@@ -584,7 +589,7 @@ class Sceptre(AppBase):
         if len(elk) > 1:
             msg = "There are multiple ELK boxes defined for this SCEPTRE experiment"
             logger.log("ERROR", msg)
-            raise error.AppError(msg)
+            raise error.AppError(msg) from None
 
         if elk:
             injects = [
@@ -640,8 +645,7 @@ class Sceptre(AppBase):
 
         for provider in providers:
             if "metadata" not in provider:
-                msg = f"No metadata for {provider.hostname}"
-                logger.log("WARN", msg)
+                logger.log("WARN", f"No metadata for provider '{provider.hostname}', skipping...")
                 continue
 
             provider_map[provider.hostname] = provider
@@ -653,8 +657,8 @@ class Sceptre(AppBase):
             self.render_sceptre_start(
                 device=provider,
                 kwargs={
-                    "publish_endpoint": pub_endpoint,
                     "server_endpoint": srv_endpoint,
+                    "publish_endpoint": pub_endpoint,
                     # if ignition hmi is being used, provider needs to sleep
                     # labels: - ignition
                     "needsleep": True if self.extract_nodes_label("ignition") else False,
@@ -716,8 +720,7 @@ class Sceptre(AppBase):
             fd_counter += 1
 
             if not fd_.metadata:
-                msg = f"No metadata for {fd_.hostname}."
-                logger.log("WARN", msg)
+                logger.log("WARN", f"No metadata for fd-server '{fd_.hostname}'")
                 continue
 
             # get provider information
@@ -734,14 +737,15 @@ class Sceptre(AppBase):
                 subtype = fd_.metadata.get("subtype", "single")
                 parsed = SceptreMetadataParser(fd_.metadata)
 
-                if provider.metadata.get("simulator", "") in [
+                simulator = provider.metadata.get("simulator", "")
+                if simulator in [
                     'PowerWorld', 'PowerWorldHelics', 'PowerWorldDynamics', 'PyPower'
                 ]:
                     fd_objects = [x['name'] for _, v in parsed.devices_by_protocol.items() for x in v]
                     power_object_list.extend(fd_objects)
             except Exception as e:
-                msg = f"There was a problem parsing metadata for {fd_.hostname}.\nPROBLEM: {e}"
-                logger.log("WARN", msg)
+                msg = f"There was a problem parsing metadata for '{fd_.hostname}'.\nPROBLEM: {e}"
+                logger.log("ERROR", msg)
                 raise error.AppError(msg) from None
 
             fd_directory = f"{self.sceptre_dir}/{fd_.hostname}"
@@ -988,8 +992,7 @@ class Sceptre(AppBase):
 
         for fd_ in fd_clients:
             if not fd_.metadata:
-                msg = f"No metadata for {fd_.hostname}."
-                logger.log("WARN", msg)
+                logger.log("WARN", f"No metadata for fd-client '{fd_.hostname}', skipping...")
                 continue
 
             fd_directory = f"{self.sceptre_dir}/{fd_.hostname}"
@@ -1290,7 +1293,7 @@ class Sceptre(AppBase):
             hmi_scada_ips = []
             if "connected_scadas" in hmi.metadata:
                 for hmi_scada_server in hmi.metadata.connected_scadas:
-                    for scada_server in scada_servers: 
+                    for scada_server in scada_servers:
                         if hmi_scada_server == scada_server.hostname:
                             hmi_scada_ips.append(scada_server.topology.network.interfaces[0].address)
             else:
@@ -1499,7 +1502,7 @@ class SceptreMetadataParser():
         register_map = {}
         config_path = topo_dir + topology + ".json"
 
-        logger.log('DEBUG', "Retriving register mapping from %s" % register_map)
+        logger.log('DEBUG', f"Retriving register mapping from {register_map}")
 
         with open(config_path) as topo:
             config = json.load(topo)
