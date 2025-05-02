@@ -14,7 +14,7 @@ authors = [
     {name = "Bryan Richardson", email = "bryan@activeshadow.com"},
     {name = "Sandia National Laboratories", email = "emulytics@sandia.gov"},
 ]
-keywords = ["sceptre", "phenix", "minimega", "emulytics", "sandia"]
+keywords = ["sceptre", "phenix", "phenix-apps", "minimega", "emulytics", "sandia"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
