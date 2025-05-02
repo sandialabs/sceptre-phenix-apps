@@ -74,10 +74,11 @@ setup(
         'lxml~=4.9.2',
         'Mako~=1.1.3',
         'minimega',
-        'python-box~=5.1.1',
+        'python-box~=7.2.0',
         'elasticsearch~=8.12.0',
         'requests==2.31.0',
         'python-dateutil==2.8.2',
+        'pyyaml~=6.0.2',
     ],
 
     long_description = long_description,
