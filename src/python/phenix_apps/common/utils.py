@@ -7,6 +7,7 @@ import os.path
 import random
 import re
 import shutil
+import stat
 import tempfile
 import time
 import sys
@@ -71,6 +72,14 @@ def mako_serve_template(template_name: str, templates_dir: str, filename: str, *
     mytemplate = mylookup.get_template(template_name)
 
     print(mytemplate.render(**kwargs), file=filename)
+
+
+def mark_executable(file_path: str):
+    """
+    Add executable by owner bit to file mode.
+    """
+    st_ = os.stat(file_path)
+    os.chmod(file_path, st_.st_mode | stat.S_IEXEC)
 
 
 def generate_mac_addr() -> str:
