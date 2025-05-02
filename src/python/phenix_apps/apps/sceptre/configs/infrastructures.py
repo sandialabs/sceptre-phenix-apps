@@ -416,6 +416,42 @@ class FuelInfrastructure(Infrastructure):
                       infrastructure=infra, **device_kwargs)
 
 
+class OPALRTInfrastructure(Infrastructure):
+    """OPALRT infrastructure for the OPALRT dynamic simulator."""
+
+    def __init__(self):
+        super().__init__()
+        super().register('opalrt')
+        self.range = -32767.0, 32767.0
+
+    @staticmethod
+    def create_device(device_type, device_name, protocol, reg_config, **kwargs):
+        if type(device_type) == str and device_type.lower() == 'analog-read':
+            device_kwargs = {
+                'range': (-32767.0, 32767.0),
+                'analog-read': kwargs.get('analog-read', ['value']),
+            }
+            return Device(device_type, device_name, protocol, reg_config, **device_kwargs)
+        elif type(device_type) == str and device_type.lower() == 'analog-read-write':
+            device_kwargs = {
+                'range': (-32767.0, 32767.0),
+                'analog-read-write': kwargs.get('analog-read-write', ['value']),
+            }
+            return Device(device_type, device_name, protocol, reg_config, **device_kwargs)
+        elif type(device_type) == str and device_type.lower() == 'binary-read':
+            device_kwargs = {
+                'range': (0, 1000),
+                'binary-read': kwargs.get('binary-read', ['value']),
+            }
+            return Device(device_type, device_name, protocol, reg_config, **device_kwargs)
+        elif type(device_type) == str and device_type.lower() == 'binary-read-write':
+            device_kwargs = {
+                'range': (0, 1000),
+                'binary-read-write': kwargs.get('binary-read-write', ['value']),
+            }
+            return Device(device_type, device_name, protocol, reg_config, **device_kwargs)
+
+
 class RTDSInfrastructure(Infrastructure):
     """Real-Time Dynamic Simulator (RTDS) infrastructure."""
     def __init__(self):
