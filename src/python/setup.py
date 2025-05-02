@@ -44,6 +44,7 @@ ENTRIES = {
         'phenix-scorch-component-tcpdump = phenix_apps.apps.scorch.tcpdump.tcpdump:main',
         'phenix-scorch-component-trafficgen = phenix_apps.apps.scorch.trafficgen.trafficgen:main',
         'phenix-scorch-component-vmstats = phenix_apps.apps.scorch.vmstats.vmstats:main',
+        'phenix-scorch-component-opcexport = phenix_apps.apps.scorch.opcexport.opcexport:main',
     ]
 }
 
