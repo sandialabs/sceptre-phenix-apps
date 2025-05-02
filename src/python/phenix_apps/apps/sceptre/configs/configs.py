@@ -15,6 +15,8 @@ def get_fdconfig_class(infrastructure: str) -> type:
         base_class = infra.FuelInfrastructure
     elif infrastructure == 'rtds':
         base_class = infra.RTDSInfrastructure
+    elif infrastructure == 'opalrt':
+        base_class = infra.OPALRTInfrastructure
     elif infrastructure == 'waterway':
         base_class = infra.WaterwayInfrastructure
     elif infrastructure == 'battery':
