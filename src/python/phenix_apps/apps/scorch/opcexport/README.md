@@ -2,7 +2,7 @@
 
 The `opcexport` component is a component used to dump data from the OPC server to Elasticsearch, into a dated index named `opc-dirty-*` (e.g. `opc-dirty-2025.03.18`). It it should be used in tandem with the `sceptre` app, and won't work without it. It also requires the `assetDir` attribute be set in the `sceptre` app's metadata, to the path of the experiment source files (e.g. `assetDir: /phenix/topologies/my_topo/`).
 
-It is assumed that Elasticsearch already exists. This can either be a VM inside your experiment or Elasticsearch on your host. If it is the latter, then you need to make sure you have the networking correctly configured for the OPC server within your experiment to reach the elastic endpoint on your host. If the `tap` or `mgmt_tap` apps are used, and the Elasticsearch server is not `172.16.0.254`, then routes will be automatically added to enable communication from the OPC to Elasticsearch.
+It is assumed that Elasticsearch already exists. This can either be a VM inside your experiment or Elasticsearch on your host. If it is the latter, then you need to make sure you have the networking correctly configured for the OPC server within your experiment to reach the elastic endpoint on your host. If the `tap` app is used, and the Elasticsearch server is not `172.16.0.254`, then routes will be automatically added to enable communication from the OPC to Elasticsearch.
 
 This component also assumes you have a valid OPC configuration file (either hand made or generated with the `sceptre` app), since the component needs be able to read it to understand the channels/devices/tags of the data in the OPC server that it will be writing to Elasticsearch.
 
