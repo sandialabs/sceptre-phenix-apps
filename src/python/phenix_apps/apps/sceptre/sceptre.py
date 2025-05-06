@@ -665,45 +665,79 @@ class Sceptre(AppBase):
                 }
             )
 
-            # Write provider config file injections
+            simulator = provider.metadata.get("simulator", "")
+            if not simulator:
+                logger.log("WARN", f"No simulator specified for provider '{provider.hostname}'")
+
+            # Create provider config file directory
             provider_directory = f"{self.sceptre_dir}/{provider.hostname}"
             os.makedirs(provider_directory, exist_ok=True)
-            config_ini = f"{provider_directory}/config.ini"
-            case, oneline, pwds_endpoint = None, None, None
-            config_helics = None
 
-            simulator = provider.metadata.get("simulator", "")
-            if 'PowerWorld' in simulator:
+            # define a kwargs object, then pass to kwargs
+            kwargs = {
+                "solver": simulator,
+                "debug": str(provider.metadata.get("debug", False)).capitalize(),
+                "server_endpoint": srv_endpoint,
+                "publish_endpoint": pub_endpoint,
+            }
+
+            if "PowerWorld" in simulator:
                 objects_file_path = f"{provider_directory}/objects.txt"
-                case = "case.PWB"
-                oneline = "oneline.pwd"
+                kwargs["case_file"] = "case.PWB"
+                kwargs["oneline_file"] = "oneline.pwd"
                 # Adding HIL tags
                 hil_object_list = provider.metadata.get('hil_tags', [])
 
             if simulator == "PowerWorldDynamics":
-                pwds_endpoint = provider.metadata.get('pwds_endpoint', '127.0.0.1')
+                kwargs["pwds_endpoint"] = provider.metadata.get('pwds_endpoint', '127.0.0.1')
             elif simulator == "PyPower":
-                case = os.path.basename(provider.metadata.case)
+                kwargs["case_file"] = os.path.basename(provider.metadata.case)
             elif "Helics" in simulator:
-                win = "C:/sceptre/helics.json"
-                nix = "/etc/sceptre/helics.json"
-                config_helics = (
-                    nix if provider.topology.hardware.os_type == "linux" else win
-                )
+                if provider.topology.hardware.os_type == "linux":
+                    kwargs["config_helics"] = "/etc/sceptre/helics.json"
+                else:
+                    kwargs["config_helics"] = "C:/sceptre/helics.json"
 
-            with open(config_ini, "w") as file_:
-                utils.mako_serve_template(
-                    "provider_config.mako",
-                    self.mako_path,
-                    file_,
-                    solver=simulator,
-                    publish_endpoint=pub_endpoint,
-                    server_endpoint=srv_endpoint,
-                    case_file=case,
-                    oneline_file=oneline,
-                    pwds_endpoint=pwds_endpoint,
-                    config_helics=config_helics
-                )
+            if simulator in ["RTDS", "OPALRT"]:
+                # TODO: move YAML rendering to configure stage, so users can edit it
+                # by stopping experiments and not have sceptre.py overwrite it again.
+
+                # allow manual overriding of config via provider.metadata.config_file
+                # for example, a custom YAML file that was added via a separate injection
+                # WARNING: experiment metadata won't be added to this file
+                if provider.metadata.get("config_file"):
+                    kwargs["config_file"] = provider.metadata.config_file
+                else:
+                    local_path = f"{provider_directory}/{simulator.lower()}_config.yaml"
+                    kwargs["config_file"] = f"/etc/sceptre/{simulator.lower()}_config.yaml"  # This will be added to INI file
+
+                    if not provider.metadata.get("data_dir"):
+                        provider.metadata.data_dir = f"/root/{simulator.lower()}/"
+
+                    # add metadata to YAML
+                    provider.metadata.sceptre_topology = self.experiment.metadata.annotations.topology
+                    provider.metadata.sceptre_scenario = self.experiment.metadata.annotations.scenario
+                    provider.metadata.sceptre_experiment = self.exp_name
+                    provider.metadata.provider_hostname = provider.hostname
+                    provider.metadata.provider_ip = ipv4_address
+
+                    # write provider metadata to the yaml file (via Box.to_yaml())
+                    provider.metadata.to_yaml(filename=local_path)
+
+                    # add injection with the yaml file to injections
+                    self.add_inject(hostname=provider.hostname, inject={
+                        "src": local_path,
+                        "dst": kwargs["config_file"],
+                        "description": "YAML configuration file for Provider"
+                    })
+
+            # Generate ("render") the config.ini file for the provider
+            # TODO: only render this if there isn't a override file?
+            self.render(
+                "provider_config.mako",
+                f"{provider_directory}/config.ini",
+                **kwargs,
+            )
 
         ######################## Field-device pre-start ###################################
         fd_server_configs = {}
