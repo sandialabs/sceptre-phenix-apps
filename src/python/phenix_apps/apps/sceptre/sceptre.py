@@ -15,15 +15,13 @@ class Sceptre(AppBase):
 
         self.eprint(self.stage)
 
-        self.startup_dir   = f"{self.exp_dir}/startup"
-        self.sceptre_dir   = f"{self.exp_dir}/sceptre"
-        self.analytics_dir = f"{self.exp_dir}/analytics"  # TODO: unused?
-        self.elk_dir       = f"{self.analytics_dir}/elk"
+        self.startup_dir = f"{self.exp_dir}/startup"
+        self.sceptre_dir = f"{self.exp_dir}/sceptre"
+        self.elk_dir     = f"{self.exp_dir}/elk"
 
-        os.makedirs(self.startup_dir,   exist_ok=True)
-        os.makedirs(self.sceptre_dir,   exist_ok=True)
-        os.makedirs(self.analytics_dir, exist_ok=True)
-        os.makedirs(self.elk_dir,       exist_ok=True)
+        os.makedirs(self.startup_dir, exist_ok=True)
+        os.makedirs(self.sceptre_dir, exist_ok=True)
+        os.makedirs(self.elk_dir, exist_ok=True)
 
         self.mako_path = utils.abs_path(__file__, "templates")  # type: str
 
