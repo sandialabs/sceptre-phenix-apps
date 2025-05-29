@@ -51,7 +51,7 @@ class DNP3(Protocol):
     endpoint.text = f'{ip}:{port}'
 
 
-  def init_master_xml(self, name='dnp3-master'):
+  def init_master_xml(self, scan_rate_value, name='dnp3-master'):
     self.master = ET.SubElement(self.root, 'master', {'name': name})
 
     local = ET.SubElement(self.master, 'local-address')
@@ -61,7 +61,7 @@ class DNP3(Protocol):
     remote.text = str(1024)
 
     scan_rate = ET.SubElement(self.master, 'scan-rate')
-    scan_rate.text = str(5)
+    scan_rate.text = str(scan_rate_value)
 
 
   def init_outstation_xml(self, name='dnp3-outstation'):

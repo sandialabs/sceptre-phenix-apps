@@ -13,18 +13,19 @@ class Register:
 
 
 class Device:
-  def __init__(self, node, default_infra = 'power-distribution'):
+  def __init__(self, node, configs = {}, default_infra = 'power-distribution'):
     self.node  = node
     self.md    = node.get('metadata', {})
     self.infra = self.md.get('infrastructure', default_infra)
 
     self.registers = {}
     self.processed = False
+    self.configs = configs
 
 
 class FEP(Device):
-  def __init__(self, node):
-    Device.__init__(self, node)
+  def __init__(self, node, configs = {}):
+    Device.__init__(self, node, configs)
 
   def process(self, devices):
     if self.processed: return
@@ -72,7 +73,9 @@ class FEP(Device):
       if 'dnp3' in device.registers:
         client = DNP3()
         client.init_xml_root('client', device.node)
-        client.init_master_xml()
+        if 'scan-rate' in self.configs.keys():
+          client.init_master_xml(self.configs['scan-rate'])
+
         client.registers_to_xml(device.registers['dnp3'])
 
         config.append_to_root(client.root)
@@ -220,8 +223,8 @@ class FieldDeviceServer(Device):
 
 
 class FieldDeviceClient(Device):
-  def __init__(self, node):
-    Device.__init__(self, node)
+  def __init__(self, node, configs = {}):
+    Device.__init__(self, node, configs)
 
   def process(self, devices):
     if self.processed: return
@@ -251,7 +254,9 @@ class FieldDeviceClient(Device):
       if 'dnp3' in device.registers:
         client = DNP3()
         client.init_xml_root('client', device.node)
-        client.init_master_xml()
+        if 'scan-rate' in self.configs.keys(): 
+          client.init_master_xml(self.configs['scan-rate'])
+          
         client.registers_to_xml(device.registers['dnp3'])
 
         config.append_to_root(client.root)
