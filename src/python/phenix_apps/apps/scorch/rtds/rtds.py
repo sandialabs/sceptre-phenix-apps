@@ -80,19 +80,6 @@ class RTDS(ComponentBase):
 
         host = self.metadata.hostname  # type: str
 
-        # !! TODO: HACK integrate this into scorch proper !!
-        self.print("cleaning up any lingering minimega artifacts")
-        self.mm.clear_cc_filter()
-        self.mm.cc_delete_command("all")
-        self.mm.cc_delete_response("all")
-        self.mm.clear_cc_commands()
-        self.mm.clear_cc_responses()
-        # ensure miniccc_responses directory is empty
-        miniccc_dir = utils.mm_get_cc_path(self.mm)
-        if miniccc_dir and any(p.exists() for p in miniccc_dir.iterdir()):
-            self.eprint(f"miniccc responses still exist in {miniccc_dir}! number remaining: {len(list(miniccc_dir.iterdir()))}")
-            sys.exit(1)
-
         self.ensure_vm_running(host)
 
         # Copy provider configs
