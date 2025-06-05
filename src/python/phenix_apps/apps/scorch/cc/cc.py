@@ -32,12 +32,7 @@ class CC(ComponentBase):
 
         for cmd in commands:
             if cmd.type == 'reset':
-                self.print("deleting miniccc commands and responses")
-                self.mm.clear_cc_filter()
-                self.mm.cc_delete_command("all")
-                self.mm.cc_delete_response("all")
-                self.mm.clear_cc_commands()
-                self.mm.clear_cc_responses()
+                self.__reset_cc()
             else:
                 self.eprint(f"Unknown command type '{cmd.type}' for stage '{stage}'")
 
@@ -192,12 +187,7 @@ class CC(ComponentBase):
                         self.eprint(f"error receiving '{src}' from VM {vm.hostname}: {ex}")
                         sys.exit(1)
                 elif cmd.type == 'reset':
-                    self.print("deleting miniccc commands and responses")
-                    self.mm.clear_cc_filter()
-                    self.mm.cc_delete_command("all")
-                    self.mm.cc_delete_response("all")
-                    self.mm.clear_cc_commands()
-                    self.mm.clear_cc_responses()
+                    self.__reset_cc()
                 else:
                     self.eprint(f"Unknown command type '{cmd.type}' for VM '{vm.hostname}' and stage '{stage}'")
 
@@ -230,6 +220,20 @@ class CC(ComponentBase):
             return f'powershell.exe -ExecutionPolicy Bypass -File {cmd_dst}'
         else:
             return f'bash {cmd_dst}'
+
+    def __reset_cc(self):
+        self.print("deleting miniccc commands and responses")
+        self.mm.clear_cc_filter()
+        self.mm.cc_delete_command("all")
+        self.mm.cc_delete_response("all")
+        self.mm.clear_cc_commands()
+        self.mm.clear_cc_responses()
+
+        # ensure miniccc_responses directory is empty
+        miniccc_dir = utils.mm_get_cc_path(self.mm)
+        if miniccc_dir and any(p.exists() for p in miniccc_dir.iterdir()):
+            self.eprint(f"WARNING: miniccc responses still exist in '{miniccc_dir}' even after clearing! number remaining: {len(list(miniccc_dir.iterdir()))}")
+            # sys.exit(1)
 
 
 def main():
