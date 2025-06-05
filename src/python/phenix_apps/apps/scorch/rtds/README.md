@@ -25,6 +25,7 @@ metadata:
   rscad_automation:
     enabled: <bool>  # (Optional) Enable automation of RSCAD case (starting/stopping). Default: false
     url: <string>  # (REQUIRED) URL of RSCAD automation server. Only required if rscad_automation.enabled is true.
+    case_name: <string>  # (Optional) Name of the RSCAD FX case to run. This should be the name of the case file (e.g. .rtfx file), WITHOUT the file extension.
   elasticsearch:
     verify: <bool>  # (Optional) If Elasticsearch data should be verified. Defaults to false.
     server: <bool>  # (REQUIRED) URL of the Elasticsearch server to use. Required if elasticsearch.verify is true.
@@ -49,6 +50,7 @@ components:
       rscad_automation:
         enabled: true
         url: http://172.24.24.120:8000
+        case_name: "IEEE9BUSMJBLoads2"
       elasticsearch:
         server: http://172.24.24.121:9200
         index: rtds-clean
