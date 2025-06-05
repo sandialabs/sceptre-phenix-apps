@@ -1,5 +1,6 @@
 import sys
 from time import sleep
+from pathlib import PurePath
 
 import requests
 from elasticsearch import Elasticsearch
@@ -30,26 +31,53 @@ class RTDS(ComponentBase):
         """
         url = f"{self.metadata.rscad_automation.url.rstrip('/')}/start_case"
         self.print(f"Starting RSCAD case, url={url}")
+
         resp = self.session.post(url)
-        if not resp or not resp.json()["success"]:
-            self.eprint(f"starting RSCAD case failed: {resp.json()}")
+
+        if not resp:
+            self.eprint("Starting RSCAD case failed: no response from server")
             sys.exit(1)
-        self.print("Started RSCAD case!")
+
+        data = resp.json()
+        if not data["success"]:
+            self.eprint(f"Starting RSCAD case failed: {data['status']}")
+            sys.exit(1)
+
+        # TODO: if status == "already_running", stop case, then start again?
+
+        # validation that correct case name started/stopped via case_file in the response
+        if self.metadata.get("case_name"):
+            case_name = PurePath(data["case_file"]).stem  # minus extension
+            if self.metadata.case_name != case_name:
+                self.eprint(f"Expected RSCAD case '{self.metadata.case_name}', but '{case_name}' was started. Stopping case and exiting...")
+                self._stop_case(allow_failure=True)
+                sys.exit(1)
+
+        self.print(f"Started RSCAD case '{data['case_file']}' (title='{data['case_title']}', status='{data['status']}')")
 
     def _stop_case(self, allow_failure: bool = False):
         url = f"{self.metadata.rscad_automation.url.rstrip('/')}/stop_case"
         self.print(f"Stopping RSCAD case, url={url}")
+
         resp = self.session.post(url)
-        if not resp or not resp.json()["success"]:
-            self.eprint(f"Stopping RSCAD case failed: {resp.json()}")
+
+        if not resp:
+            self.eprint("Stopping RSCAD case failed: no response from server")
             if not allow_failure:
                 sys.exit(1)
-        self.print("Stopped RSCAD case!")
+
+        data = resp.json()
+        if not data["success"]:
+            self.eprint(f"Stopping RSCAD case failed: {data['status']}")
+            if not allow_failure:
+                sys.exit(1)
+
+        self.print(f"Stopped RSCAD case '{data['case_file']}' (title='{data['case_title']}', status='{data['status']}')")
 
     def _stop_provider_if_running(self):
         if self.check_process_running(self.metadata.hostname, "pybennu-power-solver"):
             self.print("Stopping pybennu-power-solver")
-            cmd = "/usr/local/bin/pybennu-power-solver -e pybennu -c /etc/sceptre/config.ini -d stop"
+            cmd = "/usr/local/bin/pybennu-power-solver stop"
             self.run_and_check_command(self.metadata.hostname, cmd)
 
     def _verify_frequency(self, index: str, time_range: str = "now-5s") -> None:
@@ -103,7 +131,7 @@ class RTDS(ComponentBase):
         self.print("ensuring provider is started")
         if not self.check_process_running(host, "pybennu-power-solver"):
             self.print("Starting pybennu-power-solver")
-            cmd = "/usr/local/bin/pybennu-power-solver -e pybennu -c /etc/sceptre/config.ini -d start"
+            cmd = "/usr/local/bin/pybennu-power-solver start -d"
             self.run_and_check_command(host, cmd)
 
             sleep_for = 8.0
