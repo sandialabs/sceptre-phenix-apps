@@ -95,6 +95,13 @@ class RTDS(ComponentBase):
 
         self.ensure_vm_running(host)
 
+        # Copy provider configs
+        if self.metadata.get("export_config"):
+            self.recv_file(vm=host, src=[
+                "/etc/sceptre/config.ini",
+                "/etc/sceptre/rtds_config.yaml",
+            ])
+
         self.print("verifying NTP is ok")
         ntp_output = self.run_and_check_command(host, "ntpq -p")["stdout"]
         if ntp_output is None or ".INIT." in ntp_output:
@@ -199,19 +206,12 @@ class RTDS(ComponentBase):
             self.print(f"Saving CSV files from provider (src={src})")
             self.recv_file(host, src)
 
-        to_transfer = []
-
         # Copy provider log files
         if self.metadata.get("export_logs"):
-            to_transfer.append("/var/log/bennu-pybennu.out")
-            to_transfer.append("/var/log/bennu-pybennu.err")
-
-        # Copy provider config
-        if self.metadata.get("export_config"):
-            to_transfer.append("/etc/sceptre/config.ini")
-
-        if to_transfer:
-            self.recv_file(vm=host, src=to_transfer)
+            self.recv_file(vm=host, src=[
+                "/var/log/bennu-pybennu.out",
+                "/var/log/bennu-pybennu.err",
+            ])
 
         # # Verify Elasticsearch data
         # if self.metadata.get("elasticsearch", {}).get("verify"):
