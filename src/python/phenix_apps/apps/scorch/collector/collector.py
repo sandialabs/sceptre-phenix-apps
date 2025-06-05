@@ -1,8 +1,9 @@
-import configparser
 import sys
 import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
+
+import yaml
 
 from phenix_apps.apps.scorch import ComponentBase
 from phenix_apps.common import logger, utils
@@ -45,11 +46,12 @@ class Collector(ComponentBase):
         Path(meta_dir, "scenario.yaml").write_text(sc_data)
         Path(meta_dir, "experiment.yaml").write_text(exp_data)
 
-        # rtds: config, log files, CSV files, tags, PMU metadata
+        # rtds: YAML config, log files, CSV files, tags, PMU metadata
         rtds_src = self._comp_dir("rtds")
         rtds_dest = Path(results_dir, "rtds")
         self.print("copying rtds data")
         utils.rglob_copy("*.csv", rtds_src, rtds_dest)
+        utils.rglob_copy("*.yaml", rtds_src, meta_dir)
         utils.rglob_copy("*.txt", rtds_src, meta_dir)
         utils.rglob_copy("*.json", rtds_src, meta_dir)
         utils.rglob_copy("*.err", rtds_src, meta_dir)
@@ -149,18 +151,27 @@ class Collector(ComponentBase):
             self.eprint(f"Capture duration {expected_cap_duration} seconds is more than 6.0 seconds less than configured disruption duration of {configured_duration} seconds")
             sys.exit(1)
 
-        # Read power provider config (RTDS)
-        pconf = configparser.ConfigParser()
-        pconf.read(meta_dir / "config.ini")
-        pmu_names = [
-            x.strip() for x in pconf.get("power-solver-service", "rtds-pmu-names").split(",") if x
-        ]
-        pmu_labels = [
-            x.strip() for x in pconf.get("power-solver-service", "rtds-pmu-labels").split(",") if x
-        ]
-        # {PMU1: BUS7, ...}
-        pmus = dict(zip(pmu_names, pmu_labels))
-        self.print(f"PMUs: {pmus}")
+        # Read RTDS config
+        with Path(meta_dir, "rtds_config.yaml").open() as f:
+            rtds_conf = yaml.safe_load(f)
+
+        pmus = {}
+        if rtds_conf.get("pmu", {}).get("pmus"):
+            # {PMU1: BUS7, ...}
+            for p in rtds_conf["pmu"]["pmus"]:
+                pmus[p["name"]] = p["label"]
+            self.print(f"PMUs: {pmus}")
+        else:
+            self.print("WARNING: No PMUs defined for RTDS, skipping...")
+
+        gtnet_tags = []
+        if rtds_conf.get("gtnet_skt", {}).get("tags"):
+            # [G1CB1, G2CB2, ...]
+            for gt in rtds_conf["gtnet_skt"]["tags"]:
+                gtnet_tags.append(gt["name"].split(".")[0])
+            self.print(f"GTNET-SKT tags: {gtnet_tags}")
+        else:
+            self.print("WARNING: No GTNET-SKT tags defined for RTDS, skipping...")
 
         # Record (experiment_record.json)
         self.print("generating experiment record")
@@ -233,6 +244,7 @@ class Collector(ComponentBase):
         # RTDS/power system data
         record["rtds"] = {
             "pmus": pmus,
+            "gtnet_skt_tags": gtnet_tags,
         }
 
         # all_hosts
