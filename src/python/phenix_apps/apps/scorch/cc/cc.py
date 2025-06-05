@@ -35,6 +35,7 @@ class CC(ComponentBase):
                 self.__reset_cc()
             else:
                 self.eprint(f"Unknown command type '{cmd.type}' for stage '{stage}'")
+                sys.exit(1)
 
         for vm in vms:
             if vm.hostname not in nodes:
@@ -190,6 +191,7 @@ class CC(ComponentBase):
                     self.__reset_cc()
                 else:
                     self.eprint(f"Unknown command type '{cmd.type}' for VM '{vm.hostname}' and stage '{stage}'")
+                    sys.exit(1)
 
     def __send_cmd_as_file(self, hostname, cmd):
         cmd_file = f'run-{self.extract_run_name()}_{str(uuid.uuid4())}'
