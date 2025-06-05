@@ -249,9 +249,10 @@ def mm_send(mm: minimega.minimega, vm: str, src: str, dst: str) -> None:
 
         try:
             mm.cc_mount(vm, tmp)
+            time.sleep(1.0)
 
             if not os.path.exists(dst_dir):
-                os.makedirs(dst_dir)
+                os.makedirs(dst_dir, exist_ok=True)
 
             if os.path.isdir(src):
                 shutil.copytree(src, vm_dst, dirs_exist_ok=True)
@@ -259,6 +260,9 @@ def mm_send(mm: minimega.minimega, vm: str, src: str, dst: str) -> None:
                 shutil.copyfile(src, vm_dst)
         finally:
             mm.clear_cc_mount(vm)
+            # race condition between miniccc clearing mount and temp directory being
+            # cleaned up when exiting the context of the 'with' statement.
+            time.sleep(1.0)
 
 
 def mm_recv(mm: minimega.minimega, vm: str, src: Union[List[str], str], dst: str) -> None:
@@ -286,7 +290,7 @@ def mm_recv(mm: minimega.minimega, vm: str, src: Union[List[str], str], dst: str
         dst_dir = os.path.dirname(dst)
 
         if not os.path.exists(dst_dir):
-            os.makedirs(dst_dir)
+            os.makedirs(dst_dir, exist_ok=True)
 
         try:
             mm.cc_mount(vm, tmp)
@@ -303,12 +307,15 @@ def mm_recv(mm: minimega.minimega, vm: str, src: Union[List[str], str], dst: str
                         time.sleep(0.5)
 
                 if os.path.isdir(vm_src):
-                    shutil.copytree(vm_src, dst)
+                    shutil.copytree(vm_src, dst, dirs_exist_ok=True)
                 else:
                     # shutil.copyfile(vm_src, dst)
                     shutil.copy2(vm_src, dst)  # file or dir destination
         finally:
             mm.clear_cc_mount(vm)
+            # race condition between miniccc clearing mount and temp directory being
+            # cleaned up when exiting the context of the 'with' statement.
+            time.sleep(1.0)
 
 
 def mm_get_cc_path(mm: minimega.minimega) -> Optional[Path]:
