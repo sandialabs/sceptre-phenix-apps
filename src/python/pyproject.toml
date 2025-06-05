@@ -88,7 +88,10 @@ include-package-data = true
 [tool.setuptools.package-data]
 phenix_apps = [
     "apps/*/templates/*.mako",
-    "apps/scorch/*/templates/*.mako"
+    "apps/scorch/*/templates/*.mako",
+    "apps/scorch/opcexport/*.ps1",
+    "apps/scorch/opcexport/*.zip",
+    "apps/scorch/opcexport/*.exe",
 ]
 
 # dynamically read version from phenix_apps.__version__
