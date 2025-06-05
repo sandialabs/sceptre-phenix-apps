@@ -1,6 +1,6 @@
 # rtds Component
 
-Collects and verifies data from the Real-Time Dynamic Simulator (RTDS), and orchestrates the starting/stopping of RSCAD cases. This is intended to be used in tandem with the RTDS SCEPTRE provider.
+Collects and verifies data from the Real-Time Dynamic Simulator (RTDS), and orchestrates the starting/stopping of RSCAD cases. This is intended to be used in tandem with the RTDS SCEPTRE provider in pybennu.
 
 ```
 type:   rtds
@@ -10,10 +10,10 @@ stages: configure, start, stop, cleanup
 
 ## Notes
 
-- The `configure` stage has the side effect of clearing all miniccc commands and responses. Ensure this component is run before any other components that rely on miniccc state before execution, or are run in the background.
+- It is recommended to reset miniccc state before running `configure` stage of this component with run in a Scorch `loop`. An example of this is shown in the example section, with a `reset_cc` component used before `configure` is called. This isn't strictly required, but it will greatly increase reliability of the component when used with Scorch's `loop`.
 - This component checks a variety of things on the provider: the VM is running, NTP is syncronized, and that the `pybennu-power-solver` process is running.
-- Elasticsearch, if configured, must be reachable from the phenix container running on the host.
-- All data validation is done via Elasticsearch. The CSV files are simply copied off, and aren't used for validation. If validation is important, ensure Elasticsearch is setup and configured in the provider and in this component.
+- Elasticsearch, if configured, must be reachable from the phenix Docker container.
+- All data validation is performed via Elasticsearch. The CSV files are not used for validation and are simply copied during the `stop` stage. If data validation is important, ensure Elasticsearch configured in the provider and this component.
 
 ## Metadata Options
 
@@ -57,4 +57,25 @@ components:
       csv_files:
         path: /root/rtds_data/
         export: true
+  - name: reset_cc
+    type: cc
+    metadata:
+      configure:
+        - type: reset
+runs:
+  - configure: []
+    start: []
+    stop: []
+    cleanup: []
+    loop:
+      count: 3
+      configure:
+        - reset_cc
+        - rtds
+      start:
+        - rtds
+      stop:
+        - rtds
+      cleanup:
+        - rtds
 ```
