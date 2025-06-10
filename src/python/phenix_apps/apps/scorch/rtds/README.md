@@ -21,7 +21,7 @@ stages: configure, start, stop, cleanup
 metadata:
   hostname: <string>  # (REQUIRED) Hostname of the provider VM
   export_logs: <bool>  # (Optional) If the RTDS provider log files should be exported during the stop stage. Defaults to false.
-  export_config: <bool>  # (Optional) If the RTDS provider configuration file (config.ini) should be exported during the configure stage. Defaults to false.
+  export_config: <bool>  # (Optional) If the RTDS provider configuration file (config.ini) should be exported during the configure stage. Defaults to true.
   rscad_automation:
     enabled: <bool>  # (Optional) Enable automation of RSCAD case (starting/stopping). Default: false
     url: <string>  # (REQUIRED) URL of RSCAD automation server. Only required if rscad_automation.enabled is true.
