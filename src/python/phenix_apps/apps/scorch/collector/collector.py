@@ -234,14 +234,15 @@ class Collector(ComponentBase):
         # Uses Elasticsearch configuration from the 'rtds' component metadata
         # TODO: move to harmonize, just do basic validation of data here
         # TODO: run count query to verify number of expected docs
-        rtds_metadata = self._get_component("rtds").metadata
-        gen_csv(
-            record=record,
-            csv_path=results_dir / "experiment_results.csv",
-            es_server=rtds_metadata.elasticsearch.server,
-            es_index=rtds_metadata.elasticsearch.index,
-            iperf_dir=iperf_dest,
-        )
+        if self.metadata.get("generate_csv", True):
+            rtds_metadata = self._get_component("rtds").metadata
+            gen_csv(
+                record=record,
+                csv_path=self.results_dir / "experiment_results.csv",
+                es_server=rtds_metadata.elasticsearch.server,
+                es_index=rtds_metadata.elasticsearch.index,
+                iperf_dir=iperf_dest,
+            )
 
         logger.log('INFO', f'Stopped user component: {self.name}')
 

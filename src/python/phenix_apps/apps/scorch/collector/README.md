@@ -37,6 +37,7 @@ The role of the collector should be to:
 metadata:
   collect_iperf: <bool>  # (Optional) If iperf data should be collected and processed. Default: false
   collect_miniccc: <bool>  # (Optional) If miniccc log files from VMs should be collected, if available. Default: false
+  generate_csv: <bool>  # (Optional) Enable generation of the consolidated CSV with experiment results. Default: true
 ```
 
 ## Example Configuration
@@ -48,4 +49,5 @@ components:
     metadata:
       collect_iperf: false
       collect_miniccc: false
+      generate_csv: false
 ```
