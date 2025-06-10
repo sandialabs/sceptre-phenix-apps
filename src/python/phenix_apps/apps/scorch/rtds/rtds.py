@@ -111,7 +111,7 @@ class RTDS(ComponentBase):
         self.ensure_vm_running(host)
 
         # Copy provider configs
-        if self.metadata.get("export_config"):
+        if self.metadata.get("export_config", True):
             self.recv_file(vm=host, src=[
                 "/etc/sceptre/config.ini",
                 "/etc/sceptre/rtds_config.yaml",
