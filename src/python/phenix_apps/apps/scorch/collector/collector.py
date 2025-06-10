@@ -1,3 +1,4 @@
+import configparser
 import sys
 import shutil
 from datetime import datetime, timedelta
@@ -45,18 +46,6 @@ class Collector(ComponentBase):
         Path(meta_dir, "topology.yaml").write_text(topo_data)
         Path(meta_dir, "scenario.yaml").write_text(sc_data)
         Path(meta_dir, "experiment.yaml").write_text(exp_data)
-
-        # rtds: YAML config, log files, CSV files, tags, PMU metadata
-        rtds_src = self._comp_dir("rtds")
-        rtds_dest = Path(results_dir, "rtds")
-        self.print("copying rtds data")
-        utils.rglob_copy("*.csv", rtds_src, rtds_dest)
-        utils.rglob_copy("*.yaml", rtds_src, meta_dir)
-        utils.rglob_copy("*.txt", rtds_src, meta_dir)
-        utils.rglob_copy("*.json", rtds_src, meta_dir)
-        utils.rglob_copy("*.err", rtds_src, meta_dir)
-        utils.rglob_copy("*.out", rtds_src, meta_dir)
-        utils.rglob_copy("*.ini", rtds_src, meta_dir)
 
         # vmstats
         vms_src = self._comp_dir("vmstats") / "vm_stats.jsonl"
@@ -151,28 +140,6 @@ class Collector(ComponentBase):
             self.eprint(f"Capture duration {expected_cap_duration} seconds is more than 6.0 seconds less than configured disruption duration of {configured_duration} seconds")
             sys.exit(1)
 
-        # Read RTDS config
-        with Path(meta_dir, "rtds_config.yaml").open() as f:
-            rtds_conf = yaml.safe_load(f)
-
-        pmus = {}
-        if rtds_conf.get("pmu", {}).get("pmus"):
-            # {PMU1: BUS7, ...}
-            for p in rtds_conf["pmu"]["pmus"]:
-                pmus[p["name"]] = p["label"]
-            self.print(f"PMUs: {pmus}")
-        else:
-            self.print("WARNING: No PMUs defined for RTDS, skipping...")
-
-        gtnet_tags = []
-        if rtds_conf.get("gtnet_skt", {}).get("tags"):
-            # [G1CB1, G2CB2, ...]
-            for gt in rtds_conf["gtnet_skt"]["tags"]:
-                gtnet_tags.append(gt["name"].split(".")[0])
-            self.print(f"GTNET-SKT tags: {gtnet_tags}")
-        else:
-            self.print("WARNING: No GTNET-SKT tags defined for RTDS, skipping...")
-
         # Record (experiment_record.json)
         self.print("generating experiment record")
 
@@ -241,11 +208,8 @@ class Collector(ComponentBase):
         # qos
         record["qos"] = utils.read_json(qos_file)
 
-        # RTDS/power system data
-        record["rtds"] = {
-            "pmus": pmus,
-            "gtnet_skt_tags": gtnet_tags,
-        }
+        # Power system data from provider (RTDS, OPALRT, etc.)
+        record["provider"] = self._collect_provider_data(results_dir, meta_dir)
 
         # all_hosts
         # map hostnames to IP addresses
@@ -280,6 +244,93 @@ class Collector(ComponentBase):
         )
 
         logger.log('INFO', f'Stopped user component: {self.name}')
+
+    def _collect_provider_data(self, results_dir: Path, meta_dir: Path) -> dict:
+        """
+        Collect data from the 'providerdata' or 'rtds' components.
+
+        Args:
+            results_dir: top-level directory in the final collection of files
+            meta_dir: "metadata" sub-directory in results directory
+        """
+
+        data = {
+            "simulator": "",
+            "pmus": {},
+            "gtnet_skt_tags": [],
+            "modbus_registers": [],
+        }
+
+        # provider: YAML config, log files, CSV files, tags, PMU metadata
+        if self._get_component("providerdata"):
+            prov_src = self._comp_dir("providerdata")
+        elif self._get_component("rtds"):
+            prov_src = self._comp_dir("rtds")
+        else:
+            self.eprint("WARNING: No provider data configured for experiment, either 'providerdata' or 'rtds' component should be configured, skipping...")
+            return {}
+
+        dest = Path(results_dir, "provider_data")
+        self.print(f"copying provider data from '{prov_src}'")
+        utils.rglob_copy("*.csv", prov_src, dest)
+        utils.rglob_copy("*.yaml", prov_src, meta_dir)
+        utils.rglob_copy("*.txt", prov_src, meta_dir)
+        utils.rglob_copy("*.json", prov_src, meta_dir)
+        utils.rglob_copy("*.err", prov_src, meta_dir)
+        utils.rglob_copy("*.out", prov_src, meta_dir)
+        utils.rglob_copy("*.ini", prov_src, meta_dir)
+
+        # Read Provider config
+        ini_path = meta_dir / "config.ini"
+        if not ini_path.is_file() and ini_path.read_text():
+            self.eprint("Non-existent or empty config.ini from provider")
+            sys.exit(1)
+
+        pconf = configparser.ConfigParser()
+        pconf.read(ini_path)
+
+        # check if this is an updated config
+        if not pconf.has_option("power-solver-service", "config-file"):
+            self.eprint(
+                "Old-style provider config detected (non-YAML). This is not "
+                "supported by this version of collector, use an older version."
+            )
+            # exit error here because this shouldn't happen
+            sys.exit(1)
+
+        data["simulator"] = pconf.get("power-solver-service", "solver-type")
+
+        # parse new-style YAML-formatted config
+        self.print("Parsing YAML provider config")
+        config_file = Path(pconf.get("power-solver-service", "config-file")).name
+        yaml_path = Path(meta_dir, config_file)
+        with yaml_path.open() as yf:
+            yaml_conf = yaml.safe_load(yf)
+
+        if yaml_conf.get("pmu", {}).get("pmus"):
+            # {PMU1: BUS7, ...}
+            for p in yaml_conf["pmu"]["pmus"]:
+                data["pmus"][p["name"]] = p["label"]
+            self.print(f"PMUs: {data['pmus']}")
+        else:
+            self.print(f"WARNING: No PMUs defined for {data['simulator']} Provider, skipping...")
+
+        if yaml_conf.get("gtnet_skt", {}).get("tags"):
+            # [G1CB1, G2CB2, ...]
+            for gt in yaml_conf["gtnet_skt"]["tags"]:
+                data["gtnet_skt_tags"].append(gt["name"].split(".")[0])
+            self.print(f"GTNET-SKT tags: {data['gtnet_skt_tags']}")
+        elif data["simulator"].upper().strip() == "RTDS":
+            self.print("WARNING: No GTNET-SKT tags defined for RTDS Provider, skipping...")
+
+        if yaml_conf.get("modbus", {}).get("registers"):
+            for mb in yaml_conf["modbus"]["registers"]:
+                data["modbus_registers"].append(mb["name"])
+            self.print(f"Modbus registers: {data['modbus_registers']}")
+        else:
+            self.print(f"WARNING: No Modbus registers defined for {data['simulator']} Provider, skipping...")
+
+        return data
 
     def _comp_dir(self, component_name: str) -> Path:
         pth = Path(self.files_dir, f"scorch/run-{self.run}/{component_name}/loop-{self.loop}-count-{self.count}")
