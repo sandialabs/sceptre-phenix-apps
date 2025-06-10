@@ -11,7 +11,7 @@ stages: configure, start, stop, cleanup
 ## Notes
 
 - It is recommended to reset miniccc state before running `configure` stage of this component with run in a Scorch `loop`. An example of this is shown in the example section, with a `reset_cc` component used before `configure` is called. This isn't strictly required, but it will greatly increase reliability of the component when used with Scorch's `loop`.
-- This component checks a variety of things on the provider: the VM is running, NTP is syncronized, and that the `pybennu-power-solver` process is running.
+- This component checks a variety of things on the provider: the VM is running, NTP is synchronized, and that the `pybennu-power-solver` process is running.
 - Elasticsearch, if configured, must be reachable from the phenix Docker container.
 - All data validation is performed via Elasticsearch. The CSV files are not used for validation and are simply copied during the `stop` stage. If data validation is important, ensure Elasticsearch configured in the provider and this component.
 
@@ -20,8 +20,8 @@ stages: configure, start, stop, cleanup
 ```yaml
 metadata:
   hostname: <string>  # (REQUIRED) Hostname of the provider VM
-  export_logs: <bool>  # (Optional) If the RTDS provider log files should be exported during the stop stage. Defaults to false.
-  export_config: <bool>  # (Optional) If the RTDS provider configuration file (config.ini) should be exported during the configure stage. Defaults to true.
+  export_logs: <bool>  # (Optional) If the pybennu provider log files should be exported during the stop stage. Defaults to false.
+  export_config: <bool>  # (Optional) If the RTDS provider configuration file (config.ini) should be exported during the configure and stop stages. Defaults to true.
   rscad_automation:
     enabled: <bool>  # (Optional) Enable automation of RSCAD case (starting/stopping). Default: false
     url: <string>  # (REQUIRED) URL of RSCAD automation server. Only required if rscad_automation.enabled is true.
@@ -41,7 +41,7 @@ metadata:
 
 ```yaml
 components:
-  - name: rtds-example
+  - name: rtds_example
     type: rtds
     metadata:
       hostname: power-provider
@@ -73,11 +73,11 @@ runs:
       count: 3
       configure:
         - reset_cc
-        - rtds
+        - rtds_example
       start:
-        - rtds
+        - rtds_example
       stop:
-        - rtds
+        - rtds_example
       cleanup:
-        - rtds
+        - rtds_example
 ```

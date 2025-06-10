@@ -228,6 +228,13 @@ class RTDS(ComponentBase):
                 "/var/log/bennu-pybennu.err",
             ])
 
+        # Copy provider configs
+        if self.metadata.get("export_config", True):
+            self.recv_file(vm=host, src=[
+                "/etc/sceptre/config.ini",
+                "/etc/sceptre/rtds_config.yaml",
+            ])
+
         # # Verify Elasticsearch data
         # if self.metadata.get("elasticsearch", {}).get("verify"):
         #     index = utils.get_dated_index(self.metadata.elasticsearch.index)
