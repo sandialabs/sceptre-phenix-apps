@@ -55,6 +55,7 @@ phenix-scorch-component-hoststats = "phenix_apps.apps.scorch.hoststats.hoststats
 phenix-scorch-component-iperf = "phenix_apps.apps.scorch.iperf.iperf:main"
 phenix-scorch-component-mm = "phenix_apps.apps.scorch.mm.mm:main"
 phenix-scorch-component-pcap = "phenix_apps.apps.scorch.pcap.pcap:main"
+phenix-scorch-component-providerdata = "phenix_apps.apps.scorch.providerdata.providerdata:main"
 phenix-scorch-component-qos = "phenix_apps.apps.scorch.qos.qos:main"
 phenix-scorch-component-rtds = "phenix_apps.apps.scorch.rtds.rtds:main"
 phenix-scorch-component-disruption = "phenix_apps.apps.scorch.disruption.disruption:main"
