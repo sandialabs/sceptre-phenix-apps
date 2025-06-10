@@ -326,8 +326,8 @@ class Iperf(ComponentBase):
         responses = utils.mm_get_cc_responses(self.mm, prefix)
 
         for response in responses:
-            if not response["stdout"] or response["exitcode"] != 0:
-                self.eprint(f"failed to execute command: {cmd}\nresponse: {response}")
+            if not response["stdout"] or response.get("exitcode") != 0:
+                self.eprint(f"failed to execute command '{cmd}' with filter '{filter}'\nresponse: {response}")
                 sys.exit(1)
         self.mm.clear_cc_prefix()
 

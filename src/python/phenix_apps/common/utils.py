@@ -512,6 +512,8 @@ def mm_get_cc_responses(
                 "id": cmd_resp[0],
                 "uuid": cmd_resp[1],
                 "all_output": output,
+                "stderr": "",
+                "stdout": "",
             }
 
             if "stderr:\n" in output:
