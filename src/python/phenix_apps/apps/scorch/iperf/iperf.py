@@ -55,7 +55,7 @@ class Iperf(ComponentBase):
     def _kill_all_iperf(self, node_info: dict) -> None:
         """kill iperf3 processes on all nodes."""
         self.print(f"killing iperf3 on {len(node_info['vms'])} nodes")
-        self.print(f"vms: {node_info['vms']}")
+        self.print(f"nodes: {node_info['vms']}")
 
         # TODO: use iperf mapping
         # use filename of exe for process to kill
@@ -231,13 +231,13 @@ class Iperf(ComponentBase):
             # Only need 1 server process for rperf
             if self.metadata.get("use_rperf"):
                 server_cmd = f"{server.exe_path} --server"
-                # TODO: add_server_args from metadata
-                self.print(f"server_cmd for {server.hostname}: {server_cmd}")
+                # TODO: add_server_args from metadata for rperf
+                self.print(f"server_cmd for '{server.hostname}': {server_cmd}")
                 self.mm.cc_background(server_cmd)
             else:
                 # Start a server process for each client it will be communicating with
                 for client in server.clients.values():
-                    self.print(f"starting iperf server process for client {client.hostname} on server {server.hostname}")
+                    self.print(f"starting iperf server process for client '{client.hostname}' on server '{server.hostname}'")
 
                     idle_timeout = float(self.metadata.run_duration) + 5.0
                     server_cmd = f"{server.exe_path} --server --one-off --bind {server.ip} --json --port {client.port} --logfile {client.server_log_path} --idle-timeout {idle_timeout}"
@@ -249,15 +249,11 @@ class Iperf(ComponentBase):
 
                     # debugging logs
                     if node_info["os_types"][server.hostname] == "linux":
-                        server_cmd = f"bash -c '{server_cmd}"
-                        server_cmd += f" --verbose --debug 2>1 >/iperf_server-log_client-{client.hostname}_server-{server.hostname}.log'"
+                        server_cmd = f"bash -c '{server_cmd} 2>1 >/iperf_server-log_client-{client.hostname}_server-{server.hostname}.log'"
 
                     self.print(f"server_cmd for {server.hostname}: {server_cmd}")
-                    self.mm.cc_background(server_cmd)
-
-                    # vestigates from when I tried --daemon.
-                    # server_cmd = f"{server.exe_path} --server --one-off --bind {server.ip} --json --port {client.port} --logfile {client.server_log_path} --daemon"
-                    # self.mm.cc_exec_once(server_cmd)  # use this with --daemon. when in daemon, it will go into background
+                    retval = self.mm.cc_background(server_cmd)
+                    self.print(f"return val from 'cc background' for server_cmd: {retval}")
 
         self.mm.clear_cc_filter()
 
@@ -286,7 +282,7 @@ class Iperf(ComponentBase):
                     bandwidth = self._get_setting("bandwidth", client)
                     if bandwidth is not None:
                         client_cmd += f" --bandwidth {int(bandwidth)}"
-                    # TODO: add_client_args from metadata
+                    # TODO: add_client_args from metadata for rperf
                 else:
                     # "--client" with the IP of the server is slightly confusing here.
                     # Basically, our client (this device) is connecting to a iperf server,
@@ -305,14 +301,13 @@ class Iperf(ComponentBase):
                         client_cmd += f" {add_client_args.strip()}"
 
                     # debugging logs
-                    client_cmd = f"bash -c '{client_cmd}"
-                    client_cmd += f" --verbose --debug 2>1 >/iperf_client-log_client-{client.hostname}_server-{server.hostname}.log'"
+                    client_cmd = f"bash -c '{client_cmd} 2>1 >/iperf_client-log_client-{client.hostname}_server-{server.hostname}.log'"
 
-                self.print(f"client_cmd for {client.hostname}: {client_cmd}")
+                self.print(f"client_cmd for '{client.hostname}': {client_cmd}")
                 self.mm.cc_filter(f"name={client.hostname}")
                 self.mm.cc_background(client_cmd)
 
-        self.print("finished starting iperf processes")
+        self.print("finished starting all iperf processes")
         logger.log('INFO', f'Started user component: {self.name}')
 
     def _run_multi(self, cmd: str, filter: str, prefix: str, num_responses: int, timeout: float = 10.0) -> list:
@@ -420,7 +415,7 @@ class Iperf(ComponentBase):
             for server in mapping.values():
                 for client in server.clients.values():
                     # client results (this has the more interesting data)
-                    self.print(f"collecting iperf client data from vm {client.hostname}")
+                    self.print(f"collecting iperf client data from '{client.hostname}'")
                     utils.mm_recv(
                         mm=self.mm,
                         vm=client.hostname,
@@ -429,7 +424,7 @@ class Iperf(ComponentBase):
                     )
 
                     # server results for this client
-                    self.print(f"collecting iperf server data for client {client.hostname} from server vm {server.hostname}")
+                    self.print(f"collecting iperf server data for client '{client.hostname}' from server '{server.hostname}'")
                     utils.mm_recv(
                         mm=self.mm,
                         vm=server.hostname,
@@ -457,11 +452,11 @@ class Iperf(ComponentBase):
                 try:
                     data = utils.read_json(file)
                 except Exception as ex:
-                    self.eprint(f"failed to read iperf data from file {file}: {ex}")
+                    self.eprint(f"failed to read iperf data from '{file}': {ex}")
                     sys.exit(1)
 
                 if data.get("error"):
-                    self.eprint(f"error field set for iperf data from file {file}: {data['error']}")
+                    self.eprint(f"error field set for iperf data from '{file}': {data['error']}")
                     sys.exit(1)
 
             # Generate RTT histograms
@@ -470,7 +465,7 @@ class Iperf(ComponentBase):
                 self.print("generating RTT histograms (create_histogram=true)")
                 for server in mapping.values():
                     for client in server.clients.values():
-                        self.print(f"generating RTT histogram for client {client.hostname} and server {server.hostname}")
+                        self.print(f"generating RTT histogram for client '{client.hostname}' and server '{server.hostname}'")
                         c_path = Path(self.base_dir, os.path.basename(client["client_log_path"]))
                         results = utils.read_json(c_path)  # type: dict
 
