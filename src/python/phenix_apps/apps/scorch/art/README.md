@@ -10,7 +10,7 @@ and in `PATH` so it can be found with `which`.
 
 ## Metadata Options
 
-```
+```yaml
 metadata:
   framework: <local path to framework executable (e.g. goart)>
   technique: <technique ID>
@@ -47,7 +47,7 @@ executor exits cleanly.
 
 ## Example Configuration
 
-```
+```yaml
 components:
   - name: T1190
     type: art

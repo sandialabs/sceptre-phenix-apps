@@ -13,7 +13,7 @@ component is configured to interact with and is in the `PATH`.
 
 ## Metadata Options
 
-```
+```yaml
 metadata:
   vms:
     - hostname: <vm hostname as defined in the topology>
@@ -24,11 +24,13 @@ metadata:
 
 The resulting `ettercap` command for a VM will look like the following:
 
-`ettercap -Tq -i {iface} -M {method} {targets}`
+```shell
+ettercap -Tq -i {iface} -M {method} {targets}
+```
 
 ## Example Configuration
 
-```
+```yaml
 components:
   - name: mitm
     type: ettercap

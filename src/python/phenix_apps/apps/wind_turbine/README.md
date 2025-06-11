@@ -2,7 +2,7 @@
 
 ## Wildcard Method
 
-```
+```yaml
 spec:
   apps:
   - name: wind-turbine
@@ -129,7 +129,7 @@ spec:
 
 ## Verbose Method
 
-```
+```yaml
 spec:
   apps:
   - name: wind-turbine
