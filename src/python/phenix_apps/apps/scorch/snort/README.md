@@ -2,7 +2,7 @@
 
 ## Metadata Options
 
-```
+```yaml
 metadata:
   hostname: detector
   sniffInterface: eth0

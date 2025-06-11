@@ -22,7 +22,7 @@ run, loop, and count.
 
 ## Example Configuration
 
-```
+```yaml
 components:
   - name: foobar # this will also be the name of the operation in Caldera
     type: caldera
