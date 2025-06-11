@@ -60,7 +60,20 @@ DEFAULT_INFRASTRUCTURES = {
       'to_current':          {'type': 'analog-read', 'modbus': {'scaling': 2}},
       'to_active_power':     {'type': 'analog-read', 'modbus': {'scaling': 2}},
       'to_reactive_power':   {'type': 'analog-read', 'modbus': {'scaling': 2}},
-    }
+    },
+    'generator': {
+      'voltage':        {'type': 'analog-read',       'modbus': {'scaling': 2}},
+      'current':        {'type': 'analog-read',       'modbus': {'scaling': 2}},
+      'active_power':   {'type': 'analog-read-write', 'modbus': {'scaling': 2}},
+      'reactive_power': {'type': 'analog-read',        'modbus': {'scaling': 2}},
+    },
+    'storage': {
+      'voltage':        {'type': 'analog-read',       'modbus': {'scaling': 2}},
+      'current':        {'type': 'analog-read',       'modbus': {'scaling': 2}},
+      'active_power':   {'type': 'analog-read-write', 'modbus': {'scaling': 2}},
+      'reactive_power': {'type': 'analog-read',       'modbus': {'scaling': 2}},
+      'soc':            {'type': 'analog-read',       'modbus': {'scaling': 2}},
+    },
   }
 }
 
