@@ -4,6 +4,8 @@ import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import yaml
+
 from phenix_apps.apps.scorch import ComponentBase
 from phenix_apps.common import logger, utils
 from .csv_gen import gen_csv
@@ -14,11 +16,19 @@ from .csv_gen import gen_csv
 #   can iterate over the scorch app data from the Scenario config
 # TODO: make what's saved configurable (like the experiment)
 # TODO: migrate CSV generation functionality to harmonize (csv_gen.py)
+# TODO: configuration option to specify what components to collect from explicitly
+# TODO: add check to ensure collector is run after all other components it's collecting from in the stop stage
 
 
 class Collector(ComponentBase):
     def __init__(self):
         ComponentBase.__init__(self, 'collector')
+
+        # results_dir: top-level directory in the final collection of files
+        self.results_dir = Path(self.base_dir, "experiment_results")
+        # meta_dir: "metadata" sub-directory in results directory
+        self.meta_dir = Path(self.results_dir, "metadata")
+
         self.execute_stage()
 
     def stop(self):
@@ -26,11 +36,8 @@ class Collector(ComponentBase):
 
         record = {}
 
-        results_dir = Path(self.base_dir, "experiment_results")
-        results_dir.mkdir()
-
-        meta_dir = Path(results_dir, "metadata")
-        meta_dir.mkdir()
+        self.results_dir.mkdir()
+        self.meta_dir.mkdir()
 
         # sceptre: topology, scenario, experiment
         sceptre_topo = self.experiment.metadata.annotations.topology
@@ -41,30 +48,12 @@ class Collector(ComponentBase):
         exp_data = utils.run_command(f"phenix config get experiment/{self.exp_name}")
         assert topo_data and sc_data and exp_data
 
-        Path(meta_dir, "topology.yaml").write_text(topo_data)
-        Path(meta_dir, "scenario.yaml").write_text(sc_data)
-        Path(meta_dir, "experiment.yaml").write_text(exp_data)
+        Path(self.meta_dir, "topology.yaml").write_text(topo_data)
+        Path(self.meta_dir, "scenario.yaml").write_text(sc_data)
+        Path(self.meta_dir, "experiment.yaml").write_text(exp_data)
 
-        # rtds: config, log files, CSV files, tags, PMU metadata
-        rtds_src = self._comp_dir("rtds")
-        rtds_dest = Path(results_dir, "rtds")
-        self.print("copying rtds data")
-        utils.rglob_copy("*.csv", rtds_src, rtds_dest)
-        utils.rglob_copy("*.txt", rtds_src, meta_dir)
-        utils.rglob_copy("*.json", rtds_src, meta_dir)
-        utils.rglob_copy("*.err", rtds_src, meta_dir)
-        utils.rglob_copy("*.out", rtds_src, meta_dir)
-        utils.rglob_copy("*.ini", rtds_src, meta_dir)
-
-        # vmstats
-        vms_src = self._comp_dir("vmstats") / "vm_stats.jsonl"
-        self.print("copying vmstats data")
-        utils.copy_file(vms_src, meta_dir)
-
-        # hoststats
-        hs_src = self._comp_dir("hoststats") / "host_stats.jsonl"
-        self.print("copying hoststats data")
-        utils.copy_file(hs_src, meta_dir)
+        self._collect_vmstats()
+        self._collect_hoststats()
 
         # miniccc logs
         if self.metadata.get("collect_miniccc", False):
@@ -83,20 +72,15 @@ class Collector(ComponentBase):
         iperf_dest = None
         if self.metadata.get("collect_iperf", False):
             iperf_src = self._comp_dir("iperf")
-            iperf_dest = Path(results_dir, "iperf")
+            iperf_dest = Path(self.results_dir, "iperf")
             self.print("copying iperf data")
             shutil.copytree(iperf_src, iperf_dest)
 
         # disruption: attack_results, scenario_results, scenario_*
         s_src = self._comp_dir("disruption")
-        s_dest = Path(results_dir, "disruption")
+        s_dest = Path(self.results_dir, "disruption")
         self.print("copying disruption data")
         shutil.copytree(s_src, s_dest)
-
-        # qos: what values were applied
-        qos_file = self._comp_dir("qos") / "qos_values_applied.json"
-        self.print("copying qos data")
-        utils.copy_file(qos_file, meta_dir)
 
         # Use duration for the configured disruption
         disruption_metadata = self._get_component("disruption").metadata
@@ -131,36 +115,6 @@ class Collector(ComponentBase):
         if duration_actual < configured_duration:
             self.eprint(f"actual duration of {duration_actual:.2f} was less than the configured duration of {configured_duration}, something might have gone wrong...")
             sys.exit(1)
-
-        # pcap: pcap files
-        pcap_src = self._comp_dir("pcap")
-        pcap_dest = Path(results_dir, "pcaps")
-        self.print("copying pcap data")
-        shutil.copytree(pcap_src, pcap_dest)
-
-        # NOTE: pcap durations for several of the PCAPs may be shorter than the configured duration
-        # This is due to the low packet rate, e.g. one packet every 9 seconds, may end up with a capture
-        # duration of 21 seconds instead of 30 seconds (because capture duration is based on last packet timestamp)
-        pcap_meta_file = pcap_dest / "pcap_metadata.json"
-        pcap_metadata = utils.read_json(pcap_meta_file)
-
-        expected_cap_duration = float(pcap_metadata["merged.pcap"]["Capture duration (seconds)"])
-        if (expected_cap_duration + 6.0) < configured_duration:
-            self.eprint(f"Capture duration {expected_cap_duration} seconds is more than 6.0 seconds less than configured disruption duration of {configured_duration} seconds")
-            sys.exit(1)
-
-        # Read power provider config (RTDS)
-        pconf = configparser.ConfigParser()
-        pconf.read(meta_dir / "config.ini")
-        pmu_names = [
-            x.strip() for x in pconf.get("power-solver-service", "rtds-pmu-names").split(",") if x
-        ]
-        pmu_labels = [
-            x.strip() for x in pconf.get("power-solver-service", "rtds-pmu-labels").split(",") if x
-        ]
-        # {PMU1: BUS7, ...}
-        pmus = dict(zip(pmu_names, pmu_labels))
-        self.print(f"PMUs: {pmus}")
 
         # Record (experiment_record.json)
         self.print("generating experiment record")
@@ -227,13 +181,11 @@ class Collector(ComponentBase):
                 "results": scn_results,
             }
 
-        # qos
-        record["qos"] = utils.read_json(qos_file)
+        # qos: store in the record what QoS values were applied
+        record["qos"] = self._collect_qos()
 
-        # RTDS/power system data
-        record["rtds"] = {
-            "pmus": pmus,
-        }
+        # Power system data from provider (RTDS, OPALRT, etc.)
+        record["provider"] = self._collect_provider_data()
 
         # all_hosts
         # map hostnames to IP addresses
@@ -246,30 +198,189 @@ class Collector(ComponentBase):
         record["all_hosts"] = all_hosts
 
         # pcap metadata
-        record["pcap_metadata"] = pcap_metadata
+        record["pcap_metadata"] = self._collect_pcap()
 
         # save record to file
-        record_path = Path(results_dir, "experiment_record.json")
+        record_path = Path(self.results_dir, "experiment_record.json")
         self.print(f"Saving experiment record to {record_path}")
         utils.write_json(record_path, record)
 
 
+        # TODO: update for providerdata/opalrt
         # === CSV file (experiment_results.csv) ===
         # Uses Elasticsearch configuration from the 'rtds' component metadata
         # TODO: move to harmonize, just do basic validation of data here
         # TODO: run count query to verify number of expected docs
-        rtds_metadata = self._get_component("rtds").metadata
-        gen_csv(
-            record=record,
-            csv_path=results_dir / "experiment_results.csv",
-            es_server=rtds_metadata.elasticsearch.server,
-            es_index=rtds_metadata.elasticsearch.index,
-            iperf_dir=iperf_dest,
-        )
+        if self.metadata.get("generate_csv", True):
+            rtds_metadata = self._get_component("rtds").metadata
+            gen_csv(
+                record=record,
+                csv_path=self.results_dir / "experiment_results.csv",
+                es_server=rtds_metadata.elasticsearch.server,
+                es_index=rtds_metadata.elasticsearch.index,
+                iperf_dir=iperf_dest,
+            )
 
         logger.log('INFO', f'Stopped user component: {self.name}')
 
+    def _collect_provider_data(self) -> dict:
+        """
+        Collect data from the 'providerdata' or 'rtds' components.
+        """
+
+        data = {
+            "simulator": "",
+            "pmus": {},
+            "gtnet_skt_tags": [],
+            "modbus_registers": [],
+        }
+
+        # provider: YAML config, log files, CSV files, tags, PMU metadata
+        if self._get_component("providerdata"):
+            prov_src = self._comp_dir("providerdata")
+        elif self._get_component("rtds"):
+            prov_src = self._comp_dir("rtds")
+        else:
+            self.eprint("WARNING: No provider data configured for experiment, either 'providerdata' or 'rtds' component should be configured, skipping...")
+            return {}
+
+        dest = Path(self.results_dir, "provider_data")
+        self.print(f"copying provider data from '{prov_src}'")
+        self.print(f"prov_src: {list(prov_src.iterdir())}")
+        utils.rglob_copy("*.csv", prov_src, dest)
+        utils.rglob_copy("*.yaml", prov_src, self.meta_dir)
+        utils.rglob_copy("*.txt", prov_src, self.meta_dir)
+        utils.rglob_copy("*.json", prov_src, self.meta_dir)
+        utils.rglob_copy("*.err", prov_src, self.meta_dir)
+        utils.rglob_copy("*.out", prov_src, self.meta_dir)
+        utils.rglob_copy("*.ini", prov_src, self.meta_dir)
+        self.print(f"meta_dir: {list(self.meta_dir.iterdir())}")
+
+        # Read Provider config
+        ini_path = self.meta_dir / "config.ini"
+        if not ini_path.is_file() and ini_path.read_text():
+            self.eprint("Non-existent or empty config.ini from provider")
+            sys.exit(1)
+
+        pconf = configparser.ConfigParser()
+        pconf.read(ini_path)
+
+        # check if this is an updated config
+        if not pconf.has_option("power-solver-service", "config-file"):
+            self.eprint(
+                "Old-style provider config detected (non-YAML). This is not "
+                "supported by this version of collector, use an older version."
+            )
+            # exit error here because this shouldn't happen
+            sys.exit(1)
+
+        data["simulator"] = pconf.get("power-solver-service", "solver-type")
+
+        # parse new-style YAML-formatted config
+        self.print("Parsing YAML provider config")
+        config_file = Path(pconf.get("power-solver-service", "config-file")).name
+        yaml_path = Path(self.meta_dir, config_file)
+        with yaml_path.open() as yf:
+            yaml_conf = yaml.safe_load(yf)
+
+        if yaml_conf.get("pmu", {}).get("pmus"):
+            # {PMU1: BUS7, ...}
+            for p in yaml_conf["pmu"]["pmus"]:
+                data["pmus"][p["name"]] = p["label"]
+            self.print(f"PMUs: {data['pmus']}")
+        else:
+            self.print(f"WARNING: No PMUs defined for {data['simulator']} Provider, skipping...")
+
+        if yaml_conf.get("gtnet_skt", {}).get("tags"):
+            # [G1CB1, G2CB2, ...]
+            for gt in yaml_conf["gtnet_skt"]["tags"]:
+                data["gtnet_skt_tags"].append(gt["name"].split(".")[0])
+            self.print(f"GTNET-SKT tags: {data['gtnet_skt_tags']}")
+        elif data["simulator"].upper().strip() == "RTDS":
+            self.print("WARNING: No GTNET-SKT tags defined for RTDS Provider, skipping...")
+
+        if yaml_conf.get("modbus", {}).get("registers"):
+            for mb in yaml_conf["modbus"]["registers"]:
+                data["modbus_registers"].append(mb["name"])
+            self.print(f"Modbus registers: {data['modbus_registers']}")
+        else:
+            self.print(f"WARNING: No Modbus registers defined for {data['simulator']} Provider, skipping...")
+
+        return data
+
+    def _collect_qos(self) -> dict:
+        """
+        'qos' scorch component. Collect what QoS values were applied.
+        """
+        if not self._get_component("qos"):
+            self.print(f"NOTE: skipping 'qos' collection as its not defined in the scorch metadata")
+            return {}
+
+        qos_file = self._comp_dir("qos") / "qos_values_applied.json"
+        self.print("copying qos data")
+        utils.copy_file(qos_file, self.meta_dir)
+
+        return utils.read_json(qos_file)
+
+    def _collect_vmstats(self) -> None:
+        """
+        'vmstats' scorch component.
+        """
+        if not self._get_component("vmstats"):
+            self.print(f"NOTE: skipping 'vmstats' collection as its not defined in the scorch metadata")
+            return
+
+        vms_src = self._comp_dir("vmstats") / "vm_stats.jsonl"
+        self.print("copying vmstats data")
+        utils.copy_file(vms_src, self.meta_dir)
+
+    def _collect_hoststats(self) -> None:
+        """
+        'hoststats' scorch component.
+        """
+        if not self._get_component("hoststats"):
+            self.print(f"NOTE: skipping 'hoststats' collection as its not defined in the scorch metadata")
+            return
+
+        hs_src = self._comp_dir("hoststats") / "host_stats.jsonl"
+        self.print("copying hoststats data")
+        utils.copy_file(hs_src, self.meta_dir)
+
+    def _collect_pcap(self):
+        """
+        'pcap' scorch component. Collects PCAP files and extracts their metadata
+        to store in the experiment record
+        """
+        if not self._get_component("pcap"):
+            self.print(f"NOTE: skipping 'pcap' collection as its not defined in the scorch metadata")
+
+        pcap_src = self._comp_dir("pcap")
+        pcap_dest = Path(self.results_dir, "pcaps")
+        self.print("copying pcap data")
+        shutil.copytree(pcap_src, pcap_dest)
+
+        # NOTE: pcap durations for several of the PCAPs may be shorter than the configured duration
+        # This is due to the low packet rate, e.g. one packet every 9 seconds, may end up with a capture
+        # duration of 21 seconds instead of 30 seconds (because capture duration is based on last packet timestamp)
+        pcap_meta_file = pcap_dest / "pcap_metadata.json"
+        pcap_metadata = utils.read_json(pcap_meta_file)
+
+        if self._get_component("disruption"):
+            dis_configured_duration = float(
+                self._get_component("disruption").metadata.run_duration
+            )
+            expected_cap_duration = float(
+                pcap_metadata["merged.pcap"]["Capture duration (seconds)"]
+            )
+
+            if (expected_cap_duration + 6.0) < dis_configured_duration:
+                self.eprint(f"Capture duration {expected_cap_duration} seconds is more than 6.0 seconds less than configured disruption duration of {dis_configured_duration} seconds")
+                sys.exit(1)
+
+        return pcap_metadata
+
     def _comp_dir(self, component_name: str) -> Path:
+        # TODO: this won't work for things run in configure stage before loops start
         pth = Path(self.files_dir, f"scorch/run-{self.run}/{component_name}/loop-{self.loop}-count-{self.count}")
         if not pth.is_dir():
             self.eprint(f"Output directory for component '{component_name}' doesn't exist: {pth}")
