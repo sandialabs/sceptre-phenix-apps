@@ -33,6 +33,7 @@ dependencies = [
     "requests==2.31.0",
     "python-dateutil~=2.8.2",
     "pyyaml~=6.0.2",
+    "kafka-python~=2.2.13"
 ]
 
 [project.scripts]
@@ -63,6 +64,7 @@ phenix-scorch-component-tcpdump = "phenix_apps.apps.scorch.tcpdump.tcpdump:main"
 phenix-scorch-component-trafficgen = "phenix_apps.apps.scorch.trafficgen.trafficgen:main"
 phenix-scorch-component-vmstats = "phenix_apps.apps.scorch.vmstats.vmstats:main"
 phenix-scorch-component-opcexport = "phenix_apps.apps.scorch.opcexport.opcexport:main"
+phenix-scorch-component-kafka = "phenix_apps.apps.scorch.kafka.kafka_component:main"
 
 [project.urls]
 # Use PyPI-standard names here: https://docs.pypi.org/project_metadata/
