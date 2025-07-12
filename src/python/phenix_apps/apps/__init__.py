@@ -1,4 +1,4 @@
-import copy, os, re, sys
+import copy, os, ipaddress, re, sys
 
 from box import Box
 
@@ -106,8 +106,7 @@ class AppBase(object):
 
         if wildcard:
             return extracted
-        else:
-            return None
+        return None
 
     def extract_annotated_topology_nodes(self, annotations):
         nodes = self.experiment.spec.topology.nodes
@@ -308,6 +307,84 @@ class AppBase(object):
 
         return None
 
+    # create a node based on yaml and default values
+    def create_node(self, md, hname, image = 'miniccc.qc2',
+                    os_type = 'linux', vcpus = 2, memory = 4096):
+        '''
+        can take a minimal node definition in md, ex:
+        - hostname: hosty
+          os_type: linux
+          vcpus: 4
+          memory: 8192
+          image: miniccc.qc2
+          interfaces:
+            - name: IF0
+              address: 172.16.0.10/24
+              gateway: 172.16.0.1
+              vlan: MGMT
+            - name: IF1
+              address: 1.2.3.4/24
+              gateway: 1.2.3.1
+              vlan: INT
+
+        md is not required, node can be constructed from named arguments
+        '''
+
+        hostname = md.get('hostname', hname)
+        node = self.extract_node(hostname, wildcard=False)
+        if not node:
+            node = {
+                'type': 'VirtualMachine',
+                'general': {
+                    'hostname' : hostname,
+                    'vm_type'  : 'kvm'
+                },
+                'hardware': {
+                    'os_type' : md.get('os_type', os),
+                    'vcpus'   : md.get('vcpus', cpu),
+                    'memory'  : md.get('memory', memory),
+                    'drives'  : [
+                        {'image': md.get('image', image)},
+                    ]
+                },
+                'network': {
+                    'interfaces':
+                        self.create_interfaces(md.get('interfaces', []))
+                }
+            }
+        return node
+
+    def create_interfaces(self, ifaces):
+        '''
+        can take a minimal interface definitions in ifaces, ex:
+        - name: IF0
+          address: 172.16.0.10/24
+          gateway: 172.16.0.1
+          vlan: MGMT
+        - name: IF1
+          address: 1.2.3.4/24
+          gateway: 1.2.3.1
+          vlan: INT
+        '''
+
+        interfaces = []
+        for idx, iface in enumerate(ifaces):
+            ip = ipaddress.ip_interface(iface.get('address', '0.0.0.0/24'))
+            name = iface.get('name', [])
+            if not name:
+                name = f'IF{idx}'
+            interface = {
+                'name'    : name,
+                'type'    : 'ethernet',
+                'proto'   : 'static',
+                'address' : str(ip.ip),
+                'mask'    : ip.network.prefixlen,
+                'gateway' : iface.get('gateway', None),
+                'vlan'    : iface.get('vlan', None)
+            }
+            interfaces.append(interface)
+        return interfaces
+
     def add_node(self, new_node, overwrite = False):
         found = None
 
@@ -368,6 +445,22 @@ class AppBase(object):
             # There was no injection list, so we put the
             # injection dictionary in a list.
             node['injections'] = [inject]
+
+    def add_interfaces(self, hostname, interfaces):
+        node = self.extract_node(hostname)
+        existing = [i['name'] for i in node['network']['interfaces']]
+
+        new_ifaces = self.create_interfaces(interfaces)
+        i = 0
+        for ni in new_ifaces:
+            if ni['name'] in existing:
+                while f'IF{i}' in existing:
+                    i += 1
+                ni['name'] = f'IF{i}'
+            existing.append(ni['name'])
+
+        node['network']['interfaces'].append(new_ifaces)
+        return node
 
     def is_booting(self, hostname):
         node = self.extract_node(hostname)
