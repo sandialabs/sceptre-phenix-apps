@@ -110,7 +110,7 @@ class HostStats(ComponentBase):
                 host_dict['Load_15'] = float(loads[2])
 
                 host_dict['timestamp'] = int(time.time()*1000)  # milliseconds
-                host_dict['vm_list']   = host_vms.get(host_dict['compute_name'], [])
+                host_dict['vm_list']   = sorted(host_vms.get(host_dict['compute_name'], []))
 
                 resdata.append(host_dict)
         except TypeError:
