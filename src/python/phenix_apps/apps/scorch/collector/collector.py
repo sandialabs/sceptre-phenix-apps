@@ -75,6 +75,7 @@ class Collector(ComponentBase):
             iperf_dest = Path(self.results_dir, "iperf")
             self.print("copying iperf data")
             shutil.copytree(iperf_src, iperf_dest)
+            # TODO: remove *.log files if they're empty (no output)?
 
         # disruption: attack_results, scenario_results, scenario_*
         s_src = self._comp_dir("disruption")
@@ -246,7 +247,6 @@ class Collector(ComponentBase):
 
         dest = Path(self.results_dir, "provider_data")
         self.print(f"copying provider data from '{prov_src}'")
-        self.print(f"prov_src: {list(prov_src.iterdir())}")
         utils.rglob_copy("*.csv", prov_src, dest)
         utils.rglob_copy("*.yaml", prov_src, self.meta_dir)
         utils.rglob_copy("*.txt", prov_src, self.meta_dir)
@@ -254,7 +254,6 @@ class Collector(ComponentBase):
         utils.rglob_copy("*.err", prov_src, self.meta_dir)
         utils.rglob_copy("*.out", prov_src, self.meta_dir)
         utils.rglob_copy("*.ini", prov_src, self.meta_dir)
-        self.print(f"meta_dir: {list(self.meta_dir.iterdir())}")
 
         # Read Provider config
         ini_path = self.meta_dir / "config.ini"
@@ -287,7 +286,7 @@ class Collector(ComponentBase):
             # {PMU1: BUS7, ...}
             for p in yaml_conf["pmu"]["pmus"]:
                 data["pmus"][p["name"]] = p["label"]
-            self.print(f"PMUs: {data['pmus']}")
+            self.print(f"{len({data['pmus']})} PMUs")
         else:
             self.print(f"WARNING: No PMUs defined for {data['simulator']} Provider, skipping...")
 
@@ -295,14 +294,14 @@ class Collector(ComponentBase):
             # [G1CB1, G2CB2, ...]
             for gt in yaml_conf["gtnet_skt"]["tags"]:
                 data["gtnet_skt_tags"].append(gt["name"].split(".")[0])
-            self.print(f"GTNET-SKT tags: {data['gtnet_skt_tags']}")
+            self.print(f"{len(data['gtnet_skt_tags'])} GTNET-SKT tags")
         elif data["simulator"].upper().strip() == "RTDS":
             self.print("WARNING: No GTNET-SKT tags defined for RTDS Provider, skipping...")
 
         if yaml_conf.get("modbus", {}).get("registers"):
             for mb in yaml_conf["modbus"]["registers"]:
                 data["modbus_registers"].append(mb["name"])
-            self.print(f"Modbus registers: {data['modbus_registers']}")
+            self.print(f"{len(data['modbus_registers'])} Modbus registers")
         else:
             self.print(f"WARNING: No Modbus registers defined for {data['simulator']} Provider, skipping...")
 
