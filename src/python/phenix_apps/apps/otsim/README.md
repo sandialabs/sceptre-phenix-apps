@@ -182,7 +182,17 @@ spec:
               foo:
                 tag: foo.bar
                 value: 0
+```
+# Node-RED
+[Node-RED](https://www.node-red.dev/) is a coding software that is
+used for creating flows of data between systems.
+[Node-RED](https://www.node-red.dev/) is particularly useful for
+creating human machine interfaces (HMI's) that allow for users to
+visualize metrics and data. [Node-RED](https://www.node-red.dev/)
+can be added to front end processor (fep), field client devices
+(fd-client), and field server devices (fd-server).
 
+```
       - hostname: hmi
         metadata:
           type: fd-client
