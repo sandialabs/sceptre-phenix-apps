@@ -107,6 +107,22 @@ class OTSim(AppBase):
       self.default_fed      = 'OpenDSS'
       self.default_endpoint = 'OpenDSS/updates'
       self.end_time = str(36000)
+  
+  # Function used to configure all devices that could have node-red as a
+  # metadata tag (fd-client, fep, etc.)
+  def __config_node_red(self, device, config):
+    if 'node-red' in device.metadata:
+      nodered = NodeRed.parse_metadata(device.metadata)
+
+      module = ET.Element('module', {'name': 'node-red'})
+      module.text = 'ot-sim-node-red-module {{config_file}}'
+
+      config.append_to_root(nodered.root)
+      config.append_to_cpu(module)
+
+      inject = nodered.needs_inject()
+      if inject:
+        self.add_inject(hostname=device.hostname, inject=inject)
 
 
   def pre_start(self):
@@ -232,6 +248,8 @@ class OTSim(AppBase):
 
           config.append_to_root(logic.root)
           config.append_to_cpu(module)
+      
+      self.__config_node_red(server, config)
 
       config_file = f'{self.otsim_dir}/{server.hostname}.xml'
 
@@ -274,6 +292,8 @@ class OTSim(AppBase):
           config.append_to_root(logic.root)
           config.append_to_cpu(module)
 
+      self.__config_node_red(fep, config)
+
       config_file = f'{self.otsim_dir}/{fep.hostname}.xml'
 
       config.to_file(config_file)
@@ -308,19 +328,8 @@ class OTSim(AppBase):
 
           config.append_to_root(logic.root)
           config.append_to_cpu(module)
-
-      if 'node-red' in client.metadata:
-        nodered = NodeRed.parse_metadata(client.metadata)
-
-        module = ET.Element('module', {'name': 'node-red'})
-        module.text = 'ot-sim-node-red-module {{config_file}}'
-
-        config.append_to_root(nodered.root)
-        config.append_to_cpu(module)
-
-        inject = nodered.needs_inject()
-        if inject:
-          self.add_inject(hostname=client.hostname, inject=inject)
+        
+      self.__config_node_red(client, config)
 
       config_file = f'{self.otsim_dir}/{client.hostname}.xml'
 
