@@ -10,11 +10,8 @@ from phenix_apps.common import logger, utils
 # which includes traffic from providers to simulators and bennu field devices.
 # The workaround for this could be to apply a filter with "capture pcap filter"
 # that excludes the IP address ranges used by MGMT and any other undesirable VLANs.
-# Additionally, if multiple experiments are running simultaniously on the same
-# host, then the capture will pick up traffic from those experiments, if they
-# share the same bridge.
-# Perhaps a workaround for this would be to add functionality to minimega to
-# filter by VLAN during a bridge capture.
+# To work around issues with multiple experiements, the 'bridge-mode' argument
+# to phenix can be leveraged.
 
 # TODO: pcap file retrieval functionality from mm.py component (this assumes one node)
 # TODO: allow settings per-vm (or per-bridge) that override the "global" setting,

@@ -696,7 +696,7 @@ class Sceptre(AppBase):
                 else:
                     kwargs["config_helics"] = "C:/sceptre/helics.json"
 
-            if simulator in ["RTDS", "OPALRT"]:
+            if simulator in ["RTDS", "OPALRT", "Siren"]:
                 # TODO: move YAML rendering to configure stage, so users can edit it
                 # by stopping experiments and not have sceptre.py overwrite it again.
 
@@ -801,6 +801,9 @@ class Sceptre(AppBase):
                         (interface.vlan and interface.vlan.lower() != "mgmt")):
                         fd_interfaces['tcp'] = interface.address
                     elif (len(fd_.topology.network.interfaces) == 2 and interface.type == "serial"):
+                        fd_interfaces['tcp'] = interface.address
+                    # hack for siren. please direct all objections to this hack to /dev/null
+                    elif simulator == "Siren" and not interface.type == "serial":
                         fd_interfaces['tcp'] = interface.address
 
                 # the provider publish_endpoint should look like 'udp://*;127.0.0.1:40000',

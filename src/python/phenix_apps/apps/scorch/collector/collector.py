@@ -242,7 +242,11 @@ class Collector(ComponentBase):
         elif self._get_component("rtds"):
             prov_src = self._comp_dir("rtds")
         else:
-            self.eprint("WARNING: No provider data configured for experiment, either 'providerdata' or 'rtds' component should be configured, skipping...")
+            self.eprint(
+                "WARNING: No provider data configured for experiment, "
+                "either 'providerdata' or 'rtds' component should be "
+                "configured, skipping..."
+            )
             return {}
 
         dest = Path(self.results_dir, "provider_data")
@@ -312,7 +316,10 @@ class Collector(ComponentBase):
         'qos' scorch component. Collect what QoS values were applied.
         """
         if not self._get_component("qos"):
-            self.print(f"NOTE: skipping 'qos' collection as its not defined in the scorch metadata")
+            self.print(
+                "NOTE: skipping 'qos' collection as its not "
+                "defined in the scorch metadata"
+            )
             return {}
 
         qos_file = self._comp_dir("qos") / "qos_values_applied.json"
@@ -326,7 +333,10 @@ class Collector(ComponentBase):
         'vmstats' scorch component.
         """
         if not self._get_component("vmstats"):
-            self.print(f"NOTE: skipping 'vmstats' collection as its not defined in the scorch metadata")
+            self.print(
+                "NOTE: skipping 'vmstats' collection as its not "
+                "defined in the scorch metadata"
+            )
             return
 
         vms_src = self._comp_dir("vmstats") / "vm_stats.jsonl"
@@ -338,7 +348,10 @@ class Collector(ComponentBase):
         'hoststats' scorch component.
         """
         if not self._get_component("hoststats"):
-            self.print(f"NOTE: skipping 'hoststats' collection as its not defined in the scorch metadata")
+            self.print(
+                "NOTE: skipping 'hoststats' collection as its not "
+                "defined in the scorch metadata"
+            )
             return
 
         hs_src = self._comp_dir("hoststats") / "host_stats.jsonl"
@@ -351,8 +364,10 @@ class Collector(ComponentBase):
         to store in the experiment record
         """
         if not self._get_component("pcap"):
-            self.print(f"NOTE: skipping 'pcap' collection as its not defined in the scorch metadata")
-
+            self.print(
+                "NOTE: skipping 'pcap' collection as its not "
+                "defined in the scorch metadata"
+            )
         pcap_src = self._comp_dir("pcap")
         pcap_dest = Path(self.results_dir, "pcaps")
         self.print("copying pcap data")
@@ -373,7 +388,11 @@ class Collector(ComponentBase):
             )
 
             if (expected_cap_duration + 6.0) < dis_configured_duration:
-                self.eprint(f"Capture duration {expected_cap_duration} seconds is more than 6.0 seconds less than configured disruption duration of {dis_configured_duration} seconds")
+                self.eprint(
+                    f"Capture duration {expected_cap_duration} seconds is "
+                    f"more than 6.0 seconds less than configured disruption "
+                    f"duration of {dis_configured_duration} seconds"
+                )
                 sys.exit(1)
 
         return pcap_metadata
