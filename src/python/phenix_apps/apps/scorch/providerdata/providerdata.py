@@ -88,27 +88,11 @@ class ProviderData(ComponentBase):
             # For now, just make sure there are docs getting to ES
             # TODO figure out how to verify frequency is correct for generalized bennu provider
             if doc_count_1 < 100:
-                self.eprint(f"Elasticsearch does not appear to be running, exiting...")
+                self.eprint("Elasticsearch does not appear to be running, exiting...")
                 logger.log('ERROR', f'{self.name}: Elasticsearch does not appear to be running, exiting...')
                 sys.exit(1)
 
-            # TODO: compare docs after certain amount of time
-            # self.print(f"Sleeping for {sleep_for} seconds to wait for data to be generated...")
-            # sleep(sleep_for)  # wait 3 seconds
-
-            # self.print("Getting index doc count")
-            # doc_count_2 = self.es.indices.stats(index=index)["indices"][index]["total"]["docs"]["count"]  # type: int
-
-            # self.print("Comparing doc counts")
-            # # 8 PMUs * 6 points * 30 updates/sec = 1440 docs/second
-            # # 3 seconds * 1440 = 4,320
-            # # There seems to be some delay though, so let's subtract 1 second
-            # expected_count_diff = (sleep_for - 1) * 1440
-            # count_diff = doc_count_2 - doc_count_1
-            # if count_diff < expected_count_diff:
-            #     self.eprint(f"expected {expected_count_diff} documents created, but only {count_diff} docs were created for index {index}")
-            #     sys.exit(1)
-            # self.print("ground truth data verified")
+            # TODO: compare doc count after certain amount of time, use es.indices.stats()
 
         logger.log('INFO', f'Started user component: {self.name}')
 
