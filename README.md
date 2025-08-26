@@ -96,11 +96,6 @@ traffic, except for the cluster host the `monitor` VM is scheduled on, which
 will instead use the tap of the `IF0` interface for the `monitor` VM as the
 mirror destination.
 
-> **NOTE**: the `mirror` app is currently not namespace aware, and will fail
-> miserably if two different experiments use the same name for a VM that
-> mirrored traffic is to be sent to. This will be addressed in a future
-> version of the app.
-
 ### Additional apps
 
 - [caldera](src/python/phenix_apps/apps/caldera)
