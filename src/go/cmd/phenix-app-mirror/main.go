@@ -115,6 +115,10 @@ func configure(exp *types.Experiment) error {
 	if err != nil {
 		return fmt.Errorf("extracting app metadata: %w", err)
 	}
+	amd.Init()
+	if amd.MirrorBridge == "" {
+		amd.MirrorBridge = exp.Spec.DefaultBridge()
+	}
 
 	nw, err := mirrorNet(&amd)
 	if err != nil {
@@ -248,6 +252,11 @@ func postStart(exp *types.Experiment, dryrun bool) (ferr error) {
 	if err != nil {
 		return fmt.Errorf("extracting app metadata: %w", err)
 	}
+	amd.Init()
+	if amd.MirrorBridge == "" {
+		amd.MirrorBridge = exp.Spec.DefaultBridge()
+	}
+
 
 	nw, err := mirrorNet(&amd)
 	if err != nil {
@@ -358,7 +367,6 @@ func postStart(exp *types.Experiment, dryrun bool) (ferr error) {
 		name := util.RandomString(15)
 
 		cfg := MirrorConfig{MirrorName: name, MirrorBridge: amd.MirrorBridge, IP: ip.String()}
-
 		status.Mirrors[host.Hostname()] = cfg
 
 		for h := range cluster {
@@ -481,8 +489,10 @@ func cleanup(exp *types.Experiment, dryrun bool) error {
 	if err != nil {
 		return fmt.Errorf("extracting app metadata: %w", err)
 	}
-
 	amd.Init()
+	if amd.MirrorBridge == "" {
+		amd.MirrorBridge = exp.Spec.DefaultBridge()
+	}
 
 	cluster := cluster(exp)
 
@@ -496,7 +506,6 @@ func cleanup(exp *types.Experiment, dryrun bool) error {
 			slog.Error("removing mirror from cluster", "mirror", cfg.MirrorName, "err", err)
 		}
 	}
-
 	if err := deleteTap(status.TapName, exp.Metadata.Name, cluster); err != nil {
 		slog.Error("deleting tap from cluster", "tap", status.TapName, "err", err)
 	}
@@ -564,13 +573,13 @@ func deleteMirrorFromHost(mirror, bridge, host string) error {
 
 func mirrorNet(md *MirrorAppMetadataV1) (netaddr.IPPrefix, error) {
 	md.Init()
-
+	
 	subnet, err := netaddr.ParseIPPrefix(md.MirrorNet)
 	if err != nil {
 		return netaddr.IPPrefix{}, fmt.Errorf("parsing mirror net: %w", err)
 	}
 
-	running, err := types.RunningExperiments()
+	running, err := runningExperiments()
 	if err != nil {
 		// Log the error, but don't escalate it. Instead, just assume there's no
 		// other experiments running and let things (potentially) fail
@@ -690,4 +699,26 @@ func vlanTaps(ns string, vms, vlans []string) []string {
 	}
 
 	return taps
+}
+
+func runningExperiments() ([]*types.Experiment, error) {
+	configs, err := store.List("Experiment")
+	if err != nil {
+		return nil, fmt.Errorf("getting list of experiment configs from store: %w", err)
+	}
+
+	var experiments []*types.Experiment
+
+	for _, c := range configs {
+		exp, err := types.DecodeExperimentFromConfig(c)
+		if err != nil {
+			return nil, fmt.Errorf("decoding experiment %s from config: %w", c.Metadata.Name, err)
+		}
+
+		if exp.Running() {
+			experiments = append(experiments, exp)
+		}
+	}
+
+	return experiments, nil
 }
