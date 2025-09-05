@@ -118,6 +118,7 @@ class Helics(AppBase):
         log_dir = broker_md.get('log-dir', '/var/log')
 
         root_broker_config = {
+            'name':      root_hostname,
             'subs':      0,
             'feds':      total_fed_count,
             'endpoint':  root_ip,
@@ -140,6 +141,7 @@ class Helics(AppBase):
                 level = fedinfo[1]
 
                 broker_configs.append({
+                    'name':      hostname,
                     'feds':      count,
                     'parent':    root_ip,
                     'endpoint':  endpoint,
