@@ -53,6 +53,12 @@ class Helics(AppBase):
         self.add_label(root_hostname, 'group', 'helics')
         self.add_label(root_hostname, 'helics', 'broker')
 
+        # create the wait script to be injected into federates
+        templates = utils.abs_path(__file__, 'templates/')
+        wait_file = f'{self.helics_dir}/wait-broker.sh'
+        with open(wait_file, 'w') as f:
+            utils.mako_serve_template('wait_broker.mako', templates, f, rootbroker_ip=root_ip)
+
         total_fed_count = 0
 
         # broker hosts --> ip:port --> ['fed_count', 'log_level']
@@ -66,8 +72,13 @@ class Helics(AppBase):
 
             self.add_label(fed.general.hostname, 'group', 'helics')
             self.add_label(fed.general.hostname, 'helics', 'federate')
-
             configs = fed.annotations.get('helics/federate', [])
+            
+            # if the federate has the helics/federate annotation, add the inject to wait for the broker
+            if configs and configs[0].get('broker-wait', True):
+                dst = '/etc/phenix/startup/5-wait-broker.sh'
+                self.add_inject(hostname=fed.general.hostname, inject={'src': wait_file, 'dst': dst})
+
 
             for config in configs:
                 broker = config.get('broker', '127.0.0.1')
@@ -150,8 +161,6 @@ class Helics(AppBase):
                 })
 
             configs[hostname] = broker_configs
-
-        templates = utils.abs_path(__file__, 'templates/')
 
         for hostname, broker_configs in configs.items():
             start_file = f'{self.helics_dir}/{hostname}-broker.sh'
