@@ -131,11 +131,13 @@ class OTSim(AppBase):
     ot_devices = {}
     mappings   = self.metadata.get('infrastructures', {})
 
+    templates = utils.abs_path(__file__, 'templates/')
     # Field device, assumed to use the I/O module that acts as a HELICS
     # federate. Will use default I/O federate provided in app metadata if
     # not provided as part of the device name(s).
     servers = self.extract_nodes_type('fd-server', False)
-
+    broker_addr_wait = {} # {broker_addr:wait_file}
+    
     for server in servers:
       md    = server.metadata
       infra = md.get('infrastructure', self.default_infrastructure)
@@ -238,6 +240,18 @@ class OTSim(AppBase):
 
         annotation = [{'broker': addr, 'fed-count': 1}]
         self.add_annotation(server.hostname, 'helics/federate', annotation)
+        # if we are not using the helics app add the wait script
+        if not self.extract_app('helics') and not ':24000' in addr:
+          if addr not in broker_addr_wait:
+            wait_file = f'{self.otsim_dir}/wait-broker-{len(broker_addr_wait)}.sh' # just need a unique name
+            with open(wait_file, 'w') as f:
+              utils.mako_serve_template('wait_broker.mako', templates, f, rootbroker_ip=addr)
+            broker_addr_wait[addr] = wait_file
+
+          dst = '/etc/phenix/startup/5-wait-broker.sh'
+          self.add_inject(hostname=server.hostname, inject={'src': broker_addr_wait[addr], 'dst': dst})
+
+        
 
       if 'logic' in md:
         logic = Logic.parse_metadata(md)
@@ -338,7 +352,6 @@ class OTSim(AppBase):
 
     # Create and inject config files for any brokers specified in the app
     # metadata.
-    templates = utils.abs_path(__file__, 'templates/')
 
     for hostname, cfg in self.brokers.items():
       start_file = f'{self.otsim_dir}/{hostname}-helics-broker.sh'
