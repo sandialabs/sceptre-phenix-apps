@@ -27,14 +27,14 @@ class Protonuke(AppBase):
             if vm.topology.hardware.os_type.upper() == 'WINDOWS':
                 kwargs = {
                     'src' : path,
-                    'dst' : '/ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/protonuke-scheduler.cmd',
+                    'dst' : '/phenix/startup/90-protonuke.ps1',
                 }
 
                 templates = utils.abs_path(__file__, 'templates/')
 
                 with open(path, 'w') as f:
                     utils.mako_serve_template(
-                        'protonuke_scheduler.mako', templates, f, protonuke_args=vm.metadata.args
+                        'protonuke.ps1.mako', templates, f, protonuke_args=vm.metadata.args
                     )
             else:
                 kwargs = {
