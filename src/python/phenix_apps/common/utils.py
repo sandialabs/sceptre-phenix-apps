@@ -636,8 +636,8 @@ def mm_delete_file(
         raise ValueError(f"unknown os_type '{os_type}' for mm_delete_file with filter '{cc_filter}'")
 
 
-def run_command(cmd: str) -> str:
-    result = subprocess.check_output(cmd, shell=True)
+def run_command(cmd: str, timeout: Optional[float] = None) -> str:
+    result = subprocess.check_output(cmd, shell=True, timeout=timeout)
     if isinstance(result, bytes):
         result = result.decode()
     return result

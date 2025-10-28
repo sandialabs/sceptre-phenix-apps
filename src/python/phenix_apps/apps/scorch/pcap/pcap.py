@@ -120,13 +120,8 @@ class PCAP(ComponentBase):
         # the pcaps that were merged will be moved into "raw" sub-directory
         if self.metadata.get("create_merged_pcap", False):
             self.print(f"merging {len(pcap_paths)} PCAP files into a single file (create_merged_pcap=true)")
-            merged_path = Path(self.base_dir, "merged.pcap")
 
-            mergecap_cmd = f"mergecap -w {merged_path}"
-            for pcap_path in pcap_paths:
-                mergecap_cmd += f" {pcap_path}"
-
-            utils.run_command(mergecap_cmd)
+            merged_path = self._merge_pcaps(pcap_paths)
 
             # move all pcaps that were merged into "raw" sub-directory
             new_paths = []
@@ -141,10 +136,66 @@ class PCAP(ComponentBase):
             pcap_paths.append(merged_path)
 
             if self.metadata.get("dedupe", True):
-                self.print(f"Removing duplicates from '{merged_path.name}'")
-                dd_path = Path(self.base_dir, "deduped.pcap")
-                utils.run_command(f"editcap -d {merged_path} {dd_path}")
-                dd_path.rename(merged_path)  # overwrite merged.pcap with deduped.pcap
+                self.print(f"'dedupe' is true, removing duplicates from '{merged_path.name}'")
+
+                # special processing for TCP flood packets
+                dos_targets = []
+                for comp in self.extract_app("scorch").metadata.components:
+                    if comp.type == "disruption" and comp.metadata.current_disruption in ["dos", "cyber_physical"]:
+                        dos_targets = [t.hostname for t in comp.metadata.dos.targets]
+                        break
+
+                if dos_targets:
+                    self.print("Performing special processing for TCP packet flood")
+                    non_target_paths = [
+                        p for p in pcap_paths
+                        if p != merged_path and not any(t in p.name for t in dos_targets)
+                    ]
+                    target_paths = [p for p in pcap_paths if p != merged_path and p not in non_target_paths]
+
+                    # merge all hosts EXCEPT hosts targetted by DOS into merged.pcap, dedupe
+                    self.print(f"Special processing: merging non-target PCAPs: {[p.name for p in non_target_paths]}")
+                    merged_path = self._merge_pcaps(non_target_paths)
+                    self._dedupe_pcap(merged_path)
+
+                    # split each target's PCAP into two, first part has the DOS packets, second one has everything else
+                    self.print(f"Special processing: splitting DOS packets from non-DOS packets for targets: {[p.name for p in target_paths]}")
+                    non_dos = []
+                    fragmented = []
+                    for t_path in target_paths:
+                        frag_path = t_path.with_stem(f"{t_path.stem}_fragmented")
+                        # give tshark 2 minutes to complete
+                        utils.run_command(
+                            f'tshark -r {t_path} -w {frag_path} -o ip.defragment:FALSE -o tcp.desegment_tcp_streams:FALSE -n -Y "ip.frag_offset > 0"',
+                            timeout=120.0
+                        )
+                        fragmented.append(frag_path)
+
+                        nd_path = t_path.with_stem(f"{t_path.stem}_no_dos_fragments")
+                        # give tshark 2 minutes to complete
+                        utils.run_command(
+                            f'tshark -r {t_path} -w {nd_path} -o ip.defragment:FALSE -o tcp.desegment_tcp_streams:FALSE -n -Y "not (ip.frag_offset > 0)"',
+                            timeout=120.0
+                        )
+                        non_dos.append(nd_path)
+
+                    # merge the "everything else" pcaps from targets into merged.pcap, dedupe again
+                    self.print("Special processing: merging non-attack packets into merged.pcap and deduping")
+                    # GAH, need to make sure pcap is merged into self
+                    merged_path = self._merge_pcaps([merged_path, *non_dos])
+                    self._dedupe_pcap(merged_path)
+
+                    # merge the "dos packets" pcaps from targets into merged.pcap, DON'T dedupe this time
+                    self.print("Special processing: final merge of fragmented attack packets into merged.pcap")
+                    merged_path = self._merge_pcaps([merged_path, *fragmented])
+
+                    # delete the fragmented PCAPs (those with DOS packets)
+                    self.print("Special processing: deleting fragmented PCAPs (those with DOS packets)")
+                    for wd_path in fragmented:
+                        wd_path.unlink()
+                    self.print("Finished special processing for TCP packet flood")
+                else:
+                    self._dedupe_pcap(merged_path)
             else:
                 self.print(f"NOT removing duplicates from '{merged_path.name}' (dedupe=false)")
 
@@ -168,6 +219,39 @@ class PCAP(ComponentBase):
             self.print("PCAP --> JSON conversion disabled")
 
         logger.log("INFO", f"Stopped user component: {self.name}")
+
+    def _merge_pcaps(self, pcap_paths: list[Path], merged_name: str = "merged.pcap") -> Path:
+        merged_path = Path(self.base_dir, merged_name)
+
+        overwriting = bool(merged_path in pcap_paths)
+        if overwriting:
+            merged_path = merged_path.with_stem("temp_merged")
+
+        mergecap_cmd = f"mergecap -w {merged_path}"
+        for pcap_path in pcap_paths:
+            mergecap_cmd += f" {pcap_path}"
+
+        utils.run_command(mergecap_cmd, timeout=60.0)  # this shouldn't take long
+
+        if not merged_path.is_file():
+            self.eprint(f"PCAP merge failed, output file '{merged_path}' doesn't exist")
+            sys.exit(1)
+
+        # rename "temp_merged.pcap" to "merged.pcap"
+        if overwriting:
+            merged_path = merged_path.replace(merged_path.with_name(merged_name))
+
+        return merged_path
+
+    def _dedupe_pcap(self, pcap_path: Path) -> None:
+        dd_path = Path(self.base_dir, "deduped.pcap")
+        utils.run_command(f"editcap -d {pcap_path} {dd_path}", timeout=60.0)
+
+        if not dd_path.is_file():
+            self.eprint(f"PCAP dedupe failed, output file '{dd_path}' doesn't exist")
+            sys.exit(1)
+
+        dd_path.replace(pcap_path)  # overwrite merged.pcap with deduped.pcap
 
 
 def main():
