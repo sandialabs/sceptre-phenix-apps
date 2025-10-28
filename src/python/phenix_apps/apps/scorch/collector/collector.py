@@ -10,10 +10,6 @@ from phenix_apps.apps.scorch import ComponentBase
 from phenix_apps.common import logger, utils
 from .csv_gen import gen_csv
 
-# TODO: "self.name" is the name of the stage I think, not the component
-#   Need a way to handle stages that don't match the names of their components
-# TODO: only collect data for components that are enabled for the run
-#   can iterate over the scorch app data from the Scenario config
 # TODO: make what's saved configurable (like the experiment)
 # TODO: migrate CSV generation functionality to harmonize (csv_gen.py)
 # TODO: configuration option to specify what components to collect from explicitly
@@ -26,8 +22,27 @@ class Collector(ComponentBase):
 
         # results_dir: top-level directory in the final collection of files
         self.results_dir = Path(self.base_dir, "experiment_results")
+
         # meta_dir: "metadata" sub-directory in results directory
         self.meta_dir = Path(self.results_dir, "metadata")
+
+        # Determine what scorch components are enabled, and enable lookups
+        # by component type (for cases when name and type differ).
+        self.all_components = {
+            c.type: c
+            for c in self.extract_app("scorch").metadata.components
+        }
+        self.run_config = self.extract_app("scorch").metadata.runs[self.run]
+        self.enabled_components = {}
+
+        # TODO: this doesn't handle multiple instances of same component with different name
+        # However, for the components being collected, there should only be one instance usually.
+        for comp in self.all_components.values():
+            if (
+                any(comp.name in run_stage for run_stage in self.run_config.values() if isinstance(run_stage, list)) or
+                any(comp.name in loop_stage for loop_stage in self.run_config.get("loop", {}).values() if isinstance(loop_stage, list))
+            ):
+                self.enabled_components[comp.type] = comp
 
         self.execute_stage()
 
@@ -71,11 +86,18 @@ class Collector(ComponentBase):
         # iperf: client, server, histograms
         iperf_dest = None
         if self.metadata.get("collect_iperf", False):
-            iperf_src = self._comp_dir("iperf")
-            iperf_dest = Path(self.results_dir, "iperf")
-            self.print("copying iperf data")
-            shutil.copytree(iperf_src, iperf_dest)
-            # TODO: remove *.log files if they're empty (no output)?
+            if self._check_component("iperf"):
+                iperf_src = self._comp_dir("iperf")
+                iperf_dest = Path(self.results_dir, "iperf")
+                self.print("copying iperf data")
+                shutil.copytree(iperf_src, iperf_dest)
+                # TODO: remove *.log files if they're empty (no output)?
+            else:
+                self.eprint(f"WARNING: 'collect_iperf' is set but 'iperf' component isn't enabled in run/loop stages for run {self.run}")
+
+        if not self.enabled_components.get("disruption"):
+            self.eprint("'disruption' component isn't enabled but is required for collector!")
+            sys.exit(1)
 
         # disruption: attack_results, scenario_results, scenario_*
         s_src = self._comp_dir("disruption")
@@ -84,7 +106,7 @@ class Collector(ComponentBase):
         shutil.copytree(s_src, s_dest)
 
         # Use duration for the configured disruption
-        disruption_metadata = self._get_component("disruption").metadata
+        disruption_metadata = self.enabled_components["disruption"].metadata
         configured_duration = float(disruption_metadata.run_duration)
 
         # disruption start time
@@ -212,8 +234,12 @@ class Collector(ComponentBase):
         # Uses Elasticsearch configuration from the 'rtds' component metadata
         # TODO: move to harmonize, just do basic validation of data here
         # TODO: run count query to verify number of expected docs
-        if self.metadata.get("generate_csv", True):
-            rtds_metadata = self._get_component("rtds").metadata
+        if self.metadata.get("generate_csv", False):
+            if not self._check_component("rtds"):
+                self.eprint("'generate_csv' is true but 'rtds' component not enabled (CSV generation only works for RTDS)")
+                sys.exit(1)
+
+            rtds_metadata = self.enabled_components["rtds"].metadata
             gen_csv(
                 record=record,
                 csv_path=self.results_dir / "experiment_results.csv",
@@ -237,9 +263,9 @@ class Collector(ComponentBase):
         }
 
         # provider: YAML config, log files, CSV files, tags, PMU metadata
-        if self._get_component("providerdata"):
+        if self._check_component("providerdata"):
             prov_src = self._comp_dir("providerdata")
-        elif self._get_component("rtds"):
+        elif self._check_component("rtds"):
             prov_src = self._comp_dir("rtds")
         else:
             self.eprint(
@@ -292,7 +318,7 @@ class Collector(ComponentBase):
                 data["pmus"][p["name"]] = p["label"]
             self.print(f"{len({data['pmus']})} PMUs")
         else:
-            self.print(f"WARNING: No PMUs defined for {data['simulator']} Provider, skipping...")
+            self.print(f"WARNING: No PMUs defined for {data['simulator']} Provider, skipping adding PMU names to record...")
 
         if yaml_conf.get("gtnet_skt", {}).get("tags"):
             # [G1CB1, G2CB2, ...]
@@ -300,14 +326,14 @@ class Collector(ComponentBase):
                 data["gtnet_skt_tags"].append(gt["name"].split(".")[0])
             self.print(f"{len(data['gtnet_skt_tags'])} GTNET-SKT tags")
         elif data["simulator"].upper().strip() == "RTDS":
-            self.print("WARNING: No GTNET-SKT tags defined for RTDS Provider, skipping...")
+            self.print("WARNING: No GTNET-SKT tags defined for RTDS Provider, skipping adding those tags to record...")
 
         if yaml_conf.get("modbus", {}).get("registers"):
             for mb in yaml_conf["modbus"]["registers"]:
                 data["modbus_registers"].append(mb["name"])
             self.print(f"{len(data['modbus_registers'])} Modbus registers")
         else:
-            self.print(f"WARNING: No Modbus registers defined for {data['simulator']} Provider, skipping...")
+            self.print(f"WARNING: No Modbus registers defined for {data['simulator']} Provider, skipping adding register names to record...")
 
         return data
 
@@ -315,11 +341,7 @@ class Collector(ComponentBase):
         """
         'qos' scorch component. Collect what QoS values were applied.
         """
-        if not self._get_component("qos"):
-            self.print(
-                "NOTE: skipping 'qos' collection as its not "
-                "defined in the scorch metadata"
-            )
+        if not self._check_component("qos"):
             return {}
 
         qos_file = self._comp_dir("qos") / "qos_values_applied.json"
@@ -332,11 +354,7 @@ class Collector(ComponentBase):
         """
         'vmstats' scorch component.
         """
-        if not self._get_component("vmstats"):
-            self.print(
-                "NOTE: skipping 'vmstats' collection as its not "
-                "defined in the scorch metadata"
-            )
+        if not self._check_component("vmstats"):
             return
 
         vms_src = self._comp_dir("vmstats") / "vm_stats.jsonl"
@@ -347,11 +365,7 @@ class Collector(ComponentBase):
         """
         'hoststats' scorch component.
         """
-        if not self._get_component("hoststats"):
-            self.print(
-                "NOTE: skipping 'hoststats' collection as its not "
-                "defined in the scorch metadata"
-            )
+        if not self._check_component("hoststats"):
             return
 
         hs_src = self._comp_dir("hoststats") / "host_stats.jsonl"
@@ -363,11 +377,9 @@ class Collector(ComponentBase):
         'pcap' scorch component. Collects PCAP files and extracts their metadata
         to store in the experiment record
         """
-        if not self._get_component("pcap"):
-            self.print(
-                "NOTE: skipping 'pcap' collection as its not "
-                "defined in the scorch metadata"
-            )
+        if not self._check_component("pcap"):
+            return
+
         pcap_src = self._comp_dir("pcap")
         pcap_dest = Path(self.results_dir, "pcaps")
         self.print("copying pcap data")
@@ -379,9 +391,9 @@ class Collector(ComponentBase):
         pcap_meta_file = pcap_dest / "pcap_metadata.json"
         pcap_metadata = utils.read_json(pcap_meta_file)
 
-        if self._get_component("disruption"):
+        if self._check_component("disruption"):
             dis_configured_duration = float(
-                self._get_component("disruption").metadata.run_duration
+                self.enabled_components["disruption"].metadata.run_duration
             )
             expected_cap_duration = float(
                 pcap_metadata["merged.pcap"]["Capture duration (seconds)"]
@@ -397,18 +409,28 @@ class Collector(ComponentBase):
 
         return pcap_metadata
 
-    def _comp_dir(self, component_name: str) -> Path:
+    def _comp_dir(self, component_type: str) -> Path:
+        """
+        NOTE: the output dir is the components *name*, not the *type*.
+        Have to lookup name from the type.
+        """
+        component_name = self.all_components[component_type].name
+
         # TODO: this won't work for things run in configure stage before loops start
+        #   workaround this by determining where each component is configured.
         pth = Path(self.files_dir, f"scorch/run-{self.run}/{component_name}/loop-{self.loop}-count-{self.count}")
         if not pth.is_dir():
-            self.eprint(f"Output directory for component '{component_name}' doesn't exist: {pth}")
+            self.eprint(f"Output directory doesn't exist for scorch component '{component_type}' (name={component_name}): {pth}")
             sys.exit(1)
+
         return pth
 
-    def _get_component(self, name: str):
-        for component in self.extract_app("scorch").metadata.components:
-            if component.type == name:
-                return component
+    def _check_component(self, component_type: str) -> bool:
+        """Check if component is enabled for this run, and if not, log the fact."""
+        if not self.enabled_components.get(component_type):
+            self.print(f"NOTE: skipping '{component_type}' collection as its not defined in scorch metadata or set in any run/loop stage for run {self.run}")
+            return False
+        return True
 
 
 def main():
