@@ -240,7 +240,7 @@ class Iperf(ComponentBase):
                     self.print(f"starting iperf server process for client '{client.hostname}' on server '{server.hostname}'")
 
                     idle_timeout = float(self.metadata.run_duration) + 5.0
-                    server_cmd = f"{server.exe_path} --server --one-off --bind {server.ip} --json --port {client.port} --logfile {client.server_log_path} --idle-timeout {idle_timeout}"
+                    server_cmd = f"{server.exe_path} --server --one-off --bind {server.ip} --json --port {client.port} --idle-timeout {idle_timeout}"
 
                     # Add user-configured arguments to the iperf server process for this client
                     add_server_args = self._get_setting("add_server_args", client)
