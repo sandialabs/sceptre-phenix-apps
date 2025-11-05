@@ -1,1 +1,1 @@
-Start-Job -ScriptBlock { C:\minimega\protonuke.exe ${protonuke_args} }
+Start-Process -WindowStyle Hidden -FilePath "C:\minimega\protonuke.exe" -ArgumentList "${protonuke_args}"
