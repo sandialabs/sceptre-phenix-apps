@@ -47,8 +47,12 @@ class AppBase(object):
         # Keep this around just in case apps want direct access to it.
         self.raw_input = sys.stdin.read()
 
-        # TODO: catch exceptions parsing JSON
-        self.experiment = Box.from_json(self.raw_input)
+        try:
+            self.experiment = Box.from_json(self.raw_input)
+        except Exception as ex:
+            self.eprint(f"Failed to parse experiment JSON for app '{self.name}': {ex}")
+            sys.exit(1)
+
         self.exp_name   = self.extract_experiment_name()
         self.exp_dir    = self.extract_experiment_dir()
         self.asset_dir  = self.extract_asset_dir()
@@ -201,6 +205,7 @@ class AppBase(object):
 
         return hosts
 
+    # TODO: this only extracts nodes from "hosts" attribute on scenario metadata for app
     def extract_nodes_label(self, labels, include_missing = True):
         app   = self.extract_app()
         hosts = []
@@ -246,6 +251,7 @@ class AppBase(object):
 
         return hosts
 
+    # TODO: duplicate method
     def extract_labeled_nodes(self, labels):
         return self.extract_nodes_label(labels)
 
