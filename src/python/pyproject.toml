@@ -8,7 +8,7 @@ name = "phenix-apps"
 dynamic = ["version"]  # see section below, [tool.setuptools.dynamic]
 description = "phenix user apps, schedulers, and Scorch components"
 readme = "README.md"
-requires-python = ">=3.8,<4.0"
+requires-python = ">=3.10,<4"
 license = {file = "LICENSE"}
 authors = [
     {name = "Sandia National Laboratories", email = "emulytics@sandia.gov"},
@@ -19,8 +19,6 @@ classifiers = [
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Natural Language :: English",
     "Operating System :: POSIX :: Linux",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
