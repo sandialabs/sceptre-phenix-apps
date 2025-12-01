@@ -39,6 +39,7 @@ dependencies = [
 
 [project.scripts]
 phenix-app-caldera = "phenix_apps.apps.caldera.__main__:main"
+phenix-app-dns = "phenix_apps.apps.dns.__main__:main"
 phenix-app-helics = "phenix_apps.apps.helics.__main__:main"
 phenix-app-ot-sim = "phenix_apps.apps.otsim.__main__:main"
 phenix-app-protonuke = "phenix_apps.apps.protonuke.__main__:main"
