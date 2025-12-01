@@ -8,7 +8,7 @@ name = "phenix-apps"
 dynamic = ["version"]  # see section below, [tool.setuptools.dynamic]
 description = "phenix user apps, schedulers, and Scorch components"
 readme = "README.md"
-requires-python = ">=3.8,<4.0"
+requires-python = ">=3.10,<4"
 license = {file = "LICENSE"}
 authors = [
     {name = "Sandia National Laboratories", email = "emulytics@sandia.gov"},
@@ -19,8 +19,6 @@ classifiers = [
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Natural Language :: English",
     "Operating System :: POSIX :: Linux",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -31,14 +29,15 @@ dependencies = [
     "Mako~=1.1.3",
     "minimega",
     "python-box~=7.2.0",
-    "elasticsearch~=8.12.0",
+    "elasticsearch<9",
     "requests==2.31.0",
-    "python-dateutil==2.8.2",
+    "python-dateutil~=2.8.2",
     "pyyaml~=6.0.2",
 ]
 
 [project.scripts]
 phenix-app-caldera = "phenix_apps.apps.caldera.caldera:main"
+phenix-app-dns = "phenix_apps.apps.dns.dns:main"
 phenix-app-helics = "phenix_apps.apps.helics.helics:main"
 phenix-app-ot-sim = "phenix_apps.apps.otsim.otsim:main"
 phenix-app-protonuke = "phenix_apps.apps.protonuke.protonuke:main"

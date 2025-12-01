@@ -84,7 +84,7 @@ class ComponentBase(object):
         try:
             self.experiment = Box.from_json(self.raw_input)
         except Exception as ex:
-            self.eprint(f"Failed to parse experiment JSON: {ex}")
+            self.eprint(f"Failed to parse experiment JSON for scorch component '{self.name}': {ex}")
             sys.exit(1)
 
         self.exp_name   = self.experiment.spec.experimentName

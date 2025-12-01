@@ -1,6 +1,12 @@
-import copy, os, re, sys
+import copy
+import os
+import re
+import sys
+from typing import Optional
 
 from box import Box
+
+from phenix_apps.common import utils, logger
 
 
 class AppBase(object):
@@ -34,7 +40,7 @@ class AppBase(object):
         Prints errors to STDERR
         """
 
-        print(*args, file=sys.stderr)
+        print(*args, file=sys.stderr, flush=True)
 
     def __init__(self, name):
         self.name = name
@@ -47,15 +53,29 @@ class AppBase(object):
         # Keep this around just in case apps want direct access to it.
         self.raw_input = sys.stdin.read()
 
-        # TODO: catch exceptions parsing JSON
-        self.experiment = Box.from_json(self.raw_input)
-        self.exp_name   = self.extract_experiment_name()
-        self.exp_dir    = self.extract_experiment_dir()
-        self.asset_dir  = self.extract_asset_dir()
-        self.metadata   = self.extract_metadata()
+        try:
+            self.experiment = Box.from_json(self.raw_input)
+        except Exception as ex:
+            logger.log("ERROR", f"Failed to parse experiment JSON for app '{self.name}': {ex}")
+            sys.exit(1)
+
+        self.app: Box = self.extract_app()
+        if not self.app:
+            logger.log("ERROR", f"Failed to find app '{self.name}' in scenario metadata!")
+            sys.exit(1)
+
+        self.exp_name   = self.experiment.spec.experimentName
+        self.exp_dir    = self.experiment.spec.baseDir
+        self.asset_dir  = self.app.get('assetDir', None)
+        self.metadata   = self.app.get('metadata', {})
         self.topo       = self.get_annotation('topology')
 
+        # Create the experiment directory if it doesn't exist
         os.makedirs(self.exp_dir, exist_ok=True)
+
+        # Mako templates directory inside the app's code folder
+        py_path = sys.modules[self.__class__.__module__].__file__
+        self.templates_dir = utils.abs_path(py_path, "templates")
 
     def execute_stage(self):
         """
@@ -77,13 +97,18 @@ class AppBase(object):
         sys.stdout.close()
         sys.stdout = sys.__stdout__
 
-    def get_annotation(self, key):
+    def get_annotation(self, key: str) -> str | None:
         if 'annotations' in self.experiment.metadata:
             return self.experiment.metadata.annotations[key]
 
         return None
 
-    def extract_app(self, name = None):
+    def extract_app(self, name: Optional[str] = None) -> Box | None:
+        """
+        Return the app definition from the Scenario matching "name",
+        otherwise this app's definition if "name" is None.
+        """
+
         name = self.name if not name else name
         apps = self.experiment.spec.scenario.apps
 
@@ -91,12 +116,11 @@ class AppBase(object):
             if app.name == name:
                 return app
 
-    def extract_node(self, hostname, wildcard = False):
-        nodes = self.experiment.spec.topology.nodes
+    def extract_node(self, hostname: str, wildcard: bool = False) -> Box | list[Box] | None:
         regex = re.compile(hostname)
         extracted = []
 
-        for node in nodes:
+        for node in self.experiment.spec.topology.nodes:
             if wildcard:
                 if regex.match(node.general.hostname):
                     extracted.append(node)
@@ -109,31 +133,44 @@ class AppBase(object):
         else:
             return None
 
-    def extract_annotated_topology_nodes(self, annotations):
-        nodes = self.experiment.spec.topology.nodes
+    def extract_topology_nodes_by_attribute(self, attribute: str, vals: str | list[str]) -> list[Box]:
         hosts = []
 
-        if isinstance(annotations, str):
-            annotations = [annotations]
+        if isinstance(vals, str):
+            vals = [vals]
 
-        for node in nodes:
-            node_annotations = node.get('annotations', {})
+        for node in self.experiment.spec.topology.nodes:
+            node_attribute = node.get(attribute, {})
 
             # Could be a null entry in the JSON schema.
-            if not node_annotations:
+            if not node_attribute:
                 continue
 
-            for annotation in node_annotations.keys():
-                if annotation in annotations:
+            for val in node_attribute.keys():
+                if val in vals:
                     hosts.append(node)
                     break
 
         return hosts
 
-    def extract_app_node(self, hostname, include_missing = True):
-        app = self.extract_app()
+    def extract_annotated_topology_nodes(self, annotations: str | list[str]) -> list[Box]:
+        """
+        Return list of Topology nodes with any annotation attributes with keys
+        that match "annotations" or are in the list "annotations".
+        """
 
-        for host in app.get("hosts", []):
+        return self.extract_topology_nodes_by_attribute('annotations', annotations)
+
+    def extract_labelled_topology_nodes(self, labels: str | list[str]) -> list[Box]:
+        """
+        Return list of Topology nodes with any label attributes with keys
+        that match "labels" or are in the list "labels".
+        """
+
+        return self.extract_topology_nodes_by_attribute('labels', labels)
+
+    def extract_app_node(self, hostname: str, include_missing: bool = True) -> Box | None:
+        for host in self.app.get("hosts", []):
             if host.hostname == hostname:
                 topo_node = self.extract_node(hostname)
 
@@ -147,25 +184,16 @@ class AppBase(object):
 
         return None
 
-    def extract_nodes_topology_type(self, types):
+    def extract_all_nodes(self, include_missing: bool = True) -> list[Box]:
+        """
+        Extract Topology nodes with hostnames that match the hostname
+        defined in the "hosts" attribute in the Scenario metadata
+        for this app.
+        """
+
         hosts = []
 
-        if isinstance(types, str):
-            types = [types]
-
-        for host in self.experiment.spec.topology.nodes:
-            node_type = host.type
-
-            if node_type in types:
-                hosts.append(host)
-
-        return hosts
-
-    def extract_all_nodes(self, include_missing = True):
-        app   = self.extract_app()
-        hosts = []
-
-        for host in app.get("hosts", []):
+        for host in self.app.get("hosts", []):
             topo_node = self.extract_node(host.hostname)
 
             if not topo_node and not include_missing:
@@ -178,14 +206,20 @@ class AppBase(object):
 
         return hosts
 
-    def extract_nodes_type(self, types, include_missing = True):
-        app   = self.extract_app()
+    def extract_nodes_type(self, types: str | list[str], include_missing: bool = True) -> list[Box]:
+        """
+        Extract Topology nodes with hostnames that match the hostname
+        defined in the "hosts" attribute in the Scenario metadata
+        for this app and have the type/types matching the "type"
+        field in the Scenario metadata.
+        """
+
         hosts = []
 
         if isinstance(types, str):
             types = [types]
 
-        for host in app.get("hosts", []):
+        for host in self.app.get("hosts", []):
             node_type = host.metadata.get("type", None)
 
             if node_type in types:
@@ -201,14 +235,21 @@ class AppBase(object):
 
         return hosts
 
-    def extract_nodes_label(self, labels, include_missing = True):
-        app   = self.extract_app()
+    def extract_nodes_label(self, labels: str | list[str], include_missing: bool = True) -> list[Box]:
+        """
+        Extract Topology nodes that match values in the "labels" attribute for each
+        host in an app's "host" field in Scenario metadata.
+
+        Note that this is *different* from "labels" in the Topology metadata,
+        use "extract_labelled_topology_nodes" for those.
+        """
+
         hosts = []
 
         if isinstance(labels, str):
             labels = [labels]
 
-        for host in app.get("hosts", []):
+        for host in self.app.get("hosts", []):
             node_labels = host.metadata.get("labels", [])
 
             if isinstance(node_labels, str):
@@ -246,35 +287,13 @@ class AppBase(object):
 
         return hosts
 
-    def extract_labeled_nodes(self, labels):
-        return self.extract_nodes_label(labels)
+    def extract_node_interface_ip(self, hostname: str, iface: str, include_mask: bool = False) -> str | tuple[str, int] | None:
+        """
+        Returns str with IP address of the interface name for the matching host.
+        If include_mask is True, then a tuple is returned with the IP and
+        subnet mask integer.
+        """
 
-    def extract_experiment_name(self):
-        return self.experiment.spec.experimentName
-
-    def extract_experiment_dir(self):
-        return self.experiment.spec.baseDir
-
-    def extract_asset_dir(self):
-        app = self.extract_app()
-
-        return app.get('assetDir', None)
-
-    def extract_metadata(self):
-        app = self.extract_app()
-
-        return app.get('metadata', {})
-
-    def extract_node_metadata(self, hostname):
-        app = self.extract_app()
-
-        for host in app.get("hosts", []):
-            if host.hostname == hostname:
-                return host.metadata
-
-        return {}
-
-    def extract_node_interface_ip(self, hostname, iface, include_mask = False):
         node = self.extract_node(hostname)
 
         if iface:
@@ -295,7 +314,7 @@ class AppBase(object):
 
         return None
 
-    def extract_node_hostname_for_ip(self, address):
+    def extract_node_hostname_for_ip(self, address: str) -> str | None:
         if ':' in address:
             address, _ = address.split(':', 1)
 
@@ -308,7 +327,7 @@ class AppBase(object):
 
         return None
 
-    def add_node(self, new_node, overwrite = False):
+    def add_node(self, new_node: Box, overwrite: bool = False):
         found = None
 
         for idx, node in enumerate(self.experiment.spec.topology.nodes):
@@ -325,7 +344,7 @@ class AppBase(object):
         elif overwrite:
             self.experiment.spec.topology.nodes[found] = Box(new_node)
 
-    def add_annotation(self, hostname, key, value):
+    def add_annotation(self, hostname: str, key: str, value):
         node = self.extract_node(hostname)
 
         annotations = node.get('annotations', {})
@@ -338,7 +357,7 @@ class AppBase(object):
         annotations[key] = value
         node['annotations'] = annotations
 
-    def add_label(self, hostname, key, value):
+    def add_label(self, hostname: str, key: str, value):
         node = self.extract_node(hostname)
 
         labels = node.get('labels', {})
@@ -351,7 +370,7 @@ class AppBase(object):
         labels[key] = value
         node['labels'] = labels
 
-    def add_inject(self, hostname, inject):
+    def add_inject(self, hostname: str, inject: Box | dict):
         node = self.extract_node(hostname)
 
         if node.get('injections', None):
@@ -369,13 +388,13 @@ class AppBase(object):
             # injection dictionary in a list.
             node['injections'] = [inject]
 
-    def is_booting(self, hostname):
+    def is_booting(self, hostname: str) -> bool:
         node = self.extract_node(hostname)
         dnb  = node.general.get('do_not_boot', False)
 
         return not dnb
 
-    def is_fully_scheduled(self):
+    def is_fully_scheduled(self) -> bool:
         schedules = self.experiment.spec.schedules
 
         for node in self.experiment.spec.topology.nodes:
@@ -385,6 +404,27 @@ class AppBase(object):
                 return False
 
         return True
+
+    def render(self, template_name: str, file_path: str, **kwargs) -> str:
+        """
+        Render a Mako template from the app's "templates" directory
+        and write it to the specified file path.
+        The target file path should be absolute.
+        The template_name must be the full name of the mako template,
+        including the ".mako" extension
+
+        Returns the file path written to.
+        """
+
+        with open(file_path, "w") as fp:
+            utils.mako_serve_template(
+                template_name=template_name,
+                templates_dir=self.templates_dir,
+                filename=fp,
+                **kwargs
+            )
+
+        return file_path
 
     def configure(self):
         pass
