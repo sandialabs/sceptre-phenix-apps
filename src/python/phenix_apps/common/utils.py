@@ -40,7 +40,7 @@ def kibana_format_time(ts: datetime.datetime) -> str:
     return ts.strftime("%b %d, %Y @ %H:%M:%S.%f").replace(".000000", ".000")
 
 
-def mako_render(script_path: str, **kwargs):
+def mako_render(script_path: str, **kwargs) -> str:
     """Generate a mako template from a file and render it using provided args.
 
     Args:
@@ -57,7 +57,7 @@ def mako_render(script_path: str, **kwargs):
 
 
 def mako_serve_template(
-    template_name: str, templates_dir: str, filename: IO, **kwargs
+    template_name: str, templates_dir: str | Path, filename: IO, **kwargs
 ) -> None:
     """Serve Mako template.
 
@@ -77,7 +77,7 @@ def mako_serve_template(
     print(mytemplate.render(**kwargs), file=filename)
 
 
-def mark_executable(file_path: str):
+def mark_executable(file_path: str) -> None:
     """
     Add executable by owner bit to file mode.
     """
