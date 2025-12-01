@@ -23,8 +23,6 @@ class Sceptre(AppBase):
         os.makedirs(self.sceptre_dir, exist_ok=True)
         os.makedirs(self.elk_dir, exist_ok=True)
 
-        self.mako_path = utils.abs_path(__file__, "templates")  # type: str
-
         self.execute_stage()
 
         # We don't (currently) let the parent AppBase class handle this step
@@ -39,23 +37,6 @@ class Sceptre(AppBase):
             logger.log("INFO", f"Overriding '{filename}' with '{overrideFile}'")
             return {"src": overrideFile}
         return None
-
-    def render(self, template_name: str, file_path: str, **kwargs) -> str:
-        """
-        Render a Mako template from the templates dir
-        and write it to the specified file path.
-
-        If executable is true, change file mode to be executable.
-        """
-        with open(file_path, "w") as fp:
-            utils.mako_serve_template(
-                template_name=template_name,
-                templates_dir=self.mako_path,
-                filename=fp,
-                **kwargs
-            )
-
-        return file_path
 
     def render_sceptre_start(self, device, kwargs: dict):
         if not kwargs.get("name"):
@@ -78,18 +59,30 @@ class Sceptre(AppBase):
         self.render("sceptre_start.mako", startup_file, **kwargs)
         utils.mark_executable(startup_file)
 
+    def add_sceptre_startup_injects_windows(self, hostname: str) -> None:
+        """
+        Create sceptre startup scheduler injections for Windows hosts.
+        Mirrors the phenix startup scheduler but is needed in order to
+        run things as local user for UI automation.
+        """
+
+        # sceptre-startup_scheduler.cmd
+        kwargs = {
+            "src": f"{self.startup_dir}/sceptre-startup-scheduler.cmd",
+            "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
+            "description": "sceptre startup scheduler",
+        }
+        self.add_inject(hostname=hostname, inject=kwargs)
+
+        # sceptre-startup.ps1
+        kwargs = {
+            "src": f"{self.startup_dir}/sceptre-startup.ps1",
+            "dst": "sceptre/sceptre-startup.ps1",
+            "description": "sceptre startup script",
+        }
+        self.add_inject(hostname=hostname, inject=kwargs)
+
     def configure(self):
-        """
-        Recieves: json blob like
-
-        Modifiable:
-            `ExperimentSpec` (anything in this)
-        Returned:
-            `Experiment` (what's passed in, then modified)
-        """
-
-        logger.log("INFO", f"Configuring user application: {self.name}...")
-
         ######################## OPC configure ###################################
         opcs = self.extract_nodes_type("opc")
 
@@ -106,7 +99,7 @@ class Sceptre(AppBase):
                 kwargs = {"src": f"{opc_directory}/opc.xml"}
             kwargs.update({
                 "dst": "Users/wwuser/Documents/Configs/Inject/opc.xml",
-                "description": "opc_hardware_file",
+                "description": "OPC configuration for TopServer",
             })
             self.add_inject(hostname=opc.hostname, inject=kwargs)
 
@@ -116,25 +109,12 @@ class Sceptre(AppBase):
                 kwargs = {"src": f"{opc_directory}/topserver.ps1"}
             kwargs.update({
                 "dst": "/sceptre/startup/30-topserver.ps1",
-                "description": "topserver_file",
+                "description": "OPC TopServer startup script",
             })
             self.add_inject(hostname=opc.hostname, inject=kwargs)
 
-            # Create sceptre startup scheduler injections
-            # Mirrors the phenix startup scheduler but is needed in order to run things as local user for UI automation
-            kwargs = {
-                "src": f"{self.startup_dir}/sceptre-startup-scheduler.cmd",
-                "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
-                "description": "sceptre startup scheduler",
-            }
-            self.add_inject(hostname=opc.hostname, inject=kwargs)
-
-            kwargs = {
-                "src": f"{self.startup_dir}/sceptre-startup.ps1",
-                "dst": "sceptre/sceptre-startup.ps1",
-                "description": "sceptre startup script",
-            }
-            self.add_inject(hostname=opc.hostname, inject=kwargs)
+            # sceptre startup scheduler injections
+            self.add_sceptre_startup_injects_windows(opc.hostname)
 
 
         ######################## Field device configure ###################################
@@ -172,31 +152,18 @@ class Sceptre(AppBase):
         for hmi in hmis:
             hmi_directory = f"{self.sceptre_dir}/{hmi.hostname}"
 
-            # Create startup script injection
+            # Create HMI startup script injection
             kwargs = self.find_override(f"{hmi.hostname}_hmi.ps1")
             if kwargs is None:
                 kwargs = {"src": f"{hmi_directory}/hmi.ps1"}
             kwargs.update({
                 "dst": "/sceptre/startup/30-hmi.ps1",
-                "description": "hmi",
+                "description": "HMI startup script",
             })
             self.add_inject(hostname=hmi.hostname, inject=kwargs)
 
-            # Create sceptre startup scheduler injections
-            # Mirrors the phenix startup scheduler but is needed in order to run things as local user for UI automation
-            kwargs = {
-                "src": f"{self.startup_dir}/sceptre-startup-scheduler.cmd",
-                "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
-                "description": "sceptre startup scheduler",
-            }
-            self.add_inject(hostname=hmi.hostname, inject=kwargs)
-
-            kwargs = {
-                "src": f"{self.startup_dir}/sceptre-startup.ps1",
-                "dst": "sceptre/sceptre-startup.ps1",
-                "description": "sceptre startup script",
-            }
-            self.add_inject(hostname=hmi.hostname, inject=kwargs)
+            # sceptre startup scheduler injections
+            self.add_sceptre_startup_injects_windows(hmi.hostname)
 
         ######################## SCADA server configure ###################################
         scada_servers = self.extract_nodes_type("scada-server")
@@ -204,14 +171,14 @@ class Sceptre(AppBase):
             scada_directory = f"{self.sceptre_dir}/{scada_server.hostname}"
             if "metadata" not in scada_server:
                 msg = f"No metadata for {scada_server.hostname}"
-                logger.log("WARN", msg)
+                logger.log("WARNING", msg)
                 continue
 
             # Create SCADA project file injection
             kwargs = {
                 "src": f"{scada_server.metadata.project}",
                 "dst": "Users/wwuser/Documents/Configs/Inject/myscada.mep",
-                "description": "SCADA project file",
+                "description": "mySCADA project file",
             }
             self.add_inject(hostname=scada_server.hostname, inject=kwargs)
 
@@ -219,7 +186,7 @@ class Sceptre(AppBase):
             kwargs = {
                 "src": f"{scada_server.metadata.automation}",
                 "dst": "myscada.exe",
-                "description": "Windows automation binary",
+                "description": "mySCADA Windows automation binary",
             }
             self.add_inject(hostname=scada_server.hostname, inject=kwargs)
 
@@ -229,25 +196,12 @@ class Sceptre(AppBase):
                 kwargs = {"src": f"{scada_directory}/scada.ps1"}
             kwargs.update({
                 "dst": "/sceptre/startup/30-scada.ps1",
-                "description": "scada",
+                "description": "SCADA startup script",
             })
             self.add_inject(hostname=scada_server.hostname, inject=kwargs)
 
-            # Create sceptre startup scheduler injections
-            # Mirrors the phenix startup scheduler but is needed in order to run things as local user for UI automation
-            kwargs = {
-                "src": f"{self.startup_dir}/sceptre-startup-scheduler.cmd",
-                "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
-                "description": "sceptre startup scheduler",
-            }
-            self.add_inject(hostname=scada_server.hostname, inject=kwargs)
-
-            kwargs = {
-                "src": f"{self.startup_dir}/sceptre-startup.ps1",
-                "dst": "sceptre/sceptre-startup.ps1",
-                "description": "sceptre startup script",
-            }
-            self.add_inject(hostname=scada_server.hostname, inject=kwargs)
+            # sceptre startup scheduler injections
+            self.add_sceptre_startup_injects_windows(scada_server.hostname)
 
         ######################## Engineer workstation configure ###################################
         engineer_workstations = self.extract_nodes_type("engineer-workstation")
@@ -261,7 +215,7 @@ class Sceptre(AppBase):
                 kwargs = {"src": f"{engineer_directory}/putty.ps1"}
             kwargs.update({
                 "dst": "/sceptre/startup/30-putty.ps1",
-                "description": "engineer_workstation",
+                "description": "Engineer workstation PuTTY configurations",
             })
             self.add_inject(hostname=engineer_workstation.hostname, inject=kwargs)
 
@@ -272,25 +226,12 @@ class Sceptre(AppBase):
                     kwargs = {"src": f"{engineer_directory}/auto_winscp.ps1"}
                 kwargs.update({
                     "dst": "/sceptre/startup/40-auto_winscp.ps1",
-                    "description": "engineer_workstation auto putty connections",
+                    "description": "Engineer workstation auto putty connections",
                 })
                 self.add_inject(hostname=engineer_workstation.hostname, inject=kwargs)
 
-            # Create sceptre startup scheduler injections
-            # Mirrors the phenix startup scheduler but is needed in order to run things as local user for UI automation
-            kwargs = {
-                "src": f"{self.startup_dir}/sceptre-startup-scheduler.cmd",
-                "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
-                "description": "sceptre startup scheduler",
-            }
-            self.add_inject(hostname=engineer_workstation.hostname, inject=kwargs)
-
-            kwargs = {
-                "src": f"{self.startup_dir}/sceptre-startup.ps1",
-                "dst": "sceptre/sceptre-startup.ps1",
-                "description": "sceptre startup script",
-            }
-            self.add_inject(hostname=engineer_workstation.hostname, inject=kwargs)
+            # sceptre startup scheduler injections
+            self.add_sceptre_startup_injects_windows(engineer_workstation.hostname)
 
         ######################## Historian configure ###################################
         historians = self.extract_nodes_type("historian")
@@ -304,7 +245,7 @@ class Sceptre(AppBase):
                 kwargs = {"src": f"{historian_directory}/historian_config.txt"}
             kwargs.update({
                 "dst": "Users/wwuser/Documents/Configs/Inject/historian_config.txt",
-                "description": "historian",
+                "description": "Historian configuration",
             })
             self.add_inject(hostname=historian.hostname, inject=kwargs)
 
@@ -314,24 +255,12 @@ class Sceptre(AppBase):
                 kwargs = {"src": f"{historian_directory}/historian.ps1"}
             kwargs.update({
                 "dst": "/sceptre/startup/30-historian.ps1",
-                "description": "historian",
+                "description": "Historian startup script",
             })
             self.add_inject(hostname=historian.hostname, inject=kwargs)
 
-            # Create sceptre startup scheduler injections
-            # Mirrors the phenix startup scheduler but is needed in order to run things as local user for UI automation
-            kwargs = {
-                "src": f"{self.startup_dir}/sceptre-startup-scheduler.cmd",
-                "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
-                "description": "sceptre startup scheduler",
-            }
-            self.add_inject(hostname=historian.hostname, inject=kwargs)
-
-            kwargs ={ "src": f"{self.startup_dir}/sceptre-startup.ps1",
-                "dst": "sceptre/sceptre-startup.ps1",
-                "description": "sceptre startup script",
-            }
-            self.add_inject(hostname=historian.hostname, inject=kwargs)
+            # sceptre startup scheduler injections
+            self.add_sceptre_startup_injects_windows(historian.hostname)
 
         ######################## Provider configure ###################################
         providers = self.extract_nodes_type("provider")
@@ -342,7 +271,7 @@ class Sceptre(AppBase):
 
         for provider in providers:
             if "metadata" not in provider:
-                logger.log("WARN", f"No metadata for provider '{provider.hostname}', skipping...")
+                logger.log("WARNING", f"No metadata for provider '{provider.hostname}', skipping...")
                 continue
 
             vm_directory = f"{self.sceptre_dir}/{provider.hostname}"
@@ -350,7 +279,7 @@ class Sceptre(AppBase):
             # NOTE: names are case-sensitive, used here, in power_daemon.py in bennu, and in Phenix schemas
             simulator = provider.metadata.get("simulator", "")  # type: str
             if not simulator:
-                logger.log("WARN", f"No simulator specified for provider '{provider.hostname}', will fall back to default config")
+                logger.log("WARNING", f"No simulator specified for provider '{provider.hostname}', will fall back to default config")
 
             # Create power world provider injections
             if simulator in ["PowerWorld", "PowerWorldHelics"]:
@@ -616,11 +545,7 @@ class Sceptre(AppBase):
                 })
                 self.add_inject(hostname=elk[0].hostname, inject=kwargs)
 
-        logger.log("INFO", f"Configured user application: {self.name}")
-
     def pre_start(self):
-        logger.log("INFO", f"Running pre_start for user application: {self.name}...")
-
         # Write sceptre startup script injections
         scheduler_file = f"{self.startup_dir}/sceptre-startup-scheduler.cmd"
         self.render("sceptre-startup-scheduler.mako", scheduler_file)
@@ -643,7 +568,7 @@ class Sceptre(AppBase):
 
         for provider in providers:
             if "metadata" not in provider:
-                logger.log("WARN", f"No metadata for provider '{provider.hostname}', skipping...")
+                logger.log("WARNING", f"No metadata for provider '{provider.hostname}', skipping...")
                 continue
 
             provider_map[provider.hostname] = provider
@@ -665,7 +590,7 @@ class Sceptre(AppBase):
 
             simulator = provider.metadata.get("simulator", "")
             if not simulator:
-                logger.log("WARN", f"No simulator specified for provider '{provider.hostname}'")
+                logger.log("WARNING", f"No simulator specified for provider '{provider.hostname}'")
 
             # Create provider config file directory
             provider_directory = f"{self.sceptre_dir}/{provider.hostname}"
@@ -752,7 +677,7 @@ class Sceptre(AppBase):
             fd_counter += 1
 
             if not fd_.metadata:
-                logger.log("WARN", f"No metadata for fd-server '{fd_.hostname}'")
+                logger.log("WARNING", f"No metadata for fd-server '{fd_.hostname}'")
                 continue
 
             # get provider information
@@ -1027,7 +952,7 @@ class Sceptre(AppBase):
 
         for fd_ in fd_clients:
             if not fd_.metadata:
-                logger.log("WARN", f"No metadata for fd-client '{fd_.hostname}', skipping...")
+                logger.log("WARNING", f"No metadata for fd-client '{fd_.hostname}', skipping...")
                 continue
 
             fd_directory = f"{self.sceptre_dir}/{fd_.hostname}"
@@ -1075,7 +1000,7 @@ class Sceptre(AppBase):
 
             if not fd_.metadata:
                 msg = f"No metadata for {fd_.hostname}."
-                logger.log("WARN", msg)
+                logger.log("WARNING", msg)
                 continue
 
             fd_directory = f"{self.sceptre_dir}/{fd_.hostname}"
@@ -1107,7 +1032,6 @@ class Sceptre(AppBase):
             for _, iface in enumerate(fd_.topology.network.interfaces):
                 # the provider publish_endpoint should look like 'udp://*;127.0.0.1:40000',
                 # but the rtu needs to bind specifically to the mgmt interface
-                logger.log('INFO', f'PUB {iface.address}')
                 if iface.vlan and iface.vlan.lower() == "mgmt":
                     pub_endpoint = pub_endpoint.replace("*", iface.address)
                     srv_endpoint = f"tcp://{iface.address}:1330"
@@ -1253,7 +1177,7 @@ class Sceptre(AppBase):
                     "monitor all RTUs"
                 )
 
-                logger.log("WARN", msg)
+                logger.log("WARNING", msg)
 
                 opc_fd_configs = fd_server_configs
             else:
@@ -1270,7 +1194,7 @@ class Sceptre(AppBase):
                         "monitor all field devices"
                     )
 
-                    logger.log("WARN", msg)
+                    logger.log("WARNING", msg)
 
                     opc_fd_configs = fd_server_configs
 
@@ -1499,8 +1423,6 @@ class Sceptre(AppBase):
                 historian_name=historian.hostname.upper(),
             )
 
-        logger.log('INFO', f"Completed pre_start for user application: {self.name}...")
-
 
 class SceptreMetadataParser():
     protocols = ['bacnet', 'dnp3', 'dnp3-serial', 'modbus', 'sunspec', 'iec60870-5-104']
@@ -1521,7 +1443,9 @@ class SceptreMetadataParser():
                             md[i].pop(k, None)
                     self.devices_by_protocol[p] = md
         except Exception as e:
-            raise error.AppError(f"Failed when parsing metadata.\nError: {e}") from None
+            msg = f"Failed when parsing metadata.\nError: {e}"
+            logger.log("ERROR", msg)
+            raise error.AppError(msg) from None
 
     def get_devices_by_protocol(self, protocol):
         if protocol in self.devices_by_protocol.keys():
@@ -1531,13 +1455,15 @@ class SceptreMetadataParser():
 
     @staticmethod
     def get_reg_map_dict(topo_dir, topology):
-        """Load RegMap json into dict.
         """
+        Load RegMap json into dict.
+        """
+
         supported_protocols = ["dnp3", "modbus", "bacnet"]
         register_map = {}
         config_path = topo_dir + topology + ".json"
 
-        logger.log('DEBUG', f"Retriving register mapping from {register_map}")
+        logger.log("DEBUG", f"Retriving register mapping from {register_map}")
 
         with open(config_path) as topo:
             config = json.load(topo)
