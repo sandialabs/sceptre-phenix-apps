@@ -99,6 +99,7 @@ mirror destination.
 ### Additional apps
 
 - [caldera](src/python/phenix_apps/apps/caldera)
+- [dns](src/python/phenix_apps/apps/dns)
 - [helics](src/python/phenix_apps/apps/helics)
 - [sceptre](src/python/phenix_apps/apps/sceptre)
 - [scorch](src/python/phenix_apps/apps/scorch) - This contains Scorch components
