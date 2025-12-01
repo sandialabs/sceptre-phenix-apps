@@ -119,6 +119,8 @@ mirror destination.
 - [mm](src/python/phenix_apps/apps/scorch/mm)
 - [opcexport](src/python/phenix_apps/apps/scorch/opcexport)
 - [pcap](src/python/phenix_apps/apps/scorch/pcap)
+- [pipe](src/python/phenix_apps/apps/scorch/pipe)
+- [providerdata](src/python/phenix_apps/apps/scorch/providerdata)
 - [qos](src/python/phenix_apps/apps/scorch/qos)
 - [rtds](src/python/phenix_apps/apps/scorch/rtds)
 - [snort](src/python/phenix_apps/apps/scorch/snort)
