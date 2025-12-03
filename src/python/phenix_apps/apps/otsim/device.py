@@ -254,9 +254,8 @@ class FieldDeviceClient(Device):
       if 'dnp3' in device.registers:
         client = DNP3()
         client.init_xml_root('client', device.node)
-        if 'scan-rate' in self.configs.keys(): 
-          client.init_master_xml(self.configs['scan-rate'])
-          
+
+        client.init_master_xml(scan_rate = self.configs.get('scan-rate', 5))
         client.registers_to_xml(device.registers['dnp3'])
 
         config.append_to_root(client.root)
