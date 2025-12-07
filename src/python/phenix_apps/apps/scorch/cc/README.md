@@ -14,7 +14,8 @@ metadata:
   # Commands (types) to run for a particular stage (configure, start, stop, cleanup)
   # NOTE: The stage-level types differ from the VM-level types
   configure:
-    - type: reset  # delete all miniccc commands and responses
+    - type: reset # delete all miniccc commands and responses
+    - type: exec # run 'cc exec' with arguments targeting VMs using a cc filter
   start: [] # same array of keys as above
   stop: [] # same array of keys as above
   cleanup: [] # same array of keys as above
@@ -45,6 +46,7 @@ metadata:
   - `recv`: receive a file (VM -> Host)
 - Stage-level command types
   - `reset`: reset miniccc state, by clearing filter and deleting all commands and responses. **WARNING**: THIS WILL INTERFERE WITH OPERATION OF MANY COMPONENTS! Reset should only be used at the start or end of a run or a loop (use with special care in loops!).
+  - `exec`: execute a command (`cc exec`). Currently the only supported arguments for this stage-level command are `once` and `filter_`
 
 ## Notes on the `exec` and `background` Type
 
@@ -92,9 +94,17 @@ components:
     type: cc
     metadata:
       configure:
-        - reset
+        - type: reset
       cleanup:
-        - reset
+        - type: reset
+  - name: stage_exec
+    type: cc
+    metadata:
+      start:
+        - type: exec
+          filter: tag=foo:bar
+          args: service foobar restart
+          once: true
   - name: disable-eth0
     type: cc
     metadata:
