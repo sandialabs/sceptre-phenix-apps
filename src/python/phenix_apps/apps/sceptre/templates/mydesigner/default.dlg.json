@@ -1,0 +1,1 @@
+{"id":1,"name":"default","refreshRead":5000,"refreshLog":5000,"condition":false,"conditionContinuous":false,"samplesBefore":0,"samplesAfter":0,"maxSize":0.0,"autoSize":true,"defaultDatalog":true,"viewAccess":-1,"connection":"script","olderThen":31536000,"scriptDatalog":false,"hideDatalog":false,"enableDataFilter":true,"keys":[],"tags":[]}

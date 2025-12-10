@@ -1,0 +1,51 @@
+/**** Obarveni tabulek - bohuzel se nepovedlo udelat pouze pres barvy ****/
+.slick-row.even {background-color: rgb(220,220,220) !important; }
+.slick-row.odd {background-color: rgb(220,220,220) !important; }
+.slick-cell {border-bottom-color: silver !important;}
+
+/**** Barvy alarmu pro barveni polozek v menu - activni alarmy + nonack alarmy *****/
+.highlitedActive { background-color: #d32020 !important; color: white !important; }
+.highlitedNonAck { background-color: #ef9500 !important; color: white !important; }
+
+/**** Barveni textu pro alarmy v tabulkach - barva textu urcuje typ alarmy ****/
+.almred {color: #f00 !important;}
+.almred2 {color: #8B0000 !important;}
+.almpink {color: #F6358A !important;}
+.almblack {color: #000 !important;}
+.almblue {color: #00f !important;}
+.almgreen {color: #093 !important;}
+.almgray {color: #808080 !important;}
+
+/**** Ostatni barvy *****/
+.textWhite {color: white !important;}
+.textBlack {color: black !important;}
+.textGray1 {color: rgb(145,145,145) !important;}
+.textGray2 {color: rgb(51,51,51) !important;}
+.textGray3 {color: rgb(216,216,216) !important;}
+.textGray4 {color: rgb(85,85,85) !important;}
+.textGray5 {color: rgb(204,204,204) !important;}
+
+.textBlue1 {color: rgb(28,100,140) !important;}
+
+.bgBlue1 {background-color: rgb(40,146,206) !important; }
+.bgBlue2 {background-color: rgb(32,109,169) !important; }
+.bgBlue3 {background-color: rgb(35,​ 119,​ 186) !important; }
+.bgBlue4 {background-color: rgb(66,​ 139,​ 202) !important; }
+.bgBlue5 {background-color: rgb(51,​ 122,​ 183) !important; }
+.bgBlue6 {background-color: rgb(85,​ 144,​ 205) !important; }
+.bgBlue7 {background-color: rgb(28 ,100, 140) !important; }
+.bgBlue8 {background-color: #33ccff !important; }
+
+.bgGray1 {background-color: rgb(231,231,231) !important; }
+.bgGray2 {background-color: rgb(224,224,224) !important; }
+.bgGray3 {background-color: rgb(203,​ 203,​ 203) !important; }
+.bgGray4 {background-color: rgb(192,​ 192,​ 192) !important; }
+.bgGray5 {background-color: rgb(215, 215, 215) !important; }
+.bgGray6 {background-color: rgb(227, 227, 227) !important; }
+.bgGray7 {background-color: rgb(242, 242, 242) !important; }
+
+.bgWhite {background-color: rgb(255,255,255) !important; } 
+
+.borderBlue6 {border-color: rgb(46,109,164) !important; }
+.borderGray3 {border-color: rgb(204,204,204) !important; }
+.borderRightBlack {border-right-color: black !important; }

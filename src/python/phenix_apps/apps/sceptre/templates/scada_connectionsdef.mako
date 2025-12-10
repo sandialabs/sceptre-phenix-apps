@@ -1,0 +1,1 @@
+{"connections":[{"plcType":11,"alias":"script","id":-1,"ip":"","disableWrites":false},{"plcType":14,"alias":"OPC","id":-1,"ip":"${opc_ip}:4840","path":"opc.tcp://${opc_ip}:4840/None/None","disableWrites":false,"optwindow":50,"hide":false,"opcuaCert":"","opcuaKey":"","opcuaUser":"","opcuaPass":""}]}
