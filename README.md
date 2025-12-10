@@ -115,6 +115,7 @@ mirror destination.
 - [ettercap](src/python/phenix_apps/apps/scorch/ettercap)
 - [hoststats](src/python/phenix_apps/apps/scorch/hoststats)
 - [iperf](src/python/phenix_apps/apps/scorch/iperf)
+- [kafka](src/python/phenix_apps/apps/scorch/kafka)
 - [mm](src/python/phenix_apps/apps/scorch/mm)
 - [opcexport](src/python/phenix_apps/apps/scorch/opcexport)
 - [pcap](src/python/phenix_apps/apps/scorch/pcap)

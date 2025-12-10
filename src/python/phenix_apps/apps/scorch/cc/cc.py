@@ -33,6 +33,18 @@ class CC(ComponentBase):
         for cmd in commands:
             if cmd.type == 'reset':
                 self.__reset_cc()
+            elif cmd.type == 'exec':
+                once = cmd.get('once', True)
+                filter_ = cmd.get('filter', None)
+                if filter_:
+                    self.mm.cc_filter(filter_)
+
+                if once:
+                    self.mm.cc_exec_once(cmd.args)
+                else:
+                    self.mm.cc_exec(cmd.args)
+
+                self.print(f"command '{cmd.args}' executed with filter '{filter_}' using cc")
             else:
                 self.eprint(f"Unknown command type '{cmd.type}' for stage '{stage}'")
                 sys.exit(1)
