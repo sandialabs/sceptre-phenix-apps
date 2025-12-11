@@ -184,14 +184,16 @@ class Sceptre(AppBase):
                     "description": "SCADA project file",
                 }
                 self.add_inject(hostname=scada_server.hostname, inject=kwargs)
-
-                # Create automation injection
-                kwargs = {
-                    "src": f"{scada_server.metadata.automation}",
-                    "dst": "myscada.exe",
-                    "description": "Windows automation binary",
-                }
-                self.add_inject(hostname=scada_server.hostname, inject=kwargs)
+    
+                # If given an automation executatble, use that. Else, the scada.mako will use alternative automation
+                if 'automation' in scada_server.metadata:
+                    # Create automation injection
+                    kwargs = {
+                        "src": f"{scada_server.metadata.automation}",
+                        "dst": "myscada.exe",
+                        "description": "Windows automation binary",
+                    }
+                    self.add_inject(hostname=scada_server.hostname, inject=kwargs)
             
                 # Create startup script injection
                 kwargs = self.find_override(f"{scada_server.hostname}_scada.ps1")
