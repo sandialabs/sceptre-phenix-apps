@@ -6,7 +6,8 @@ import requests
 from elasticsearch import Elasticsearch
 
 from phenix_apps.apps.scorch import ComponentBase
-from phenix_apps.common import logger, utils
+from phenix_apps.common import utils
+from phenix_apps.common.logger import logger
 
 
 class RTDS(ComponentBase):
@@ -104,7 +105,7 @@ class RTDS(ComponentBase):
         self.print("frequency verified")
 
     def configure(self):
-        logger.log('INFO', f'Configuring user component: {self.name}')
+        logger.info(f'Configuring user component: {self.name}')
 
         host = self.metadata.hostname  # type: str
 
@@ -138,10 +139,10 @@ class RTDS(ComponentBase):
             self.print(f"sleeping for {sleep_for} seconds to give provider time to start and reconnect to PMUs...")
             sleep(sleep_for)
 
-        logger.log('INFO', f'Configured user component: {self.name}')
+        logger.info(f'Configured user component: {self.name}')
 
     def start(self):
-        logger.log('INFO', f'Starting user component: {self.name}')
+        logger.info(f'Starting user component: {self.name}')
 
         host = self.metadata.hostname  # type: str
 
@@ -203,10 +204,10 @@ class RTDS(ComponentBase):
                     sys.exit(1)
                 self.print("time drift verified")
 
-        logger.log('INFO', f'Started user component: {self.name}')
+        logger.info(f'Started user component: {self.name}')
 
     def stop(self):
-        logger.log('INFO', f'Stopping user component: {self.name}')
+        logger.info(f'Stopping user component: {self.name}')
 
         host = self.metadata.hostname  # type: str
 
@@ -242,10 +243,10 @@ class RTDS(ComponentBase):
         #     # This doubles as a check for the data in Elastic
         #     self._verify_frequency(index=index, time_range="now-20s")
 
-        logger.log('INFO', f'Stopped user component: {self.name}')
+        logger.info(f'Stopped user component: {self.name}')
 
     def cleanup(self):
-        logger.log('INFO', f'Cleaning up user component: {self.name}')
+        logger.info(f'Cleaning up user component: {self.name}')
 
         host = self.metadata.hostname  # type: str
 
@@ -266,7 +267,7 @@ class RTDS(ComponentBase):
         if self.metadata.get("rscad_automation", {}).get("enabled"):
             self._stop_case(allow_failure=True)
 
-        logger.log('INFO', f'Cleaned up user component: {self.name}')
+        logger.info(f'Cleaned up user component: {self.name}')
 
 
 def get_time_drift(

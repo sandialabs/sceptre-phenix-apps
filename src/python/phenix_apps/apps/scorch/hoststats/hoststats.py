@@ -5,7 +5,7 @@ import threading
 import time
 
 from phenix_apps.apps.scorch import ComponentBase
-from phenix_apps.common import logger
+from phenix_apps.common.logger import logger
 
 
 class HostStats(ComponentBase):
@@ -25,25 +25,25 @@ class HostStats(ComponentBase):
 
 
     def start(self):
-        logger.log('INFO', f'Starting user component: {self.name}')
+        logger.info(f'Starting user component: {self.name}')
 
         self.monitor = True
 
         thread = threading.Thread(target=self.__run_monitor)
         thread.start()
 
-        logger.log('INFO', f'Started user component: {self.name}')
+        logger.info(f'Started user component: {self.name}')
 
         # wait for calling process to send SIGTERM
         signal.pause()
         self.monitor = False
 
-        logger.log('INFO', f'Stopping user component: {self.name}')
+        logger.info(f'Stopping user component: {self.name}')
 
         thread.join()
         self.__flush_buffer()
 
-        logger.log('INFO', f'Stopped user component: {self.name}')
+        logger.info(f'Stopped user component: {self.name}')
 
 
     def __run_monitor(self):

@@ -1,74 +1,48 @@
+import argparse
 import copy
 import os
 import re
 import sys
-from typing import Optional
+from typing import Any, Optional
 
 from box import Box
 
-from phenix_apps.common import utils, logger
+from phenix_apps.common import settings, utils
+from phenix_apps.common.logger import logger, configure_logging
 
 
 class AppBase(object):
     valid_stages = ["configure", "pre-start", "post-start", "running", "cleanup"]
 
-    @classmethod
-    def check_stdin(klass):
-        """
-        Ensures that only one argument is passed in via the command line
-        This takes in the stage as the first argument ?
-        Need to make sure that if anything errors it takes it errors with a status code that is non-zero
-        """
-
-        if len(sys.argv) != 2:
-            msg = f"must pass exactly one argument to phenix app: was passed {len(sys.argv) - 1}"
-
-            klass.eprint(msg)
-            klass.eprint("app expects <executable> <app_stage> << <json_input>")
-
-            sys.exit(1)
-
-        if sys.argv[1] not in klass.valid_stages:
-            klass.eprint(f'{sys.argv[1]} is not a valid stage')
-            klass.eprint(f'Valid stages are: {klass.valid_stages}')
-
-            sys.exit(1)
-
-    @staticmethod
-    def eprint(*args):
-        """
-        Prints errors to STDERR
-        """
-
-        print(*args, file=sys.stderr, flush=True)
-
-    def __init__(self, name):
+    def __init__(self, name: str, stage: str, dryrun: bool = False) -> None:
         self.name = name
-
-        self.dryrun = os.getenv('PHENIX_DRYRUN', 'false') == 'true'
-
-        self.check_stdin()
-        self.stage = sys.argv[1]
+        self.stage = stage
+        self.dryrun = dryrun
 
         # Keep this around just in case apps want direct access to it.
         self.raw_input = sys.stdin.read()
 
         try:
             self.experiment = Box.from_json(self.raw_input)
-        except Exception as ex:
-            logger.log("ERROR", f"Failed to parse experiment JSON for app '{self.name}': {ex}")
-            sys.exit(1)
+        except Exception:
+            try:
+                self.experiment = Box.from_yaml(self.raw_input)
+            except Exception as ex:
+                logger.error(
+                    f"Failed to parse experiment input (JSON or YAML) for app '{self.name}': {ex}",
+                )
+                sys.exit(1)
 
-        self.app: Box = self.extract_app()
+        self.app = self.extract_app()
         if not self.app:
-            logger.log("ERROR", f"Failed to find app '{self.name}' in scenario metadata!")
+            logger.error(f"Failed to find app '{self.name}' in scenario metadata!")
             sys.exit(1)
 
-        self.exp_name   = self.experiment.spec.experimentName
-        self.exp_dir    = self.experiment.spec.baseDir
-        self.asset_dir  = self.app.get('assetDir', None)
-        self.metadata   = self.app.get('metadata', {})
-        self.topo       = self.get_annotation('topology')
+        self.exp_name = self.experiment.spec.experimentName
+        self.exp_dir = self.experiment.spec.baseDir
+        self.asset_dir = self.app.get("assetDir", None)
+        self.metadata = self.app.get("metadata", {})
+        self.topo = self.get_annotation("topology")
 
         # Create the experiment directory if it doesn't exist
         os.makedirs(self.exp_dir, exist_ok=True)
@@ -77,29 +51,55 @@ class AppBase(object):
         py_path = sys.modules[self.__class__.__module__].__file__
         self.templates_dir = utils.abs_path(py_path, "templates")
 
-    def execute_stage(self):
+    @classmethod
+    def main(cls, name: str):
+        parser = argparse.ArgumentParser(description=f"phenix user app: {name}")
+        parser.add_argument(
+            "stage", choices=cls.valid_stages, help="Lifecycle stage to execute"
+        )
+        parser.add_argument("--dry-run", action="store_true", help="Perform a dry run")
+
+        args = parser.parse_args()
+
+        dryrun = args.dry_run or os.getenv("PHENIX_DRYRUN", "false") == "true"
+
+        # Configure logger. In dry-run mode, force console output.
+        configure_logging(force_console=dryrun)
+
+        app = cls(name, args.stage, dryrun)
+        app.execute_stage()
+        app.finalize()
+
+        # Output the experiment JSON (standard Phenix app behavior)
+        if app.dryrun:
+            print(app.experiment.to_json(indent=2))
+        else:
+            print(app.experiment.to_json())
+
+        return app
+
+    def execute_stage(self) -> None:
         """
         Executes the stage passed in from the json blob
         """
 
         stages_dict = {
-            'configure'  : self.configure,
-            'pre-start'  : self.pre_start,
-            'post-start' : self.post_start,
-            'running'    : self.running,
-            'cleanup'    : self.cleanup
+            "configure": self.configure,
+            "pre-start": self.pre_start,
+            "post-start": self.post_start,
+            "running": self.running,
+            "cleanup": self.cleanup,
         }
-
-        sys.stdout = open('/dev/null', 'w')
 
         stages_dict[self.stage]()
 
-        sys.stdout.close()
-        sys.stdout = sys.__stdout__
+    def finalize(self) -> None:
+        pass
 
     def get_annotation(self, key: str) -> str | None:
-        if 'annotations' in self.experiment.metadata:
-            return self.experiment.metadata.annotations[key]
+        metadata = self.experiment.get("metadata")
+        if metadata and "annotations" in metadata:
+            return metadata.annotations.get(key)
 
         return None
 
@@ -116,7 +116,9 @@ class AppBase(object):
             if app.name == name:
                 return app
 
-    def extract_node(self, hostname: str, wildcard: bool = False) -> Box | list[Box] | None:
+    def extract_node(
+        self, hostname: str, wildcard: bool = False
+    ) -> Box | list[Box] | None:
         regex = re.compile(hostname)
         extracted = []
 
@@ -133,7 +135,9 @@ class AppBase(object):
         else:
             return None
 
-    def extract_topology_nodes_by_attribute(self, attribute: str, vals: str | list[str]) -> list[Box]:
+    def extract_topology_nodes_by_attribute(
+        self, attribute: str, vals: str | list[str]
+    ) -> list[Box]:
         hosts = []
 
         if isinstance(vals, str):
@@ -153,13 +157,15 @@ class AppBase(object):
 
         return hosts
 
-    def extract_annotated_topology_nodes(self, annotations: str | list[str]) -> list[Box]:
+    def extract_annotated_topology_nodes(
+        self, annotations: str | list[str]
+    ) -> list[Box]:
         """
         Return list of Topology nodes with any annotation attributes with keys
         that match "annotations" or are in the list "annotations".
         """
 
-        return self.extract_topology_nodes_by_attribute('annotations', annotations)
+        return self.extract_topology_nodes_by_attribute("annotations", annotations)
 
     def extract_labelled_topology_nodes(self, labels: str | list[str]) -> list[Box]:
         """
@@ -167,9 +173,11 @@ class AppBase(object):
         that match "labels" or are in the list "labels".
         """
 
-        return self.extract_topology_nodes_by_attribute('labels', labels)
+        return self.extract_topology_nodes_by_attribute("labels", labels)
 
-    def extract_app_node(self, hostname: str, include_missing: bool = True) -> Box | None:
+    def extract_app_node(
+        self, hostname: str, include_missing: bool = True
+    ) -> Box | None:
         for host in self.app.get("hosts", []):
             if host.hostname == hostname:
                 topo_node = self.extract_node(hostname)
@@ -178,7 +186,7 @@ class AppBase(object):
                     continue
 
                 node = copy.deepcopy(host)
-                node.update({'topology': topo_node})
+                node.update({"topology": topo_node})
 
                 return node
 
@@ -200,13 +208,15 @@ class AppBase(object):
                 continue
 
             node = copy.deepcopy(host)
-            node.update({'topology': topo_node})
+            node.update({"topology": topo_node})
 
             hosts.append(node)
 
         return hosts
 
-    def extract_nodes_type(self, types: str | list[str], include_missing: bool = True) -> list[Box]:
+    def extract_nodes_type(
+        self, types: str | list[str], include_missing: bool = True
+    ) -> list[Box]:
         """
         Extract Topology nodes with hostnames that match the hostname
         defined in the "hosts" attribute in the Scenario metadata
@@ -229,13 +239,15 @@ class AppBase(object):
                     continue
 
                 node = copy.deepcopy(host)
-                node.update({'topology': topo_node})
+                node.update({"topology": topo_node})
 
                 hosts.append(node)
 
         return hosts
 
-    def extract_nodes_label(self, labels: str | list[str], include_missing: bool = True) -> list[Box]:
+    def extract_nodes_label(
+        self, labels: str | list[str], include_missing: bool = True
+    ) -> list[Box]:
         """
         Extract Topology nodes that match values in the "labels" attribute for each
         host in an app's "host" field in Scenario metadata.
@@ -260,7 +272,7 @@ class AppBase(object):
                         continue
 
                     node = copy.deepcopy(host)
-                    node.update({'topology': topo_node})
+                    node.update({"topology": topo_node})
 
                     hosts.append(node)
             elif isinstance(node_labels, list):
@@ -271,7 +283,7 @@ class AppBase(object):
                         continue
 
                     node = copy.deepcopy(host)
-                    node.update({'topology': topo_node})
+                    node.update({"topology": topo_node})
 
                     hosts.append(node)
             elif str(node_labels) in labels:
@@ -281,13 +293,15 @@ class AppBase(object):
                     continue
 
                 node = copy.deepcopy(host)
-                node.update({'topology': topo_node})
+                node.update({"topology": topo_node})
 
                 hosts.append(node)
 
         return hosts
 
-    def extract_node_interface_ip(self, hostname: str, iface: str, include_mask: bool = False) -> str | tuple[str, int] | None:
+    def extract_node_interface_ip(
+        self, hostname: str, iface: str, include_mask: bool = False
+    ) -> str | tuple[str, int] | None:
         """
         Returns str with IP address of the interface name for the matching host.
         If include_mask is True, then a tuple is returned with the IP and
@@ -298,40 +312,40 @@ class AppBase(object):
 
         if iface:
             for i in node.network.interfaces:
-                if i['name'] == iface and 'address' in i:
+                if i["name"] == iface and "address" in i:
                     if include_mask:
-                        return i['address'], i['mask']
+                        return i["address"], i["mask"]
                     else:
-                        return i['address']
+                        return i["address"]
         elif len(node.network.interfaces) > 0:
             i = node.network.interfaces[0]
 
-            if 'address' in i:
+            if "address" in i:
                 if include_mask:
-                    return i['address'], i['mask']
+                    return i["address"], i["mask"]
                 else:
-                    return i['address']
+                    return i["address"]
 
         return None
 
     def extract_node_hostname_for_ip(self, address: str) -> str | None:
-        if ':' in address:
-            address, _ = address.split(':', 1)
+        if ":" in address:
+            address, _ = address.split(":", 1)
 
         nodes = self.experiment.spec.topology.nodes
 
         for node in nodes:
             for i in node.network.interfaces:
-                if 'address' in i and i['address'] == address:
+                if "address" in i and i["address"] == address:
                     return node.general.hostname
 
         return None
 
-    def add_node(self, new_node: Box, overwrite: bool = False):
+    def add_node(self, new_node: Box | dict, overwrite: bool = False) -> None:
         found = None
 
         for idx, node in enumerate(self.experiment.spec.topology.nodes):
-            if node.general.hostname == new_node['general']['hostname']:
+            if node.general.hostname == new_node["general"]["hostname"]:
                 found = idx
                 break
 
@@ -344,10 +358,10 @@ class AppBase(object):
         elif overwrite:
             self.experiment.spec.topology.nodes[found] = Box(new_node)
 
-    def add_annotation(self, hostname: str, key: str, value):
+    def add_annotation(self, hostname: str, key: str, value: Any) -> None:
         node = self.extract_node(hostname)
 
-        annotations = node.get('annotations', {})
+        annotations = node.get("annotations", {})
 
         # Could be a null entry in the JSON schema.
         if not annotations:
@@ -355,12 +369,12 @@ class AppBase(object):
 
         # This will override an existing annotation with the same key.
         annotations[key] = value
-        node['annotations'] = annotations
+        node["annotations"] = annotations
 
-    def add_label(self, hostname: str, key: str, value):
+    def add_label(self, hostname: str, key: str, value: str) -> None:
         node = self.extract_node(hostname)
 
-        labels = node.get('labels', {})
+        labels = node.get("labels", {})
 
         # Could be a null entry in the JSON schema.
         if not labels:
@@ -368,29 +382,29 @@ class AppBase(object):
 
         # This will override an existing label with the same key.
         labels[key] = value
-        node['labels'] = labels
+        node["labels"] = labels
 
-    def add_inject(self, hostname: str, inject: Box | dict):
+    def add_inject(self, hostname: str, inject: Box | dict) -> None:
         node = self.extract_node(hostname)
 
-        if node.get('injections', None):
+        if node.get("injections", None):
             # First check to see if this exact injection already exists. This
             # would occur, for example, if an experiment gets started multiple
             # times. We don't raise an exception here since ultimately it's OK
             # if the injection already exists.
             for i in node.injections:
-                if i.src == inject['src'] and i.dst == inject['dst']:
+                if i.src == inject["src"] and i.dst == inject["dst"]:
                     return
 
             node.injections.append(inject)
         else:
             # There was no injection list, so we put the
             # injection dictionary in a list.
-            node['injections'] = [inject]
+            node["injections"] = [inject]
 
     def is_booting(self, hostname: str) -> bool:
         node = self.extract_node(hostname)
-        dnb  = node.general.get('do_not_boot', False)
+        dnb = node.general.get("do_not_boot", False)
 
         return not dnb
 
@@ -421,22 +435,22 @@ class AppBase(object):
                 template_name=template_name,
                 templates_dir=self.templates_dir,
                 filename=fp,
-                **kwargs
+                **kwargs,
             )
 
         return file_path
 
-    def configure(self):
+    def configure(self) -> None:
         pass
 
-    def pre_start(self):
+    def pre_start(self) -> None:
         pass
 
-    def post_start(self):
+    def post_start(self) -> None:
         pass
 
-    def running(self):
+    def running(self) -> None:
         pass
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         pass

@@ -1,5 +1,5 @@
 from phenix_apps.apps.scorch import ComponentBase
-from phenix_apps.common import logger
+from phenix_apps.common.logger import logger
 
 
 class Pipe(ComponentBase):
@@ -12,7 +12,7 @@ class Pipe(ComponentBase):
         self.execute_stage()
 
     def start(self):
-        logger.log('INFO', f"Starting user component: {self.name}")
+        logger.info(f"Starting user component: {self.name}")
 
         pipe = self.metadata.get('pipe', None)
         data = self.metadata.get('data', None)
@@ -49,10 +49,10 @@ class Pipe(ComponentBase):
             self.print(f"writing data '{data}' to pipe '{pipe}'")
             self.mm.pipe(pipe, f"'{data}'")
 
-        logger.log('INFO', f"Started user component: {self.name}")
+        logger.info(f"Started user component: {self.name}")
 
     def cleanup(self):
-        logger.log('INFO', f'Cleaning up user component: {self.name}')
+        logger.info(f'Cleaning up user component: {self.name}')
 
         pipe = self.metadata.get('pipe', None)
 
@@ -63,7 +63,7 @@ class Pipe(ComponentBase):
         self.print(f"clearing pipe '{pipe}'")
         self.mm.clear_pipe(pipe)
 
-        logger.log('INFO', f'Cleaned up user component: {self.name}')
+        logger.info(f'Cleaned up user component: {self.name}')
 
 
 def main():

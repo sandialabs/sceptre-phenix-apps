@@ -5,7 +5,7 @@ import lxml.etree as ET
 from box import Box
 
 from phenix_apps.apps   import AppBase
-from phenix_apps.common import logger
+from phenix_apps.common.logger import logger
 
 from phenix_apps.apps.otsim.config           import Config
 from phenix_apps.apps.otsim.device           import Register
@@ -16,26 +16,20 @@ from phenix_apps.apps.otsim.protocols.dnp3   import DNP3
 
 
 class WindTurbine(AppBase):
-  def __init__(self):
-    AppBase.__init__(self, 'wind-turbine')
+  def __init__(self, name: str, stage: str, dryrun: bool = False) -> None:
+    super().__init__(name, stage, dryrun)
 
-    self.startup_dir = f"{self.exp_dir}/startup"
-    self.ot_sim_dir  = f"{self.exp_dir}/ot-sim"
+    self.startup_dir: str = f"{self.exp_dir}/startup"
+    self.ot_sim_dir: str  = f"{self.exp_dir}/ot-sim"
 
     os.makedirs(self.startup_dir, exist_ok=True)
     os.makedirs(self.ot_sim_dir,  exist_ok=True)
 
     self.__init_defaults()
-    self.execute_stage()
-
-    # We don't (currently) let the parent AppBase class handle this step
-    # just in case app developers want to do any additional manipulation
-    # after the appropriate stage function has completed.
-    print(self.experiment.to_json())
 
 
   def pre_start(self):
-    logger.log('INFO', f'Starting user application: {self.name}')
+    logger.info(f'Starting user application: {self.name}')
 
     app = self.extract_app()
     self.templates = app.get('metadata', {}).get('templates', {})
@@ -52,7 +46,7 @@ class WindTurbine(AppBase):
 
         # Will match if hostname matches filter exactly, but won't have any groups.
         if match and len(match.groups()) > 0:
-          logger.log('INFO', f'node {node.general.hostname} matched {host.hostname}')
+          logger.info(f'node {node.general.hostname} matched {host.hostname}')
 
           md     = copy.deepcopy(host.get('metadata', {}))
           groups = match.groups()
@@ -107,25 +101,25 @@ class WindTurbine(AppBase):
           for blade in md.controllers.blades:
             self.__blade_controller(blade, {'ground-truth-module': md.get('ground-truth-module', {})})
 
-    logger.log('INFO', f'Started user application: {self.name}')
+    logger.info(f'Started user application: {self.name}')
 
 
   def __init_defaults(self):
     # Track multiple brokers that need an inject generated, along with their
     # total federate count to be started with and log level/file settings.
-    self.brokers = {}
+    self.brokers: dict = {}
 
     if 'helics' in self.metadata:
       # The `helics.broker` key gets processed by each app host if needed.
-      self.default_fed      = self.metadata['helics'].get('federate', 'OpenDSS')
-      self.default_endpoint = self.metadata['helics'].get('endpoint', f'{self.default_fed}/updates')
+      self.default_fed: str      = self.metadata['helics'].get('federate', 'OpenDSS')
+      self.default_endpoint: str = self.metadata['helics'].get('endpoint', f'{self.default_fed}/updates')
 
       # handle `self.default_endpoint` being set to False
       if self.default_endpoint and '/' not in self.default_endpoint:
         self.default_endpoint = f'{self.default_fed}/{self.default_endpoint}'
     else:
-      self.default_fed      = 'OpenDSS'
-      self.default_endpoint = 'OpenDSS/updates'
+      self.default_fed: str      = 'OpenDSS'
+      self.default_endpoint: str = 'OpenDSS/updates'
 
 
   def __process_helics_broker_metadata(self, md):
@@ -561,11 +555,3 @@ class WindTurbine(AppBase):
     return [
       Register('binary-read-write', 'feathered', {}),
     ]
-
-
-def main():
-  WindTurbine()
-
-
-if __name__ == '__main__':
-  main()

@@ -1,7 +1,8 @@
 import subprocess, sys
 
 from phenix_apps.apps.scorch import ComponentBase
-from phenix_apps.common import logger, utils
+from phenix_apps.common import utils
+from phenix_apps.common.logger import logger
 
 # TODO: merge tcpdump's functionality into the 'pcap' component
 
@@ -13,7 +14,7 @@ class TCPDump(ComponentBase):
 
 
     def start(self):
-        logger.log('INFO', f'Starting user component: {self.name}')
+        logger.info(f'Starting user component: {self.name}')
 
         vms = self.metadata.get('vms', None)
 
@@ -47,11 +48,11 @@ class TCPDump(ComponentBase):
             mm.cc_exec(f'ip link set {iface} up')
             mm.cc_background(f'tcpdump {options} -i {iface} -U -w /dump-{iface}.pcap {filter}')
 
-        logger.log('INFO', f'Started user component: {self.name}')
+        logger.info(f'Started user component: {self.name}')
 
 
     def stop(self):
-        logger.log('INFO', f'Stopping user component: {self.name}')
+        logger.info(f'Stopping user component: {self.name}')
 
         vms = self.metadata.get('vms', None)
 
@@ -98,7 +99,7 @@ class TCPDump(ComponentBase):
 
                 self.print(f'PCAP --> JSON conversion for node {hostname} complete')
 
-        logger.log('INFO', f'Stopped user component: {self.name}')
+        logger.info(f'Stopped user component: {self.name}')
 
 
 def main():

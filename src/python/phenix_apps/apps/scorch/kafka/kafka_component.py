@@ -6,7 +6,7 @@ import uuid
 from pathlib import Path
 
 from phenix_apps.apps.scorch import ComponentBase
-from phenix_apps.common import logger
+from phenix_apps.common.logger import logger
 
 
 class Kafka(ComponentBase):

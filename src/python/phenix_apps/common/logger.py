@@ -1,36 +1,29 @@
-import inspect
-import logging
-import os
-from typing import Literal
+import sys
+
+from loguru import logger
 
 import phenix_apps.common.settings as settings
 
-logger = None
 
-def log(level: Literal['DEBUG', 'INFO', 'WARNING', 'ERROR'] , msg: str) -> None:
-    """
-    Write a log message to the phenix log.
+def configure_logging(force_console: bool = False) -> None:
+    """Configures the logger based on settings."""
+    logger.remove()
 
-    This function first creates (or accesses) the phenix log, and then writes
-    a message to it.
+    log_level = settings.PHENIX_LOG_LEVEL.upper()
+    log_file = settings.PHENIX_LOG_FILE
 
-    Args:
-        level (str): Name of logging level (DEBUG, INFO, WARNING, ERROR)
-        msg (str): Message to write to log
-    """
-
-    # create phenix logger
-    global logger
-    if logger is None:
-        logger = logging.getLogger('phenix-apps')
-        logger.setLevel(settings.PHENIX_LOG_LEVEL.upper())
-
-        # create handler for phenix logger
-        handler = logging.FileHandler(settings.PHENIX_LOG_FILE)
-        caller = os.path.basename(inspect.stack()[1].filename)
-        fmt = f'{{"time": "%(asctime)s", "level": "%(levelname)s", "msg": "%(message)s", "caller": "{caller}"}}'
-        handler.setFormatter(logging.Formatter(fmt))
-
-        # add handler to phenix logger
-        logger.handlers[:] = [handler]
-    logger.log(getattr(logging, level.upper()), msg)
+    if log_file and not force_console:
+        # File logging with JSON serialization
+        logger.add(
+            log_file,
+            level=log_level,
+            rotation="10 MB",
+            serialize=True,
+        )
+    else:
+        # Console logging
+        logger.add(
+            sys.stderr,
+            level=log_level,
+            format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <level>{message}</level>",
+        )

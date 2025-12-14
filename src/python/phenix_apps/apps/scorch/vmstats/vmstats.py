@@ -3,7 +3,8 @@ import sys
 import time
 
 from phenix_apps.apps.scorch import ComponentBase
-from phenix_apps.common import logger, utils
+from phenix_apps.common import utils
+from phenix_apps.common.logger import logger
 
 
 class VMStats(ComponentBase):
@@ -16,7 +17,7 @@ class VMStats(ComponentBase):
         self.execute_stage()
 
     def start(self):
-        logger.log('INFO', f'Starting user component: {self.name}')
+        logger.info(f'Starting user component: {self.name}')
 
         freq = self.metadata.get('pollPeriod', 1)
         vms = self.__vm_list()
@@ -29,10 +30,10 @@ class VMStats(ComponentBase):
         self.mm.cc_background(f"bash -c 'vmstat -n -t {freq} >> /vmstat.out'")
         self.mm.clear_cc_filter()
 
-        logger.log('INFO', f'Started user component: {self.name}')
+        logger.info(f'Started user component: {self.name}')
 
     def stop(self):
-        logger.log('INFO', f'Stopping user component: {self.name}')
+        logger.info(f'Stopping user component: {self.name}')
 
         vms = self.__vm_list()
 
@@ -90,7 +91,7 @@ class VMStats(ComponentBase):
                 json_record = json.dumps(datum)
                 f.write(json_record + '\n')
 
-        logger.log('INFO', f'Stopped user component: {self.name}')
+        logger.info(f'Stopped user component: {self.name}')
 
     def __vm_list(self) -> list:
         vms = self.metadata.get('vms', None)

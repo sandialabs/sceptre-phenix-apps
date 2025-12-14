@@ -3,7 +3,8 @@ import sys
 from pathlib import Path
 
 from phenix_apps.apps.scorch import ComponentBase
-from phenix_apps.common import logger, utils
+from phenix_apps.common import utils
+from phenix_apps.common.logger import logger
 
 # TODO: bridge capture functionality from mm.py component
 # The issue with bridge captures in phenix is it will capture MGMT traffic,
@@ -36,7 +37,7 @@ class PCAP(ComponentBase):
                 sys.exit(1)
 
     def start(self):
-        logger.log("INFO", f"Starting user component: {self.name}")
+        logger.info(f"Starting user component: {self.name}")
 
         self.print("clearing capture on minimega")
         self.mm.clear_capture("pcap")
@@ -76,10 +77,10 @@ class PCAP(ComponentBase):
             self.print(f"starting capture on '{hostname}' interface '{interface}' to '{filepath}' ({i+1} of {len(self.metadata.vms)})")
             self.mm.capture_pcap_vm(hostname, interface, str(filepath))
 
-        logger.log("INFO", f"Started user component: {self.name}")
+        logger.info(f"Started user component: {self.name}")
 
     def stop(self):
-        logger.log("INFO", f"Stopping user component: {self.name}")
+        logger.info(f"Stopping user component: {self.name}")
 
         pcap_paths = []
 
@@ -218,7 +219,7 @@ class PCAP(ComponentBase):
         else:
             self.print("PCAP --> JSON conversion disabled")
 
-        logger.log("INFO", f"Stopped user component: {self.name}")
+        logger.info(f"Stopped user component: {self.name}")
 
     def _merge_pcaps(self, pcap_paths: list[Path], merged_name: str = "merged.pcap") -> Path:
         merged_path = Path(self.base_dir, merged_name)
