@@ -3,8 +3,12 @@ import re
 import signal
 import sys
 import time
+from datetime import datetime, timezone
 from typing import List, Optional, Tuple, Union
 from pathlib import Path
+from contextlib import redirect_stdout, redirect_stderr
+import io
+import json
 
 from phenix_apps.common.settings import PHENIX_DIR
 from phenix_apps.common import logger, utils
@@ -12,7 +16,6 @@ from phenix_apps.common import logger, utils
 from box import Box
 from elasticsearch import Elasticsearch
 import minimega
-
 
 class ComponentBase(object):
     valid_stages = ["configure", "start", "stop", "cleanup"]
@@ -47,7 +50,7 @@ class ComponentBase(object):
         print(msg, file=sys.stderr)
 
         if ui:
-            tstamp = time.strftime('%H:%M:%S')
+            tstamp = time.strftime('%Y-%m-%dT%H:%M:%S')
             print(f'[{tstamp}] ERROR : {msg}', flush=True)
 
         logger.log("ERROR", msg)  # write error to phenix log file
@@ -60,7 +63,7 @@ class ComponentBase(object):
         """
 
         if ts:
-            tstamp = time.strftime('%H:%M:%S')
+            tstamp = time.strftime('%Y-%m-%dT%H:%M:%S')
             print(f'[{tstamp}] {msg}', flush=True)
         else:
             print(msg, flush=True)
@@ -108,7 +111,7 @@ class ComponentBase(object):
 
     def execute_stage(self):
         """
-        Executes the stage passed in from the json blob
+        Executes the stage passed in from the json blob and captures logger output, stdout, and stderr to info file
         """
 
         stages_dict = {
@@ -118,7 +121,79 @@ class ComponentBase(object):
             'cleanup'   : self.cleanup
         }
 
-        stages_dict[self.stage]()
+        orig_logger_log = logger.log
+        orig_stdout_stream = sys.stdout
+        orig_stderr_stream = sys.stderr
+        log_buffer = io.StringIO()
+
+        # mirror stdout and stderr
+        stdout_mirror = _MirrorAndBuffer(orig_stdout_stream, io.StringIO())
+        stderr_mirror = _MirrorAndBuffer(orig_stderr_stream, io.StringIO())
+
+        # override phenix's logger to save to the buffer
+        # we use a lambda function because level and msg do not exist until the logger calls this function
+        logger.log = lambda level, msg: self.buffer_logger_log(level, msg, log_buffer, orig_logger_log)
+
+        start = time.time()
+
+        # redirect stdout and stderr to mirror to our buffers
+        try:
+            with redirect_stdout(stdout_mirror), redirect_stderr(stderr_mirror):
+                out = stages_dict[self.stage]() or ""
+        except Exception as ex:
+            out = f"Error occurred: {ex}"
+        finally:
+            sys.stdout = orig_stdout_stream
+            sys.stderr = orig_stderr_stream
+            logger.log = orig_logger_log
+
+        end = time.time()
+
+
+        start_dt = datetime.fromtimestamp(start, tz=timezone.utc)
+        end_dt = datetime.fromtimestamp(end, tz=timezone.utc)
+
+        start_ts = start_dt.isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+        end_ts = end_dt.isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+
+        # filenames can't have colons, so replace with dashes
+        start_ts_filename = start_dt.strftime('%Y-%m-%dT%H-%M-%SZ')
+
+        info_file = os.path.join(
+            self.base_dir,
+            f'{self.exp_name}-scorch-run-{self.run}-{self.name}-loop-{self.loop}-count-{self.count}-{self.stage}-{start_ts_filename}.json',
+        )
+
+        content = {
+          "experiment_name": self.exp_name,
+          "scorch_run_index": self.run,
+          "component": self.name,
+          "loop": self.loop,
+          "count": self.count,
+          "stage": self.stage,
+          "start": start_ts,
+          "end": end_ts,
+          "return": out,
+          "stdout": self._format_stream(stdout_mirror.getvalue()),
+          "stderr": self._format_stream(stderr_mirror.getvalue()),
+          "logs": self._format_stream(log_buffer.getvalue())
+        }
+        with open(info_file, 'w') as f:
+            json.dump(content, f, indent=2)
+
+    # override phenix's logger buffer_logger_log to also save to our buffer
+    def buffer_logger_log(self, level, msg, log_buffer, orig_logger_log):
+        try:
+            tstamp = time.strftime("%Y-%m-%dT%H:%M:%S")
+            log_buffer.write(f'[{tstamp}] {level} : {msg}\n')
+        except Exception as ex:
+            print(f"Error writing to log buffer: {ex}")
+        orig_logger_log(level, msg)
+
+    def _format_stream(self, s):
+        if not s:
+            return []
+        return [ln.strip() for ln in s.splitlines() if ln.strip()]
 
     @property
     def mm(self) -> minimega.minimega:
@@ -139,6 +214,8 @@ class ComponentBase(object):
         a version mismatch. This utility function prevents that from happening.
         """
 
+        saved_stdout = sys.stdout
+
         sys.stdout = open('/dev/null', 'w')
 
         mm = None
@@ -149,7 +226,7 @@ class ComponentBase(object):
             mm = minimega.connect()
 
         sys.stdout.close()
-        sys.stdout = sys.__stdout__
+        sys.stdout = saved_stdout
 
         return mm
 
@@ -356,3 +433,24 @@ class ComponentBase(object):
 
     def cleanup(self):
         pass
+
+class _MirrorAndBuffer:
+    """
+    Overwrites a stream to mirror output to the original stream and a buffer
+    """
+
+    def __init__(self, orig_stream, buffer):
+        self.orig_stream = orig_stream
+        self.buffer = buffer
+
+    def write(self, s):
+        self.orig_stream.write(s)
+        self.buffer.write(s)
+        self.orig_stream.flush()
+        self.buffer.flush()
+    def flush(self):
+        self.orig_stream.flush()
+        self.buffer.flush()
+
+    def getvalue(self):
+        return self.buffer.getvalue()
