@@ -29,3 +29,6 @@ case-file         = /etc/sceptre/${case_file}
 % if solver in ['RTDS', 'OPALRT'] or config_file:
 config-file       = ${config_file}
 % endif
+% if solver == 'GenericPython':
+simulation-file = /etc/sceptre/simulation.py
+% endif

@@ -565,6 +565,41 @@ class BatteryInfrastructure(Infrastructure):
 
         return Device(device_type, device_name, protocol, reg_config, **device_kwargs)
 
+class GenericInfrastructure(Infrastructure):
+    """Generic infrastructure.
+    Useful when you don't want to have to define explicit devices and fields. """
+    def __init__(self):
+        super().__init__()
+        super().register('generic')
+        self.range = -32767.0, 32767.0
+
+    @staticmethod
+    def create_device(device_type, device_name, protocol, reg_config, **kwargs):
+        if type(device_type) == str and device_type.lower() == 'analog-read':
+            device_kwargs = {
+                'range': (-32767.0, 32767.0),
+                'analog-read': kwargs.get('analog-read', ['value']),
+            }
+            return Device(device_type, device_name, protocol, reg_config, **device_kwargs)
+        elif type(device_type) == str and device_type.lower() == 'analog-read-write':
+            device_kwargs = {
+                'range': (-32767.0, 32767.0),
+                'analog-read-write': kwargs.get('analog-read-write', ['value']),
+            }
+            return Device(device_type, device_name, protocol, reg_config, **device_kwargs)
+        elif type(device_type) == str and device_type.lower() == 'binary-read':
+            device_kwargs = {
+                'range': (0, 1000),
+                'binary-read': kwargs.get('binary-read', ['status']),
+            }
+            return Device(device_type, device_name, protocol, reg_config, **device_kwargs)
+        elif type(device_type) == str and device_type.lower() == 'binary-read-write':
+            device_kwargs = {
+                'range': (0, 1000),
+                'binary-read-write': kwargs.get('binary-read-write', ['status']),
+            }
+            return Device(device_type, device_name, protocol, reg_config, **device_kwargs)
+
 
 class Device(Infrastructure):
     def __init__(self, device_type, device_name, protocol, reg_config, **kwargs):
