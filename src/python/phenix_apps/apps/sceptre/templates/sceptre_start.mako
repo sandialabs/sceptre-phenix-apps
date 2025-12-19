@@ -19,7 +19,7 @@ bennu-simulink-provider --server-endpoint '${server_endpoint}' --publish-endpoin
         % endif
     % elif metadata.get('simulator','').lower() == 'alicanto':
 pybennu-alicanto -c /etc/sceptre/alicanto.json -d DEBUG > /etc/sceptre/log/alicanto.log 2>&1 &
-    % elif 'provider' in name.lower() or metadata.get('simulator', '').lower().startswith('powerworld') or metadata.get('simulator', '').lower() in ['pypower', 'siren', 'opalrt', 'rtds']:
+    % elif 'provider' in name.lower() or metadata.get('simulator', '').lower().startswith('powerworld') or metadata.get('simulator', '').lower() in ['pypower', 'siren', 'opalrt', 'rtds', 'genericpython']:
         % if needsleep:
 sleep 60s
         % endif

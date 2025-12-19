@@ -424,6 +424,26 @@ class Sceptre(AppBase):
                 }
                 self.add_inject(hostname=provider.hostname, inject=kwargs)
 
+            # Create Python provider injections
+            elif simulator == "GenericPython":
+                # config
+                kwargs = self.find_override(f"{provider.hostname}_config.ini")
+                if kwargs is None:
+                    kwargs = {"src": f"{vm_directory}/config.ini"}
+                kwargs.update({
+                    "dst": "/etc/sceptre/config.ini",
+                    "description": "Python provider config",
+                })
+                self.add_inject(hostname=provider.hostname, inject=kwargs)
+
+                # simulation file
+                kwargs = {
+                    "src": f"{provider.metadata.simulation_file}",
+                    "dst": f"/etc/sceptre/simulation.py",
+                    "description": "Python simulation file",
+                }
+                self.add_inject(hostname=provider.hostname, inject=kwargs)
+
             # Create default provider injections
             else:
                 # config
