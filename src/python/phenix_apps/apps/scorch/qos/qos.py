@@ -3,7 +3,8 @@ from collections import defaultdict
 from pathlib import Path
 
 from phenix_apps.apps.scorch import ComponentBase
-from phenix_apps.common import logger, utils
+from phenix_apps.common import utils
+from phenix_apps.common.logger import logger
 
 
 class QoS(ComponentBase):
@@ -16,7 +17,7 @@ class QoS(ComponentBase):
         self.execute_stage()
 
     def start(self):
-        logger.log('INFO', f'Starting user component: {self.name}')
+        logger.info(f'Starting user component: {self.name}')
 
         values_applied = defaultdict(dict)
         vms = self.metadata.vms
@@ -79,10 +80,10 @@ class QoS(ComponentBase):
         self.print(f"saving qos values applied to {qos_path}")
         utils.write_json(qos_path, values_applied)
 
-        logger.log('INFO', f'Started user component: {self.name}')
+        logger.info(f'Started user component: {self.name}')
 
     def stop(self):
-        logger.log('INFO', f'Stopping user component: {self.name}')
+        logger.info(f'Stopping user component: {self.name}')
 
         vms = self.metadata.vms  # type: list
         self.print(f"clearing qos from {len(vms)} VMs")
@@ -91,7 +92,7 @@ class QoS(ComponentBase):
             self.print(f'clearing qos for interface {interface} on node {hostname} ({i+1} of {len(vms)})')
             self.mm.clear_qos(hostname, interface)
 
-        logger.log('INFO', f'Stopped user component: {self.name}')
+        logger.info(f'Stopped user component: {self.name}')
 
 
 def main():

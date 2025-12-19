@@ -4,7 +4,8 @@ from time import sleep
 from pathlib import Path
 
 from phenix_apps.apps.scorch import ComponentBase
-from phenix_apps.common import logger, utils
+from phenix_apps.common import utils
+from phenix_apps.common.logger import logger
 
 # TODO: user-configurable script path + script arguments for dos
 # TODO: allow dos attacks to be executed on Windows
@@ -80,7 +81,7 @@ class Disruption(ComponentBase):
         return elapsed
 
     def configure(self):
-        logger.log('INFO', f'Configuring user component: {self.name}')
+        logger.info(f'Configuring user component: {self.name}')
 
         if self.metadata.current_disruption in ["dos", "cyber_physical"]:
             self.print(f"Running checks for '{self.metadata.current_disruption}' disruption")
@@ -113,10 +114,10 @@ class Disruption(ComponentBase):
                     self.print(f"disabling interface {interface.name} on {a_host}")
                     utils.mm_exec_wait(self.mm, a_host, f"ip link set {interface.name} down", timeout=10.0, poll_rate=0.5)
 
-        logger.log('INFO', f'Configured user component: {self.name}')
+        logger.info(f'Configured user component: {self.name}')
 
     def start(self):
-        logger.log('INFO', f'Starting user component: {self.name}')
+        logger.info(f'Starting user component: {self.name}')
 
         # NOTE: Because we have to wait on the dos process, or do a sleep (for baseline),
         # it doesn't make sense to split functionality across start/stop stages
@@ -293,10 +294,10 @@ class Disruption(ComponentBase):
 
         self.mm.clear_cc_filter()
 
-        logger.log('INFO', f'Started user component: {self.name}')
+        logger.info(f'Started user component: {self.name}')
 
     def cleanup(self):
-        logger.log('INFO', f'Cleaning up user component: {self.name}')
+        logger.info(f'Cleaning up user component: {self.name}')
 
         if self.metadata.current_disruption in ["dos", "cyber_physical"]:
             # ensure processes are killed for an aborted run
@@ -330,7 +331,7 @@ class Disruption(ComponentBase):
             sleep(1.0)
             self.mm.clear_cc_filter()
 
-        logger.log('INFO', f'Cleaned up user component: {self.name}')
+        logger.info(f'Cleaned up user component: {self.name}')
 
 
 def main():
@@ -339,4 +340,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

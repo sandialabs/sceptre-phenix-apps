@@ -1,7 +1,8 @@
 import os, time
 
 from phenix_apps.apps.scorch import ComponentBase
-from phenix_apps.common import logger, utils
+from phenix_apps.common import utils
+from phenix_apps.common.logger import logger
 
 
 class TrafficGen(ComponentBase):
@@ -12,7 +13,7 @@ class TrafficGen(ComponentBase):
 
 
     def configure(self):
-        logger.log('INFO', f'Configuring user component: {self.name}')
+        logger.info(f'Configuring user component: {self.name}')
 
         scripts = self.metadata.get('scripts', {})
         targets = self.metadata.get('targets', None)
@@ -54,11 +55,11 @@ class TrafficGen(ComponentBase):
             else:
                 self.print('no malware client configured for target {hostname}')
 
-        logger.log('INFO', f'Configured user component: {self.name}')
+        logger.info(f'Configured user component: {self.name}')
 
 
     def start(self):
-        logger.log('INFO', f'Starting user component: {self.name}')
+        logger.info(f'Starting user component: {self.name}')
 
         scripts = self.metadata.get('scripts', {})
         targets = self.metadata.get('targets', None)
@@ -117,11 +118,11 @@ class TrafficGen(ComponentBase):
 
             time.sleep(int(duration) + 5)
 
-        logger.log('INFO', f'Started user component: {self.name}')
+        logger.info(f'Started user component: {self.name}')
 
 
     def stop(self):
-        logger.log('INFO', f'Stopping user component: {self.name}')
+        logger.info(f'Stopping user component: {self.name}')
 
         scripts = self.metadata.get('scripts', {})
         targets = self.metadata.get('targets', None)
@@ -163,11 +164,11 @@ class TrafficGen(ComponentBase):
             else:
                 self.print('no malware client configured for target {target_host}')
 
-        logger.log('INFO', f'Stopped user component: {self.name}')
+        logger.info(f'Stopped user component: {self.name}')
 
 
     def cleanup(self):
-        logger.log('INFO', f'Cleaning up user component: {self.name}')
+        logger.info(f'Cleaning up user component: {self.name}')
 
         scripts = self.metadata.get('scripts', {})
         targets = self.metadata.get('targets', None)
@@ -209,7 +210,7 @@ class TrafficGen(ComponentBase):
             else:
                 self.print('no malware client configured for target {target_host}')
 
-        logger.log('INFO', f'Cleaned up user component: {self.name}')
+        logger.info(f'Cleaned up user component: {self.name}')
 
 
 def main():

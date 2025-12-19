@@ -7,7 +7,8 @@ from pathlib import Path
 import yaml
 
 from phenix_apps.apps.scorch import ComponentBase
-from phenix_apps.common import logger, utils
+from phenix_apps.common import utils
+from phenix_apps.common.logger import logger
 from .csv_gen import gen_csv
 
 # TODO: make what's saved configurable (like the experiment)
@@ -47,7 +48,7 @@ class Collector(ComponentBase):
         self.execute_stage()
 
     def stop(self):
-        logger.log('INFO', f'Stopping user component: {self.name}')
+        logger.info(f'Stopping user component: {self.name}')
 
         record = {}
 
@@ -248,7 +249,7 @@ class Collector(ComponentBase):
                 iperf_dir=iperf_dest,
             )
 
-        logger.log('INFO', f'Stopped user component: {self.name}')
+        logger.info(f'Stopped user component: {self.name}')
 
     def _collect_provider_data(self) -> dict:
         """

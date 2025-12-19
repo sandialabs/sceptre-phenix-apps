@@ -7,7 +7,7 @@ requires = ["setuptools>=68.0", "wheel>=0.37.1"]
 name = "phenix-apps"
 dynamic = ["version"]  # see section below, [tool.setuptools.dynamic]
 description = "phenix user apps, schedulers, and Scorch components"
-readme = "README.md"
+readme = {file = "README.md", content-type = "text/markdown"}
 requires-python = ">=3.10,<4"
 license = {file = "LICENSE"}
 authors = [
@@ -25,26 +25,30 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
 ]
 dependencies = [
+    "elasticsearch<9",
+    "kafka-python~=2.2.13",
     "lxml~=4.9.2",
     "Mako~=1.1.3",
     "minimega",
+    "loguru>=0.7.2",
+    "pydantic>=2.0.0",
     "python-box~=7.2.0",
-    "elasticsearch<9",
-    "requests==2.31.0",
     "python-dateutil~=2.8.2",
     "pyyaml~=6.0.2",
-    "kafka-python~=2.2.13"
+    "requests==2.31.0",
+    "rich~=14.2.0",
 ]
 
 [project.scripts]
-phenix-app-caldera = "phenix_apps.apps.caldera.caldera:main"
-phenix-app-helics = "phenix_apps.apps.helics.helics:main"
-phenix-app-ot-sim = "phenix_apps.apps.otsim.otsim:main"
-phenix-app-protonuke = "phenix_apps.apps.protonuke.protonuke:main"
-phenix-app-sceptre = "phenix_apps.apps.sceptre.sceptre:main"
-phenix-app-wind-turbine = "phenix_apps.apps.wind_turbine.wind_turbine:main"
-phenix-app-wireguard = "phenix_apps.apps.wireguard.wireguard:main"
-phenix-scheduler-single-node = "phenix_apps.schedulers.single_node.single_node:main"
+phenix-app-caldera = "phenix_apps.apps.caldera.__main__:main"
+phenix-app-helics = "phenix_apps.apps.helics.__main__:main"
+phenix-app-ot-sim = "phenix_apps.apps.otsim.__main__:main"
+phenix-app-protonuke = "phenix_apps.apps.protonuke.__main__:main"
+phenix-app-scale = "phenix_apps.apps.scale.__main__:main"
+phenix-app-sceptre = "phenix_apps.apps.sceptre.__main__:main"
+phenix-app-wind-turbine = "phenix_apps.apps.wind_turbine.__main__:main"
+phenix-app-wireguard = "phenix_apps.apps.wireguard.__main__:main"
+phenix-scheduler-single-node = "phenix_apps.schedulers.single_node.__main__:main"
 phenix-scorch-component-art = "phenix_apps.apps.scorch.art.art:main"
 phenix-scorch-component-caldera = "phenix_apps.apps.scorch.caldera.caldera:main"
 phenix-scorch-component-cc = "phenix_apps.apps.scorch.cc.cc:main"
@@ -66,6 +70,10 @@ phenix-scorch-component-vmstats = "phenix_apps.apps.scorch.vmstats.vmstats:main"
 phenix-scorch-component-opcexport = "phenix_apps.apps.scorch.opcexport.opcexport:main"
 phenix-scorch-component-kafka = "phenix_apps.apps.scorch.kafka.kafka_component:main"
 
+[project.entry-points."phenix.scale.plugins"]
+builtin = "phenix_apps.apps.scale.plugins.builtin:BuiltinV1"
+wind_turbine = "phenix_apps.apps.scale.plugins.wind_turbine:WindTurbine"
+
 [project.urls]
 # Use PyPI-standard names here: https://docs.pypi.org/project_metadata/
 "Homepage" = "https://github.com/sandialabs/sceptre-phenix-apps/"
@@ -78,19 +86,19 @@ phenix-scorch-component-kafka = "phenix_apps.apps.scorch.kafka.kafka_component:m
 [project.optional-dependencies]
 dev = [
     "codespell>=2.2.4",  # spelling
+    "pytest",  # testing framework
+    "pytest-cov",  # coverage reporting
+    "pytest-mock",  # mocking framework
     "ruff",  # powerful linter
     "vulture",  # checks for unused code
-    "isort",  # sorts import statements
-    "black",  # code style formatting
 ]
 
-[tool.setuptools]
-include-package-data = true
+[tool.setuptools.packages.find]
+where = ["."]
 
 [tool.setuptools.package-data]
 phenix_apps = [
-    "apps/*/templates/*.mako",
-    "apps/scorch/*/templates/*.mako",
+    "**/*.mako",
     "apps/scorch/opcexport/*.ps1",
     "apps/scorch/opcexport/*.zip",
     "apps/scorch/opcexport/*.exe",
@@ -99,3 +107,6 @@ phenix_apps = [
 # dynamically read version from phenix_apps.__version__
 [tool.setuptools.dynamic]
 version = {attr = "phenix_apps.__version__"}
+
+[tool.ruff.lint.isort]
+known-first-party = ["phenix_apps"]

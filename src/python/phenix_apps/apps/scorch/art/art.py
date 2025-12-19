@@ -1,7 +1,8 @@
 import os, subprocess, sys, uuid
 
 from phenix_apps.apps.scorch import ComponentBase
-from phenix_apps.common import logger, utils
+from phenix_apps.common import utils
+from phenix_apps.common.logger import logger
 
 from box import Box
 
@@ -14,7 +15,7 @@ class AtomicRedTeam(ComponentBase):
 
 
     def start(self):
-        logger.log('INFO', f'Starting user component: {self.name}')
+        logger.info(f'Starting user component: {self.name}')
 
         goart      = self.metadata.get('framework', None)
         technique  = self.metadata.get('technique', None)
@@ -118,7 +119,7 @@ class AtomicRedTeam(ComponentBase):
 
                 os.remove(tempfile)
 
-        logger.log('INFO', f'Started user component: {self.name}')
+        logger.info(f'Started user component: {self.name}')
 
 
 def main():

@@ -24,6 +24,8 @@ def get_fdconfig_class(infrastructure: str) -> type:
         base_class = infra.WaterwayInfrastructure
     elif infrastructure == 'battery':
         base_class = infra.BatteryInfrastructure
+    elif infrastructure == 'generic':
+        base_class = infra.GenericInfrastructure
     else:
         raise error.AppError(f"Infrastructure: {infrastructure} not supported")
 

@@ -1,30 +1,24 @@
 import os, sys
 
-from phenix_apps.apps   import AppBase
-from phenix_apps.common import logger, utils
+from phenix_apps.apps import AppBase
+from phenix_apps.common import utils
+from phenix_apps.common.logger import logger
 
 class Helics(AppBase):
-    def __init__(self):
-        AppBase.__init__(self, 'helics')
+    def __init__(self, name: str, stage: str, dryrun: bool = False) -> None:
+        super().__init__(name, stage, dryrun)
 
-        self.helics_dir = f"{self.exp_dir}/helics"
+        self.helics_dir: str = f"{self.exp_dir}/helics"
         os.makedirs(self.helics_dir, exist_ok=True)
 
-        self.execute_stage()
-
-        # We don't (currently) let the parent AppBase class handle this step
-        # just in case app developers want to do any additional manipulation
-        # after the appropriate stage function has completed.
-        print(self.experiment.to_json())
-
     def pre_start(self):
-        logger.log('INFO', f'Starting user application: {self.name}')
+        logger.info(f'Starting user application: {self.name}')
 
         broker_md = self.metadata.get('broker', {})
         root      = broker_md.get('root', None)
 
         if not root:
-            logger.log('ERROR', 'no root broker provided, but required')
+            logger.error('no root broker provided, but required')
             sys.exit(1)
 
         if '|' in root: # hostname|iface
@@ -33,7 +27,7 @@ class Helics(AppBase):
             root_ip = self.extract_node_interface_ip(root_hostname, iface)
 
             if not root_ip:
-                logger.log('ERROR', f'root broker not found in topology: {root_hostname}')
+                logger.error(f'root broker not found in topology: {root_hostname}')
                 sys.exit(1)
         else: # ip[:port]
             root_ip = root
@@ -44,11 +38,11 @@ class Helics(AppBase):
         root_hostname = self.extract_node_hostname_for_ip(root_ip)
 
         if not root_hostname:
-            logger.log('ERROR', f'root broker not found in topology: {root}')
+            logger.error(f'root broker not found in topology: {root}')
             sys.exit(1)
 
         if not self.is_booting(root_hostname):
-            logger.log('ERROR', f'root broker is marked do not boot: {root_hostname}')
+            logger.error(f'root broker is marked do not boot: {root_hostname}')
 
         self.add_label(root_hostname, 'group', 'helics')
         self.add_label(root_hostname, 'helics', 'broker')
@@ -73,7 +67,7 @@ class Helics(AppBase):
             self.add_label(fed.general.hostname, 'group', 'helics')
             self.add_label(fed.general.hostname, 'helics', 'federate')
             configs = fed.annotations.get('helics/federate', [])
-            
+
             # if the federate has the helics/federate annotation, add the inject to wait for the broker
             if configs and configs[0].get('broker-wait', True):
                 dst = '/etc/phenix/startup/5-wait-broker.sh'
@@ -92,7 +86,7 @@ class Helics(AppBase):
                     broker_ip = self.extract_node_interface_ip(broker_hostname, iface)
 
                     if not broker_ip:
-                        logger.log('ERROR', f'broker not found in topology: {broker_hostname}')
+                        logger.error(f'broker not found in topology: {broker_hostname}')
                         sys.exit(1)
                 else: # ip[:port]
                     broker_ip = broker
@@ -108,11 +102,11 @@ class Helics(AppBase):
                 hostname = self.extract_node_hostname_for_ip(broker_ip)
 
                 if not hostname:
-                    logger.log('ERROR', f'node not found for broker at {broker}')
+                    logger.error(f'node not found for broker at {broker}')
                     sys.exit(1)
 
                 if not self.is_booting(hostname):
-                    logger.log('ERROR', f'broker node is marked do not boot: {hostname}')
+                    logger.error(f'broker node is marked do not boot: {hostname}')
 
                 self.add_label(hostname, 'group', 'helics')
                 self.add_label(hostname, 'helics', 'broker')
@@ -170,11 +164,3 @@ class Helics(AppBase):
 
             dst = '/etc/phenix/startup/90-helics-broker.sh'
             self.add_inject(hostname=hostname, inject={'src': start_file, 'dst': dst})
-
-
-def main():
-    Helics()
-
-
-if __name__ == '__main__':
-    main()

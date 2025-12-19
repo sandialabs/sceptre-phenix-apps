@@ -7,7 +7,8 @@ from time import sleep
 from box import Box
 
 from phenix_apps.apps.scorch import ComponentBase
-from phenix_apps.common import logger, utils
+from phenix_apps.common import utils
+from phenix_apps.common.logger import logger
 
 # TODO: configure which interface to use
 # OR be smart and determine which interface to use based on subnets
@@ -152,7 +153,7 @@ class Iperf(ComponentBase):
         return None
 
     def configure(self):
-        logger.log('INFO', f'Configuring user component: {self.name}')
+        logger.info(f'Configuring user component: {self.name}')
         node_info = self._get_node_info()
 
         # Generate iperf mapping and save it to a JSON file
@@ -214,10 +215,10 @@ class Iperf(ComponentBase):
         self.mm.clear_cc_commands()
         self.mm.clear_cc_responses()
 
-        logger.log('INFO', f'Configured user component: {self.name}')
+        logger.info(f'Configured user component: {self.name}')
 
     def start(self):
-        logger.log('INFO', f'Starting user component: {self.name}')
+        logger.info(f'Starting user component: {self.name}')
         node_info = self._get_node_info()
         mapping = self._build_iperf_mapping()
 
@@ -308,7 +309,7 @@ class Iperf(ComponentBase):
                 self.mm.cc_background(client_cmd)
 
         self.print("finished starting all iperf processes")
-        logger.log('INFO', f'Started user component: {self.name}')
+        logger.info(f'Started user component: {self.name}')
 
     def _run_multi(self, cmd: str, filter: str, prefix: str, num_responses: int, timeout: float = 10.0) -> list:
         self.mm.clear_cc_prefix()
@@ -386,7 +387,7 @@ class Iperf(ComponentBase):
         Path(self.base_dir, "ss_outputs.txt").write_text(ss_outputs)
 
     def stop(self):
-        logger.log('INFO', f'Stopping user component: {self.name}')
+        logger.info(f'Stopping user component: {self.name}')
         node_info = self._get_node_info()
         mapping = self._build_iperf_mapping()
 
@@ -488,10 +489,10 @@ class Iperf(ComponentBase):
         else:
             self.print("using rperf, skipping data collection and processing")
 
-        logger.log('INFO', f'Stopped user component: {self.name}')
+        logger.info(f'Stopped user component: {self.name}')
 
     def cleanup(self):
-        logger.log('INFO', f'Cleaning up user component: {self.name}')
+        logger.info(f'Cleaning up user component: {self.name}')
         node_info = self._get_node_info()
 
         self.mm.clear_cc_prefix()
@@ -502,7 +503,7 @@ class Iperf(ComponentBase):
         for vm in node_info["vms"]:
             self.mm.clear_vm_tag(vm, "iperf")
 
-        logger.log('INFO', f'Cleaned up user component: {self.name}')
+        logger.info(f'Cleaned up user component: {self.name}')
 
 
 def main():

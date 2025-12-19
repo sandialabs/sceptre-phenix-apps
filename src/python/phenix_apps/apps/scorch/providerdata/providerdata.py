@@ -4,7 +4,8 @@ import sys
 from time import sleep
 
 from phenix_apps.apps.scorch import ComponentBase
-from phenix_apps.common import logger, utils
+from phenix_apps.common import utils
+from phenix_apps.common.logger import logger
 
 
 class ProviderData(ComponentBase):
@@ -18,7 +19,7 @@ class ProviderData(ComponentBase):
         self.execute_stage()
 
     def configure(self):
-        logger.log('INFO', f'Configuring user component: {self.name}')
+        logger.info(f'Configuring user component: {self.name}')
 
         host = self.metadata.hostname  # type: str
 
@@ -53,10 +54,10 @@ class ProviderData(ComponentBase):
             self.print(f"sleeping for {sleep_for} seconds to give provider time to start and reconnect to PMUs...")
             sleep(sleep_for)
 
-        logger.log('INFO', f'Configured user component: {self.name}')
+        logger.info(f'Configured user component: {self.name}')
 
     def start(self):
-        logger.log('INFO', f'Starting user component: {self.name}')
+        logger.info(f'Starting user component: {self.name}')
 
         host = self.metadata.hostname  # type: str
 
@@ -73,7 +74,7 @@ class ProviderData(ComponentBase):
             self.run_and_check_command(host, f"ls -lh {csv_path}")
 
         # Verify elasticsearch
-        logger.log('INFO', f'{self.name}: checking ES')
+        logger.info(f'{self.name}: checking ES')
         if self.metadata.get("elasticsearch", {}).get("verify"):
             self.print("Verifying data in Elasticsearch (elasticsearch.verify=true)")
             index = utils.get_dated_index(self.metadata.elasticsearch.index)
@@ -89,15 +90,15 @@ class ProviderData(ComponentBase):
             # TODO figure out how to verify frequency is correct for generalized bennu provider
             if doc_count_1 < 100:
                 self.eprint("Elasticsearch does not appear to be running, exiting...")
-                logger.log('ERROR', f'{self.name}: Elasticsearch does not appear to be running, exiting...')
+                logger.error(f'{self.name}: Elasticsearch does not appear to be running, exiting...')
                 sys.exit(1)
 
             # TODO: compare doc count after certain amount of time, use es.indices.stats()
 
-        logger.log('INFO', f'Started user component: {self.name}')
+        logger.info(f'Started user component: {self.name}')
 
     def stop(self):
-        logger.log('INFO', f'Stopping user component: {self.name}')
+        logger.info(f'Stopping user component: {self.name}')
 
         host = self.metadata.hostname  # type: str
 
@@ -127,7 +128,7 @@ class ProviderData(ComponentBase):
             config_path = pconf.get(section="power-solver-service", option="config-file")
             self.recv_file(vm=host, src=config_path)
 
-        logger.log('INFO', f'Stopped user component: {self.name}')
+        logger.info(f'Stopped user component: {self.name}')
 
 
 def main():

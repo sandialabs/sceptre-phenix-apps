@@ -1,3 +1,7 @@
+> **DEPRECATED**: This standalone `wind-turbine` application is deprecated and will be removed in a future release. Its functionality has been migrated to the `wind_turbine` plugin within the new `scale` application, which offers superior scalability and configuration management. Please see the `app_migration_guide.md` documentation for details on how to migrate.
+>
+> ---
+
 # Wind Turbine phenix App
 
 ## Wildcard Method

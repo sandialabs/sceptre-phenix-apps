@@ -6,36 +6,28 @@ import shutil
 from typing import Optional, Dict
 
 from phenix_apps.apps import AppBase
-from phenix_apps.common import error, logger, utils
+from phenix_apps.common import error, utils
+from phenix_apps.common.logger import logger
 from phenix_apps.apps.sceptre.configs import configs
 
 
 class Sceptre(AppBase):
-    def __init__(self):
-        AppBase.__init__(self, 'sceptre')
+    def __init__(self, name: str, stage: str, dryrun: bool = False) -> None:
+        super().__init__(name, stage, dryrun)
 
-        self.eprint(self.stage)
-
-        self.startup_dir = f"{self.exp_dir}/startup"
-        self.sceptre_dir = f"{self.exp_dir}/sceptre"
-        self.elk_dir     = f"{self.exp_dir}/elk"
+        self.startup_dir: str = f"{self.exp_dir}/startup"
+        self.sceptre_dir: str = f"{self.exp_dir}/sceptre"
+        self.elk_dir: str     = f"{self.exp_dir}/elk"
 
         os.makedirs(self.startup_dir, exist_ok=True)
         os.makedirs(self.sceptre_dir, exist_ok=True)
         os.makedirs(self.elk_dir, exist_ok=True)
 
-        self.execute_stage()
-
-        # We don't (currently) let the parent AppBase class handle this step
-        # just in case app developers want to do any additional manipulation
-        # after the appropriate stage function has completed.
-        print(self.experiment.to_json())
-
     def find_override(self, filename: str) -> Optional[Dict[str, str]]:
         # Note, asset_dir must be declared in the scenario.yaml to work correctly
         overrideFile = f"{self.asset_dir}/injects/override/{filename}"
         if os.path.exists(overrideFile):
-            logger.log("INFO", f"Overriding '{filename}' with '{overrideFile}'")
+            logger.info(f"Overriding '{filename}' with '{overrideFile}'")
             return {"src": overrideFile}
         return None
 
@@ -172,7 +164,7 @@ class Sceptre(AppBase):
             scada_directory = f"{self.sceptre_dir}/{scada_server.hostname}"
             if "metadata" not in scada_server:
                 msg = f"No metadata for {scada_server.hostname}"
-                logger.log("WARNING", msg)
+                logger.warning(msg)
                 continue
 
             # If given a project file, add project file and associated automation injections
@@ -184,7 +176,7 @@ class Sceptre(AppBase):
                     "description": "SCADA project file",
                 }
                 self.add_inject(hostname=scada_server.hostname, inject=kwargs)
-    
+
                 # If given an automation executatble, use that. Else, the scada.mako will use alternative automation
                 if 'automation' in scada_server.metadata:
                     # Create automation injection
@@ -194,7 +186,7 @@ class Sceptre(AppBase):
                         "description": "Windows automation binary",
                     }
                     self.add_inject(hostname=scada_server.hostname, inject=kwargs)
-            
+
                 # Create startup script injection
                 kwargs = self.find_override(f"{scada_server.hostname}_scada.ps1")
                 if kwargs is None:
@@ -224,7 +216,7 @@ class Sceptre(AppBase):
                     "description": "scada",
                 })
                 self.add_inject(hostname=scada_server.hostname, inject=kwargs)
-            
+
             # sceptre startup scheduler injections
             self.add_sceptre_startup_injects_windows(scada_server.hostname)
 
@@ -291,12 +283,12 @@ class Sceptre(AppBase):
         providers = self.extract_nodes_type("provider")
         if not providers:
             msg = "No SCEPTRE providers have been configured for this experiment"
-            logger.log("ERROR", msg)
+            logger.error(msg)
             raise error.AppError(msg) from None
 
         for provider in providers:
             if "metadata" not in provider:
-                logger.log("WARNING", f"No metadata for provider '{provider.hostname}', skipping...")
+                logger.warning(f"No metadata for provider '{provider.hostname}', skipping...")
                 continue
 
             vm_directory = f"{self.sceptre_dir}/{provider.hostname}"
@@ -304,7 +296,7 @@ class Sceptre(AppBase):
             # NOTE: names are case-sensitive, used here, in power_daemon.py in bennu, and in Phenix schemas
             simulator = provider.metadata.get("simulator", "")  # type: str
             if not simulator:
-                logger.log("WARNING", f"No simulator specified for provider '{provider.hostname}', will fall back to default config")
+                logger.warning(f"No simulator specified for provider '{provider.hostname}', will fall back to default config")
 
             # Create power world provider injections
             if simulator in ["PowerWorld", "PowerWorldHelics"]:
@@ -432,6 +424,26 @@ class Sceptre(AppBase):
                 }
                 self.add_inject(hostname=provider.hostname, inject=kwargs)
 
+            # Create Python provider injections
+            elif simulator == "GenericPython":
+                # config
+                kwargs = self.find_override(f"{provider.hostname}_config.ini")
+                if kwargs is None:
+                    kwargs = {"src": f"{vm_directory}/config.ini"}
+                kwargs.update({
+                    "dst": "/etc/sceptre/config.ini",
+                    "description": "Python provider config",
+                })
+                self.add_inject(hostname=provider.hostname, inject=kwargs)
+
+                # simulation file
+                kwargs = {
+                    "src": f"{provider.metadata.simulation_file}",
+                    "dst": f"/etc/sceptre/simulation.py",
+                    "description": "Python simulation file",
+                }
+                self.add_inject(hostname=provider.hostname, inject=kwargs)
+
             # Create default provider injections
             else:
                 # config
@@ -540,7 +552,7 @@ class Sceptre(AppBase):
 
         if len(elk) > 1:
             msg = "There are multiple ELK boxes defined for this SCEPTRE experiment"
-            logger.log("ERROR", msg)
+            logger.error(msg)
             raise error.AppError(msg) from None
 
         if elk:
@@ -593,7 +605,7 @@ class Sceptre(AppBase):
 
         for provider in providers:
             if "metadata" not in provider:
-                logger.log("WARNING", f"No metadata for provider '{provider.hostname}', skipping...")
+                logger.warning(f"No metadata for provider '{provider.hostname}', skipping...")
                 continue
 
             provider_map[provider.hostname] = provider
@@ -615,7 +627,7 @@ class Sceptre(AppBase):
 
             simulator = provider.metadata.get("simulator", "")
             if not simulator:
-                logger.log("WARNING", f"No simulator specified for provider '{provider.hostname}'")
+                logger.warning(f"No simulator specified for provider '{provider.hostname}'")
 
             # Create provider config file directory
             provider_directory = f"{self.sceptre_dir}/{provider.hostname}"
@@ -702,7 +714,7 @@ class Sceptre(AppBase):
             fd_counter += 1
 
             if not fd_.metadata:
-                logger.log("WARNING", f"No metadata for fd-server '{fd_.hostname}'")
+                logger.warning(f"No metadata for fd-server '{fd_.hostname}'")
                 continue
 
             # get provider information
@@ -727,7 +739,7 @@ class Sceptre(AppBase):
                     power_object_list.extend(fd_objects)
             except Exception as e:
                 msg = f"There was a problem parsing metadata for '{fd_.hostname}'.\nPROBLEM: {e}"
-                logger.log("ERROR", msg)
+                logger.error(msg)
                 raise error.AppError(msg) from None
 
             fd_directory = f"{self.sceptre_dir}/{fd_.hostname}"
@@ -977,7 +989,7 @@ class Sceptre(AppBase):
 
         for fd_ in fd_clients:
             if not fd_.metadata:
-                logger.log("WARNING", f"No metadata for fd-client '{fd_.hostname}', skipping...")
+                logger.warning(f"No metadata for fd-client '{fd_.hostname}', skipping...")
                 continue
 
             fd_directory = f"{self.sceptre_dir}/{fd_.hostname}"
@@ -1025,7 +1037,7 @@ class Sceptre(AppBase):
 
             if not fd_.metadata:
                 msg = f"No metadata for {fd_.hostname}."
-                logger.log("WARNING", msg)
+                logger.warning(msg)
                 continue
 
             fd_directory = f"{self.sceptre_dir}/{fd_.hostname}"
@@ -1203,7 +1215,7 @@ class Sceptre(AppBase):
                     "monitor all RTUs"
                 )
 
-                logger.log("WARNING", msg)
+                logger.warning(msg)
 
                 opc_fd_configs = fd_server_configs
             else:
@@ -1220,7 +1232,7 @@ class Sceptre(AppBase):
                         "monitor all field devices"
                     )
 
-                    logger.log("WARNING", msg)
+                    logger.warning(msg)
 
                     opc_fd_configs = fd_server_configs
 
@@ -1240,7 +1252,7 @@ class Sceptre(AppBase):
                 opc_configs[opc_ip] = opc_config
                 primary_opc = True
             # Keep track of backups for scada server/historian automation
-            else: 
+            else:
                 opc_bak_configs[opc_ip] = opc_config
 
             # Write OPC config file injection
@@ -1296,11 +1308,11 @@ class Sceptre(AppBase):
                             break
 
                 if opc_ip == "":
-                    logger.log('WARN', "Did not find OPC server on same subnet")
+                    logger.warning("Did not find OPC server on same subnet")
                     # Select the first OPC server as default
                     opc_ip = next(iter(opc_configs))
                     opc_config = opc_configs[opc_ip]
-                    
+
                 #copy over all base scada files
                 shutil.copytree(f"{self.templates_dir}/mydesigner", f"{scada_directory}/autoproject", dirs_exist_ok=True)
                 # write autoproject files
@@ -1316,7 +1328,7 @@ class Sceptre(AppBase):
                 f"{scada_directory}/autoproject/Table.svg",
                 opc_config=opc_config,
                 )
-                
+
                 # Write scada server startup script injection
                 self.render("scada_autoproject.mako", f"{scada_directory}/scada_autoproject.ps1")
 
@@ -1523,7 +1535,7 @@ class SceptreMetadataParser():
                     self.devices_by_protocol[p] = md
         except Exception as e:
             msg = f"Failed when parsing metadata.\nError: {e}"
-            logger.log("ERROR", msg)
+            logger.error(msg)
             raise error.AppError(msg) from None
 
     def get_devices_by_protocol(self, protocol):
@@ -1542,7 +1554,7 @@ class SceptreMetadataParser():
         register_map = {}
         config_path = topo_dir + topology + ".json"
 
-        logger.log("DEBUG", f"Retriving register mapping from {register_map}")
+        logger.debug(f"Retriving register mapping from {register_map}")
 
         with open(config_path) as topo:
             config = json.load(topo)
@@ -1557,7 +1569,3 @@ class SceptreMetadataParser():
                         register_map[config["nodes"][i]["general"]["hostname"]][proto] = config["nodes"][i]["metadata"][proto]
 
         return register_map
-
-
-def main():
-    Sceptre()

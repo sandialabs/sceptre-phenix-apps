@@ -1,5 +1,6 @@
 # phenix (kafka) Component
 Collects and filters desired Kafka data into CSV/JSON format, so that Kafka data can be easily used by programs such as Excel. The output directory for the data is listed in the phenix log when the scorch component starts.
+This component is called in the configure and cleanup stages.
 
 ```
 type: kafka
@@ -38,4 +39,15 @@ metadata:
           - key: name
             value: bar* # Wildcards work for values
         name: ${BRANCH_NAME}.foo.bar2
+```
+
+## Example Pipeline
+
+```yaml
+runs:
+  - name: kafka_pipeline
+    configure:
+      - kafka
+    cleanup:
+      - kafka
 ```

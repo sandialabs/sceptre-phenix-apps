@@ -5,7 +5,8 @@ import sys
 from xml.etree import ElementTree as ET
 
 from phenix_apps.apps.scorch import ComponentBase
-from phenix_apps.common import logger, utils
+from phenix_apps.common import utils
+from phenix_apps.common.logger import logger
 
 
 class OPCExport(ComponentBase):
@@ -14,7 +15,7 @@ class OPCExport(ComponentBase):
         self.execute_stage()
 
     def configure(self):
-        logger.log('INFO', f'Configuring user component: {self.name}')
+        logger.info(f'Configuring user component: {self.name}')
 
         host = self.metadata['opc_hostname']  # type: str
 
@@ -89,10 +90,10 @@ class OPCExport(ComponentBase):
         # elastic_port = self.metadata.get('elastic_port', '9200')
         # self.mm.cc_test_conn_wait("tcp", elastic_ip, elastic_port, "10s")
 
-        logger.log('INFO', f'Configured user component: {self.name}')
+        logger.info(f'Configured user component: {self.name}')
 
     def start(self):
-        logger.log('INFO', f'Starting user component: {self.name}')
+        logger.info(f'Starting user component: {self.name}')
 
         host = self.metadata['opc_hostname']  # type: str
         elastic_ip = self.metadata.get('elastic_ip', '172.16.0.254')
@@ -126,10 +127,10 @@ class OPCExport(ComponentBase):
             self.eprint("scada_to_elastic.py is not running!")
             sys.exit(1)
 
-        logger.log('INFO', f'Started user component: {self.name}')
+        logger.info(f'Started user component: {self.name}')
 
     def stop(self):
-        logger.log('INFO', f'Stopping user component: {self.name}')
+        logger.info(f'Stopping user component: {self.name}')
 
         host = self.metadata['opc_hostname']  # type: str
 
@@ -146,10 +147,10 @@ class OPCExport(ComponentBase):
 
         # TODO: validate that data made it into Elasticsearch
 
-        logger.log('INFO', f'Stopped user component: {self.name}')
+        logger.info(f'Stopped user component: {self.name}')
 
     def cleanup(self):
-        logger.log('INFO', f'Cleaning up user component: {self.name}')
+        logger.info(f'Cleaning up user component: {self.name}')
 
         host = self.metadata['opc_hostname']  # type: str
         elastic_ip = self.metadata.get('elastic_ip', '172.16.0.254')
@@ -159,7 +160,7 @@ class OPCExport(ComponentBase):
         self.print(f"Running delete_scada_to_elastic.py (host={host}, elastic_ip={elastic_ip}, elastic_port={elastic_port})")
         utils.mm_exec_wait(self.mm, host, f"C:/Progra~1/Python38/python.exe C:/opcexport/delete_scada_to_elastic.py -e {elastic_ip}:{elastic_port}")
 
-        logger.log('INFO', f'Cleaned up user component: {self.name}')
+        logger.info(f'Cleaned up user component: {self.name}')
 
     def create_opc_variables(self, opc_config_file: str) -> dict:
         self.print(f"Generating OPC variables from: {opc_config_file}")

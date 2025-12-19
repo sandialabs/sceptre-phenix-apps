@@ -1,5 +1,5 @@
 from phenix_apps.apps.scorch import ComponentBase
-from phenix_apps.common import logger
+from phenix_apps.common.logger import logger
 
 
 class Ettercap(ComponentBase):
@@ -10,7 +10,7 @@ class Ettercap(ComponentBase):
 
 
     def start(self):
-        logger.log('INFO', f'Starting user component: {self.name}')
+        logger.info(f'Starting user component: {self.name}')
 
         vms = self.metadata.get('vms', None)
 
@@ -46,11 +46,11 @@ class Ettercap(ComponentBase):
 
             mm.cc_background(cmd)
 
-        logger.log('INFO', f'Started user component: {self.name}')
+        logger.info(f'Started user component: {self.name}')
 
 
     def stop(self):
-        logger.log('INFO', f'Stopping user component: {self.name}')
+        logger.info(f'Stopping user component: {self.name}')
 
         vms = self.metadata.get('vms', None)
 
@@ -67,7 +67,7 @@ class Ettercap(ComponentBase):
             mm.cc_filter(f'name={hostname}')
             mm.cc_exec('pkill ettercap')
 
-        logger.log('INFO', f'Stopped user component: {self.name}')
+        logger.info(f'Stopped user component: {self.name}')
 
 
 def main():

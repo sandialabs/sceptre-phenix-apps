@@ -1,7 +1,8 @@
 import csv, json, os, time
 
 from phenix_apps.apps.scorch import ComponentBase
-from phenix_apps.common import logger, utils
+from phenix_apps.common import utils
+from phenix_apps.common.logger import logger
 
 
 class Snort(ComponentBase):
@@ -12,7 +13,7 @@ class Snort(ComponentBase):
 
 
     def configure(self):
-        logger.log('INFO', f'Configuring user component: {self.name}')
+        logger.info(f'Configuring user component: {self.name}')
 
         hostname = self.metadata.get('hostname', 'detector')
         scripts  = self.metadata.get('scripts', {})
@@ -53,11 +54,11 @@ class Snort(ComponentBase):
         mm.cc_filter(f'name={hostname}')
         mm.cc_exec(f'ip link set {iface} up')
 
-        logger.log('INFO', f'Configured user component: {self.name}')
+        logger.info(f'Configured user component: {self.name}')
 
 
     def start(self):
-        logger.log('INFO', f'Starting user component: {self.name}')
+        logger.info(f'Starting user component: {self.name}')
 
         hostname = self.metadata.get('hostname', 'detector')
         iface    = self.metadata.get('sniffInterface', 'eth0')
@@ -75,11 +76,11 @@ class Snort(ComponentBase):
         mm.cc_filter(f'name={hostname}')
         mm.cc_background(f'snort -i {iface} -c /etc/snort/snort.conf')
 
-        logger.log('INFO', f'Started user component: {self.name}')
+        logger.info(f'Started user component: {self.name}')
 
 
     def stop(self):
-        logger.log('INFO', f'Stopping user component: {self.name}')
+        logger.info(f'Stopping user component: {self.name}')
 
         hostname = self.metadata.get('hostname', 'detector')
         wait     = self.metadata.get('waitDuration', 30)
@@ -130,11 +131,11 @@ class Snort(ComponentBase):
                             json.dump(row, f)
                             f.write('\n')
 
-        logger.log('INFO', f'Stopped user component: {self.name}')
+        logger.info(f'Stopped user component: {self.name}')
 
 
     def cleanup(self):
-        logger.log('INFO', f'Cleaning up user component: {self.name}')
+        logger.info(f'Cleaning up user component: {self.name}')
 
         hostname = self.metadata.get('hostname', 'detector')
         logfiles = ['snort.log', 'snort.err', 'snort.stats']
@@ -147,7 +148,7 @@ class Snort(ComponentBase):
             mm.cc_filter(f'name={hostname}')
             mm.cc_exec(f'rm /var/log/snort/{log}')
 
-        logger.log('INFO', f'Cleaned up user component: {self.name}')
+        logger.info(f'Cleaned up user component: {self.name}')
 
 
 def main():

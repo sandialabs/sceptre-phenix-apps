@@ -19,11 +19,3 @@ class SingleNode(SchedulerBase):
             spec.schedules.hostname = hosts[0].name
 
         print(self.experiment.to_json())
-
-
-def main():
-    SingleNode()
-
-
-if __name__ == "__main__":
-    main()

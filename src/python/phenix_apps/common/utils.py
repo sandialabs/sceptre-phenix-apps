@@ -19,7 +19,7 @@ from socket import inet_ntoa
 from struct import pack
 
 import phenix_apps.common.settings as phenix_settings
-from phenix_apps.common import logger
+from phenix_apps.common.logger import logger
 
 import mako.lookup
 import mako.template
@@ -783,7 +783,7 @@ def eprint(msg: str, ui: bool = True) -> None:
         tstamp = time.strftime('%H:%M:%S')
         print(f'[{tstamp}] ERROR : {msg}', flush=True)
 
-    logger.log("ERROR", msg)  # write error to phenix log file
+    logger.error(msg)  # write error to phenix log file
 
 
 def print_msg(msg: str, ts: bool = True) -> None:
