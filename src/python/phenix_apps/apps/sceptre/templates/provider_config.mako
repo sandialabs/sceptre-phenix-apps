@@ -1,4 +1,11 @@
 <%page args="solver, server_endpoint, publish_endpoint, debug='False', config_helics=None, case_file=None, oneline_file=None, pwds_endpoint=None, config_file=None, **kwargs"/>
+% if solver.lower() == 'python':
+[python-solver-service]
+debug             = ${debug}
+server-endpoint   = ${server_endpoint}
+publish-endpoint  = ${publish_endpoint}
+simulation-file = /etc/sceptre/simulation.py
+% else:
 [power-solver-service]
 solver-type       = ${solver}
 debug             = ${debug}
@@ -28,4 +35,5 @@ case-file         = /etc/sceptre/${case_file}
 % endif
 % if solver in ['RTDS', 'OPALRT'] or config_file:
 config-file       = ${config_file}
+% endif
 % endif
