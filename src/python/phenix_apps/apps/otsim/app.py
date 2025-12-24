@@ -13,19 +13,13 @@ from phenix_apps.apps.otsim.nodered        import NodeRed
 
 
 class OTSim(AppBase):
-  def __init__(self):
-    AppBase.__init__(self, 'ot-sim')
+  def __init__(self, name, stage, dryrun=False):
+    super().__init__(name, stage, dryrun)
 
     self.otsim_dir = f"{self.exp_dir}/ot-sim"
     os.makedirs(self.otsim_dir, exist_ok=True)
 
     self.__init_defaults()
-    self.execute_stage()
-
-    # We don't (currently) let the parent AppBase class handle this step
-    # just in case app developers want to do any additional manipulation
-    # after the appropriate stage function has completed.
-    print(self.experiment.to_json())
 
 
   def __process_helics_broker_metadata(self, md):
@@ -83,7 +77,7 @@ class OTSim(AppBase):
         return 5
     else:
       return None
-    
+
 
   def __init_defaults(self):
     self.default_infrastructure = self.metadata.get('infrastructure', 'power-distribution')
@@ -100,14 +94,14 @@ class OTSim(AppBase):
       # handle `self.default_endpoint` being set to False
       if self.default_endpoint and '/' not in self.default_endpoint:
         self.default_endpoint = f'{self.default_fed}/{self.default_endpoint}'
-      
+
       self.end_time = str(self.metadata['helics'].get('end-time', 36000))
 
     else:
       self.default_fed      = 'OpenDSS'
       self.default_endpoint = 'OpenDSS/updates'
       self.end_time = str(36000)
-  
+
   # Function used to configure all devices that could have node-red as a
   # metadata tag (fd-client, fep, etc.)
   def __config_node_red(self, device, config):
@@ -137,7 +131,7 @@ class OTSim(AppBase):
     # not provided as part of the device name(s).
     servers = self.extract_nodes_type('fd-server', False)
     broker_addr_wait = {} # {broker_addr:wait_file}
-    
+
     for server in servers:
       md    = server.metadata
       infra = md.get('infrastructure', self.default_infrastructure)
@@ -198,7 +192,7 @@ class OTSim(AppBase):
         federate  = ET.SubElement(io, 'federate-name')
         log_level = ET.SubElement(io, 'federate-log-level')
         end_time  = ET.SubElement(io, 'end-time')
-        
+
         end_time.text = self.end_time
 
         if 'helics' in md:
@@ -224,11 +218,11 @@ class OTSim(AppBase):
         else:
           addr = self.__process_helics_broker_metadata(self.metadata)
           assert addr
-          
+
           broker.text    = addr
           federate.text  = server.hostname
           log_level.text = 'SUMMARY'
-        
+
         infrastructure.io_module_xml(io, infra, devices)
 
         config.append_to_root(io)
@@ -251,7 +245,7 @@ class OTSim(AppBase):
           dst = '/etc/phenix/startup/5-wait-broker.sh'
           self.add_inject(hostname=server.hostname, inject={'src': broker_addr_wait[addr], 'dst': dst})
 
-        
+
 
       if 'logic' in md:
         logic = Logic.parse_metadata(md)
@@ -262,7 +256,7 @@ class OTSim(AppBase):
 
           config.append_to_root(logic.root)
           config.append_to_cpu(module)
-      
+
       self.__config_node_red(server, config)
 
       config_file = f'{self.otsim_dir}/{server.hostname}.xml'
@@ -280,11 +274,11 @@ class OTSim(AppBase):
     scan_rate_from_md = self.__process_scan_rate_metadata(self.metadata)
 
     for fep in feps:
-      if scan_rate_from_md is not None: 
+      if scan_rate_from_md is not None:
         ot_devices[fep.hostname] = FEP(fep, {"scan-rate": scan_rate_from_md})
-      else: 
+      else:
         ot_devices[fep.hostname] = FEP(fep)
-       
+
     for fep in feps:
       config  = Config(self.metadata)
       injects = config.init_xml_root(fep.metadata)
@@ -342,7 +336,7 @@ class OTSim(AppBase):
 
           config.append_to_root(logic.root)
           config.append_to_cpu(module)
-        
+
       self.__config_node_red(client, config)
 
       config_file = f'{self.otsim_dir}/{client.hostname}.xml'
@@ -362,11 +356,3 @@ class OTSim(AppBase):
       self.add_inject(hostname=hostname, inject={'src': start_file, 'dst': '/etc/phenix/startup/90-helics-broker.sh'})
 
     logger.log('INFO', f'Started user application: {self.name}')
-
-
-def main():
-  OTSim()
-
-
-if __name__ == '__main__':
-  main()

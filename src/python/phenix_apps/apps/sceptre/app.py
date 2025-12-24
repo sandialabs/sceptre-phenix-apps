@@ -11,8 +11,8 @@ from phenix_apps.apps.sceptre.configs import configs
 
 
 class Sceptre(AppBase):
-    def __init__(self):
-        AppBase.__init__(self, 'sceptre')
+    def __init__(self, name, stage, dryrun=False):
+        super().__init__(name, stage, dryrun)
 
         self.eprint(self.stage)
 
@@ -23,13 +23,6 @@ class Sceptre(AppBase):
         os.makedirs(self.startup_dir, exist_ok=True)
         os.makedirs(self.sceptre_dir, exist_ok=True)
         os.makedirs(self.elk_dir, exist_ok=True)
-
-        self.execute_stage()
-
-        # We don't (currently) let the parent AppBase class handle this step
-        # just in case app developers want to do any additional manipulation
-        # after the appropriate stage function has completed.
-        print(self.experiment.to_json())
 
     def find_override(self, filename: str) -> Optional[Dict[str, str]]:
         # Note, asset_dir must be declared in the scenario.yaml to work correctly
@@ -184,7 +177,7 @@ class Sceptre(AppBase):
                     "description": "SCADA project file",
                 }
                 self.add_inject(hostname=scada_server.hostname, inject=kwargs)
-    
+
                 # If given an automation executatble, use that. Else, the scada.mako will use alternative automation
                 if 'automation' in scada_server.metadata:
                     # Create automation injection
@@ -194,7 +187,7 @@ class Sceptre(AppBase):
                         "description": "Windows automation binary",
                     }
                     self.add_inject(hostname=scada_server.hostname, inject=kwargs)
-            
+
                 # Create startup script injection
                 kwargs = self.find_override(f"{scada_server.hostname}_scada.ps1")
                 if kwargs is None:
@@ -224,7 +217,7 @@ class Sceptre(AppBase):
                     "description": "scada",
                 })
                 self.add_inject(hostname=scada_server.hostname, inject=kwargs)
-            
+
             # sceptre startup scheduler injections
             self.add_sceptre_startup_injects_windows(scada_server.hostname)
 
@@ -1240,7 +1233,7 @@ class Sceptre(AppBase):
                 opc_configs[opc_ip] = opc_config
                 primary_opc = True
             # Keep track of backups for scada server/historian automation
-            else: 
+            else:
                 opc_bak_configs[opc_ip] = opc_config
 
             # Write OPC config file injection
@@ -1300,7 +1293,7 @@ class Sceptre(AppBase):
                     # Select the first OPC server as default
                     opc_ip = next(iter(opc_configs))
                     opc_config = opc_configs[opc_ip]
-                    
+
                 #copy over all base scada files
                 shutil.copytree(f"{self.templates_dir}/mydesigner", f"{scada_directory}/autoproject", dirs_exist_ok=True)
                 # write autoproject files
@@ -1316,7 +1309,7 @@ class Sceptre(AppBase):
                 f"{scada_directory}/autoproject/Table.svg",
                 opc_config=opc_config,
                 )
-                
+
                 # Write scada server startup script injection
                 self.render("scada_autoproject.mako", f"{scada_directory}/scada_autoproject.ps1")
 
@@ -1557,7 +1550,3 @@ class SceptreMetadataParser():
                         register_map[config["nodes"][i]["general"]["hostname"]][proto] = config["nodes"][i]["metadata"][proto]
 
         return register_map
-
-
-def main():
-    Sceptre()

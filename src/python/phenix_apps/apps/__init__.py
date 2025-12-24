@@ -1,4 +1,6 @@
+import argparse
 import copy
+import logging
 import os
 import re
 import sys
@@ -6,58 +8,28 @@ from typing import Optional
 
 from box import Box
 
-from phenix_apps.common import utils, logger
+from phenix_apps.common import utils, logger, settings
 
 
 class AppBase(object):
     valid_stages = ["configure", "pre-start", "post-start", "running", "cleanup"]
 
-    @classmethod
-    def check_stdin(klass):
-        """
-        Ensures that only one argument is passed in via the command line
-        This takes in the stage as the first argument ?
-        Need to make sure that if anything errors it takes it errors with a status code that is non-zero
-        """
-
-        if len(sys.argv) != 2:
-            msg = f"must pass exactly one argument to phenix app: was passed {len(sys.argv) - 1}"
-
-            klass.eprint(msg)
-            klass.eprint("app expects <executable> <app_stage> << <json_input>")
-
-            sys.exit(1)
-
-        if sys.argv[1] not in klass.valid_stages:
-            klass.eprint(f'{sys.argv[1]} is not a valid stage')
-            klass.eprint(f'Valid stages are: {klass.valid_stages}')
-
-            sys.exit(1)
-
-    @staticmethod
-    def eprint(*args):
-        """
-        Prints errors to STDERR
-        """
-
-        print(*args, file=sys.stderr, flush=True)
-
-    def __init__(self, name):
+    def __init__(self, name, stage, dryrun=False):
         self.name = name
-
-        self.dryrun = os.getenv('PHENIX_DRYRUN', 'false') == 'true'
-
-        self.check_stdin()
-        self.stage = sys.argv[1]
+        self.stage = stage
+        self.dryrun = dryrun
 
         # Keep this around just in case apps want direct access to it.
         self.raw_input = sys.stdin.read()
 
         try:
             self.experiment = Box.from_json(self.raw_input)
-        except Exception as ex:
-            logger.log("ERROR", f"Failed to parse experiment JSON for app '{self.name}': {ex}")
-            sys.exit(1)
+        except Exception:
+            try:
+                self.experiment = Box.from_yaml(self.raw_input)
+            except Exception as ex:
+                logger.log("ERROR", f"Failed to parse experiment input (JSON or YAML) for app '{self.name}': {ex}")
+                sys.exit(1)
 
         self.app: Box = self.extract_app()
         if not self.app:
@@ -77,6 +49,44 @@ class AppBase(object):
         py_path = sys.modules[self.__class__.__module__].__file__
         self.templates_dir = utils.abs_path(py_path, "templates")
 
+    @classmethod
+    def main(cls, name):
+        parser = argparse.ArgumentParser(description=f"phenix user app: {name}")
+        parser.add_argument("stage", choices=cls.valid_stages, help="Lifecycle stage to execute")
+        parser.add_argument("--dry-run", action="store_true", help="Perform a dry run")
+
+        args = parser.parse_args()
+
+        dryrun = args.dry_run or os.getenv('PHENIX_DRYRUN', 'false') == 'true'
+
+        if dryrun:
+            settings.PHENIX_LOG_FILE = None
+
+        # Reset logger to pick up new settings
+        logger.logger = None
+        # Initialize logger (this sets up FileHandler if configured, wiping existing handlers)
+        logger.log('DEBUG', 'Initializing phenix-apps logger')
+
+        # Ensure we have a handler for stderr so logs appear in console/container logs
+        log = logging.getLogger('phenix-apps')
+        has_console = any(isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler) for h in log.handlers)
+        if not has_console:
+            handler = logging.StreamHandler(sys.stderr)
+            handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+            log.addHandler(handler)
+
+        app = cls(name, args.stage, dryrun)
+        app.execute_stage()
+        app.finalize()
+
+        # Output the experiment JSON (standard Phenix app behavior)
+        if app.dryrun:
+            print(app.experiment.to_json(indent=2))
+        else:
+            print(app.experiment.to_json())
+
+        return app
+
     def execute_stage(self):
         """
         Executes the stage passed in from the json blob
@@ -90,16 +100,15 @@ class AppBase(object):
             'cleanup'    : self.cleanup
         }
 
-        sys.stdout = open('/dev/null', 'w')
-
         stages_dict[self.stage]()
 
-        sys.stdout.close()
-        sys.stdout = sys.__stdout__
+    def finalize(self):
+        pass
 
     def get_annotation(self, key: str) -> str | None:
-        if 'annotations' in self.experiment.metadata:
-            return self.experiment.metadata.annotations[key]
+        metadata = self.experiment.get('metadata')
+        if metadata and 'annotations' in metadata:
+            return metadata.annotations.get(key)
 
         return None
 

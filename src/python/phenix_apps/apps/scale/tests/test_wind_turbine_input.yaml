@@ -1,0 +1,75 @@
+spec:
+  experimentName: test-wind-turbine
+  baseDir: /tmp/test-wind-turbine
+  scenario:
+    apps:
+      - name: scale
+        metadata:
+          profiles:
+            - name: wtg
+              plugin: wind_turbine
+              count: 30 # Total number of wind turbines to simulate
+              containers_per_node: 18 # 3 turbines * 6 components each
+              container_template:
+                memory: 1024
+                external_network:
+                  - name: ot
+                    network: 192.168.100.0/24
+                    start_ip: 192.168.100.10
+                    gateway: 192.168.100.254
+              # Complex configuration for the wind turbine components
+              ground-truth-module:
+                elastic:
+                  endpoint: http://192.168.100.101:9200
+                  index-base-name: wind-turbine
+                  labels:
+                    turbine: "{{turbine_name}}"
+              templates:
+                default:
+                  main-controller:
+                    turbine:
+                      type: E-126/4200
+                      hubHeight: 135
+                      roughnessLength: 0.15
+                    logic:
+                      speedTag: speed.high
+                      directionTag: dir.high
+                      directionError: 0.04
+                    node-red:
+                      flows: /phenix/injects/flows.json
+                    weather:
+                      columns:
+                        - name: wind_speed
+                          tags:
+                            - { name: speed.high, height: 58.2 }
+                            - { name: speed.med, height: 36.6 }
+                            - { name: speed.low, height: 15.0 }
+                        - name: temperature
+                          tags:
+                            - { name: temp.high, height: 58.2 }
+                            - { name: temp.low, height: 3.0 }
+                        - name: pressure
+                          tags:
+                            - { name: pressure, height: 0.0 }
+                  anemometer:
+                    weather:
+                      replayData: /phenix/injects/weather.csv
+                      columns:
+                        - { name: "Windspeed 58.2m", tag: speed.high }
+                        - { name: "Windspeed 36.6m", tag: speed.med }
+                        - { name: "Windspeed 15.0m", tag: speed.low }
+                        - { name: "Wind Direction 58.2m", tag: dir.high }
+                        - { name: "Wind Direction 36.6m", tag: dir.med }
+                        - { name: "Wind Direction 15.0m", tag: dir.low }
+                        - { name: "Temperature 58.2m", tag: temp.high }
+                        - { name: "Temperature 3.0m", tag: temp.low }
+                        - { name: "Barometric Pressure", tag: pressure }
+                  yaw-controller:
+                    yaw:
+                      initialPosition: 0
+                      degreePerSecond: 0.1
+  topology:
+    nodes: []
+status:
+  vlans:
+    ot: 200

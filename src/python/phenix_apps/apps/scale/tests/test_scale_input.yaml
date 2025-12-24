@@ -1,0 +1,39 @@
+spec:
+  experimentName: test-plugins
+  baseDir: /tmp/test-plugins
+  scenario:
+    apps:
+      - name: scale
+        metadata:
+          profiles:
+            - name: builtin-profile-v1
+              plugin:
+                name: builtin
+                version: "1.0.0"
+              containers: 23
+              containers_per_node: 5
+              container_template:
+                networks:
+                  - name: MGMT
+                    network: 172.20.99.0/16
+                  - name: EXP
+                    network: 10.10.99.0/16
+                gateway: MGMT
+                rootfs: foobar.tgz
+            - name: builtin-profile-latest
+              plugin: builtin # This will resolve to the latest version (2.0.0)
+              count: 2
+              container_template:
+                networks:
+                  - name: MGMT
+                    network: 172.21.99.0/16
+                  - name: EXP
+                    network: 10.11.99.0/16
+                gateway: MGMT
+                rootfs: baz.tgz
+  topology:
+    nodes: []
+status:
+  vlans:
+    MGMT: 222
+    EXP: 333

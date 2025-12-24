@@ -4,18 +4,11 @@ from phenix_apps.apps   import AppBase
 from phenix_apps.common import logger, utils
 
 class Helics(AppBase):
-    def __init__(self):
-        AppBase.__init__(self, 'helics')
+    def __init__(self, name, stage, dryrun=False):
+        super().__init__(name, stage, dryrun)
 
         self.helics_dir = f"{self.exp_dir}/helics"
         os.makedirs(self.helics_dir, exist_ok=True)
-
-        self.execute_stage()
-
-        # We don't (currently) let the parent AppBase class handle this step
-        # just in case app developers want to do any additional manipulation
-        # after the appropriate stage function has completed.
-        print(self.experiment.to_json())
 
     def pre_start(self):
         logger.log('INFO', f'Starting user application: {self.name}')
@@ -73,7 +66,7 @@ class Helics(AppBase):
             self.add_label(fed.general.hostname, 'group', 'helics')
             self.add_label(fed.general.hostname, 'helics', 'federate')
             configs = fed.annotations.get('helics/federate', [])
-            
+
             # if the federate has the helics/federate annotation, add the inject to wait for the broker
             if configs and configs[0].get('broker-wait', True):
                 dst = '/etc/phenix/startup/5-wait-broker.sh'
@@ -170,11 +163,3 @@ class Helics(AppBase):
 
             dst = '/etc/phenix/startup/90-helics-broker.sh'
             self.add_inject(hostname=hostname, inject={'src': start_file, 'dst': dst})
-
-
-def main():
-    Helics()
-
-
-if __name__ == '__main__':
-    main()

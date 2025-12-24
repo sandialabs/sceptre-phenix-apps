@@ -16,8 +16,8 @@ from phenix_apps.apps.otsim.protocols.dnp3   import DNP3
 
 
 class WindTurbine(AppBase):
-  def __init__(self):
-    AppBase.__init__(self, 'wind-turbine')
+  def __init__(self, name, stage, dryrun=False):
+    super().__init__(name, stage, dryrun)
 
     self.startup_dir = f"{self.exp_dir}/startup"
     self.ot_sim_dir  = f"{self.exp_dir}/ot-sim"
@@ -26,12 +26,6 @@ class WindTurbine(AppBase):
     os.makedirs(self.ot_sim_dir,  exist_ok=True)
 
     self.__init_defaults()
-    self.execute_stage()
-
-    # We don't (currently) let the parent AppBase class handle this step
-    # just in case app developers want to do any additional manipulation
-    # after the appropriate stage function has completed.
-    print(self.experiment.to_json())
 
 
   def pre_start(self):
@@ -561,11 +555,3 @@ class WindTurbine(AppBase):
     return [
       Register('binary-read-write', 'feathered', {}),
     ]
-
-
-def main():
-  WindTurbine()
-
-
-if __name__ == '__main__':
-  main()

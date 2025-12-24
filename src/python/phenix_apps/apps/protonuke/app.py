@@ -3,17 +3,10 @@ from phenix_apps.common import logger, utils
 
 
 class Protonuke(AppBase):
-    def __init__(self):
-        AppBase.__init__(self, 'protonuke')
+    def __init__(self, name, stage, dryrun=False):
+        super().__init__(name, stage, dryrun)
 
         self.startup_dir = f"{self.exp_dir}/startup"
-
-        self.execute_stage()
-
-        # We don't (currently) let the parent AppBase class handle this step
-        # just in case app developers want to do any additional manipulation
-        # after the appropriate stage function has completed.
-        print(self.experiment.to_json())
 
 
     def pre_start(self):
@@ -48,11 +41,3 @@ class Protonuke(AppBase):
             self.add_inject(hostname=vm.hostname, inject=kwargs)
 
         logger.log('INFO', f'Started user application: {self.name}')
-
-
-def main():
-    Protonuke()
-
-
-if __name__ == '__main__':
-    main()

@@ -6,21 +6,14 @@ from phenix_apps.apps   import AppBase
 from phenix_apps.common import logger, utils, settings
 
 class Caldera(AppBase):
-    def __init__(self):
-        AppBase.__init__(self, 'caldera')
+    def __init__(self, name, stage, dryrun=False):
+        super().__init__(name, stage, dryrun)
 
         self.app_dir = f"{self.exp_dir}/caldera"
         os.makedirs(self.app_dir, exist_ok=True)
 
         self.files_dir = f"{settings.PHENIX_DIR}/images/{self.exp_name}/caldera"
         os.makedirs(self.files_dir, exist_ok=True)
-
-        self.execute_stage()
-
-        # We don't (currently) let the parent AppBase class handle this step
-        # just in case app developers want to do any additional manipulation
-        # after the appropriate stage function has completed.
-        print(self.experiment.to_json())
 
 
     def configure(self):
@@ -168,11 +161,3 @@ class Caldera(AppBase):
                 self.add_inject(hostname=host.hostname, inject={'src': agent_file, 'dst': '/etc/phenix/startup/90-sandcat-agent.sh'})
 
         logger.log('INFO', f'Started user application: {self.name}')
-
-
-def main():
-  Caldera()
-
-
-if __name__ == '__main__':
-  main()
