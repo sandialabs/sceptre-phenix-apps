@@ -2,6 +2,7 @@ import json
 import os
 import shlex
 import subprocess
+import uuid
 from pathlib import Path
 
 from phenix_apps.apps.scorch import ComponentBase
@@ -11,29 +12,23 @@ from phenix_apps.common import logger
 class Kafka(ComponentBase):
     def __init__(self):
         ComponentBase.__init__(self, "kafka")
+        
+        # generate a universal uid so that multiple kafka components can run simultaneously
+        config_str = json.dumps(self.metadata, sort_keys=True)
+        component_uuid = uuid.uuid5(uuid.NAMESPACE_DNS, f"{self.exp_name}-{self.name}-{config_str}")
+        
         self.pid_file = (
-            f"/tmp/phenix-scorch-kafka-{self.exp_name}.pid"
+            f"/tmp/phenix-scorch-kafka-{self.exp_name}-{component_uuid.hex}.pid"
         )
-        self.started = False
-        self.configured = False
         self.execute_stage()
 
-    # configure just calls start
     def configure(self):
-        # if we call the start and configure changes, only run the
-        # component once
-        if self.started:
+        # if the deterministic PID file already exists, don't configure the component again
+        if os.path.exists(self.pid_file):
+            logger.log("INFO", f"User component {self.name} already configured, skipping")
             return
-        else:
-            self.start()
-            self.configured = True
-
-    def start(self):
-        # if we've already configured the element, return
-        if self.configured:
-            return
-        self.started = True
-        logger.log("INFO", f"Starting user component: {self.name}")
+  
+        logger.log("INFO", f"Configuring user component: {self.name}")
 
         # get kafka ip addresses and concatenate them into a list of
         # strings in format ip:port
@@ -131,25 +126,21 @@ class Kafka(ComponentBase):
             )
             return pid
 
-    def stop(self):
+    def cleanup(self):
         # stops listener executable
         pid = self._consume_pid_file()
 
         if not pid:
-            logger.log("INFO", f"Stopped user component: {self.name}")
+            logger.log("INFO", f"No PID, component already cleaned up")
             exit()
 
         try:
             os.kill(pid, 9)
-            logger.log("INFO", f"Stopped user component: {self.name}")
+            logger.log("INFO", f"Cleaned up user component: {self.name}")
         except Exception as e:
             self.eprint(
                 f"Error terminating listener at PID {pid}. See: {e}"
             )
-
-    # cleanup is the same as stop
-    def cleanup(self):
-        self.stop()
 
 
 def main():
