@@ -18,7 +18,7 @@ class Kafka(ComponentBase):
         component_uuid = uuid.uuid5(uuid.NAMESPACE_DNS, f"{self.exp_name}-{self.name}-{config_str}")
         
         self.pid_file = (
-            f"/tmp/phenix-scorch-kafka-{self.exp_name}-{component_uuid.hex[:8]}.pid"
+            f"/tmp/phenix-scorch-kafka-{self.exp_name}-{component_uuid.hex}.pid"
         )
         self.execute_stage()
 
