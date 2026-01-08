@@ -66,13 +66,13 @@ type MirrorHostMetadata struct {
 }
 
 type MirrorAppStatus struct {
-	TapName string                  `structs:"tapName" mapstructure:"tapName"`
-	Subnet  string                  `structs:"subnet" mapstructure:"subnet"`
-	Mirrors map[string]MirrorConfig `structs:"mirrors" mapstructure:"mirrors"`
+	TapName string                  `mapstructure:"tapName" structs:"tapName"`
+	Subnet  string                  `mapstructure:"subnet"  structs:"subnet"`
+	Mirrors map[string]MirrorConfig `mapstructure:"mirrors" structs:"mirrors"`
 }
 
 type MirrorConfig struct {
-	MirrorName   string `structs:"mirrorName" mapstructure:"mirrorName"`
-	MirrorBridge string `structs:"mirrorBridge" mapstructure:"mirrorBridge"`
-	IP           string `structs:"ip" mapstructure:"ip"`
+	MirrorName   string `mapstructure:"mirrorName"   structs:"mirrorName"`
+	MirrorBridge string `mapstructure:"mirrorBridge" structs:"mirrorBridge"`
+	IP           string `mapstructure:"ip"           structs:"ip"`
 }

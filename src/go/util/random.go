@@ -15,12 +15,12 @@ func init() {
 
 func RandomString(n int) string {
 	var (
-		buf = make([]rune, n)
-		len = len(chars)
+		buf    = make([]rune, n)
+		length = len(chars)
 	)
 
 	for i := range buf {
-		buf[i] = chars[rand.Intn(len)]
+		buf[i] = chars[rand.Intn(length)]
 	}
 
 	return string(buf)

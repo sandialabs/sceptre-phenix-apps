@@ -5,7 +5,7 @@ import (
 	ifaces "phenix/types/interfaces"
 )
 
-func ExtractVersion(md map[string]interface{}) string {
+func ExtractVersion(md map[string]any) string {
 	val, ok := md["version"]
 	if ok {
 		version, ok := val.(string)
@@ -48,6 +48,7 @@ func ExtractNodesTopologyType(topo ifaces.TopologySpec, types ...string) []iface
 		for _, typ := range types {
 			if node.Type() == typ {
 				nodes = append(nodes, node)
+
 				break
 			}
 		}
@@ -56,7 +57,11 @@ func ExtractNodesTopologyType(topo ifaces.TopologySpec, types ...string) []iface
 	return nodes
 }
 
-func ExtractNodesType(scenario ifaces.ScenarioSpec, name string, types ...string) []ifaces.ScenarioAppHost {
+func ExtractNodesType(
+	scenario ifaces.ScenarioSpec,
+	name string,
+	types ...string,
+) []ifaces.ScenarioAppHost {
 	app := ExtractApp(scenario, name)
 
 	var hosts []ifaces.ScenarioAppHost
@@ -72,7 +77,11 @@ func ExtractNodesType(scenario ifaces.ScenarioSpec, name string, types ...string
 	return hosts
 }
 
-func ExtractNodesLabel(scenario ifaces.ScenarioSpec, name string, labels ...string) []ifaces.ScenarioAppHost {
+func ExtractNodesLabel(
+	scenario ifaces.ScenarioSpec,
+	name string,
+	labels ...string,
+) []ifaces.ScenarioAppHost {
 	app := ExtractApp(scenario, name)
 
 	var hosts []ifaces.ScenarioAppHost

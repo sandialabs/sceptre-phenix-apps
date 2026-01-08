@@ -2,16 +2,16 @@ package util
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
 
+	"github.com/mitchellh/mapstructure"
 	"phenix/store"
 	"phenix/types"
 	ifaces "phenix/types/interfaces"
 	"phenix/types/version"
-
-	"github.com/mitchellh/mapstructure"
 )
 
 func IsDryRun() bool {
@@ -31,7 +31,7 @@ func IsDryRun() bool {
 }
 
 func DecodeExperiment(body []byte) (*types.Experiment, error) {
-	var mapper map[string]interface{}
+	var mapper map[string]any
 
 	if err := json.Unmarshal(body, &mapper); err != nil {
 		return nil, fmt.Errorf("unable to parse JSON: %w", err)
@@ -53,7 +53,7 @@ func DecodeExperiment(body []byte) (*types.Experiment, error) {
 
 	spec, ok := iface.(ifaces.ExperimentSpec)
 	if !ok {
-		return nil, fmt.Errorf("invalid experiment spec")
+		return nil, errors.New("invalid experiment spec")
 	}
 
 	iface, err = version.GetVersionedStatusForKind("Experiment", "v1")
@@ -67,7 +67,7 @@ func DecodeExperiment(body []byte) (*types.Experiment, error) {
 
 	status, ok := iface.(ifaces.ExperimentStatus)
 	if !ok {
-		return nil, fmt.Errorf("invalid experiment status")
+		return nil, errors.New("invalid experiment status")
 	}
 
 	return &types.Experiment{Metadata: md, Spec: spec, Status: status}, nil
