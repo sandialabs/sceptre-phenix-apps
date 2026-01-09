@@ -104,6 +104,20 @@ While the Scale app provides a common schema, plugins are free to interpret thes
 *   **`builtin` Plugin**: `count` refers to the number of **Virtual Machines** to deploy.
 *   **`wind_turbine` Plugin**: `count` refers to the number of **Wind Turbines** (assets) to simulate. Since one turbine consists of 6 containers, the plugin calculates the actual number of VMs based on `containers_per_node`.
 
+### Plugin Versioning
+
+The Scale app supports multiple versions of the same plugin.
+
+*   **Default**: If `version` is omitted, the app loads the **latest** version (based on semantic versioning, e.g., `2.0.0` > `1.0.0`).
+*   **Explicit**: You can pin a specific version in the profile.
+*   **Deprecation**: If a requested plugin version is marked as deprecated, a warning will be logged at runtime.
+
+```yaml
+plugin:
+  name: builtin
+  version: "1.0.0"
+```
+
 ## Plugins
 
 ### Builtin Plugin (`builtin`)
@@ -212,15 +226,15 @@ Plugins can be **Internal** (built into `phenix-apps`) or **External** (installe
 ### Internal Plugins
 1.  Create a class inheriting from `phenix_apps.apps.scale.interface.ScalePlugin`.
 2.  Implement the abstract methods.
-3.  Decorate with `@register_plugin("my_plugin_name")`.
-4.  Place the file in `phenix_apps/apps/scale/plugins/`.
+3.  Decorate with `@register_plugin("my_plugin_name", "1.0.0", deprecated=False)`.
+4.  Register the plugin in `pyproject.toml` under `[project.entry-points."phenix.scale.plugins"]`.
 
 ### External Plugins
 External plugins allow you to extend the Scale app without modifying the core codebase.
 
 1.  **Create your plugin package** structure.
 2.  **Implement the plugin** class with the `@register_plugin` decorator (same as 1-3 of **Internal Plugins**).
-3.  **Register an entry point** in your `pyproject.toml` (or `setup.py`). The entry point name must start with `phenix-scale-plugin-`.
+3.  **Register an entry point** in your `pyproject.toml` (or `setup.py`) under the group `phenix.scale.plugins`.
 
 **Example `my_plugin.py`:**
 ```python
@@ -235,10 +249,8 @@ class MyExternalPlugin(ScalePlugin):
 
 **Example `pyproject.toml`:**
 ```toml
-[project.scripts]
-# The name must start with 'phenix-scale-plugin-'
-# The value points to the module containing the decorated class
-phenix-scale-plugin-custom = "my_package.my_plugin:MyExternalPlugin"
+[project.entry-points."phenix.scale.plugins"]
+my-external-plugin = "my_package.my_plugin:MyExternalPlugin"
 ```
 
 See `phenix_apps/apps/scale/interface.py` for the API definition.

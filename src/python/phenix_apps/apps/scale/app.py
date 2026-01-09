@@ -1,4 +1,3 @@
-import importlib
 import io
 import ipaddress as ip
 import os
@@ -51,42 +50,18 @@ class Scale(AppBase):
         return plugins
 
     def _discover_plugins(self) -> None:
-        # Discover plugins via console_scripts
+        # Discover plugins via specific group
         try:
-            logger.debug("Discovering plugins via 'phenix-scale-plugin-*' entry points...")
-            eps = entry_points(group="console_scripts")
+            logger.debug("Discovering plugins via 'phenix.scale.plugins' entry points...")
+            eps = entry_points(group="phenix.scale.plugins")
             for ep in eps:
-                if ep.name.startswith("phenix-scale-plugin-"):
-                    try:
-                        ep.load()
-                        logger.debug(f"Loaded plugin from console script: {ep.name}")
-                    except Exception as e:
-                        logger.error(f"Failed to load plugin from script {ep.name}: {e}")
+                try:
+                    ep.load()
+                    logger.debug(f"Loaded plugin from entry point: {ep.name}")
+                except Exception as e:
+                    logger.error(f"Failed to load plugin {ep.name}: {e}")
         except Exception as e:
             logger.warning(f"Failed to discover plugins via entry_points: {e}")
-
-        plugins_to_load = self._get_required_plugins()
-
-        for name in plugins_to_load:
-            if name in PLUGIN_REGISTRY:
-                continue
-
-            try:
-                # Try to load as an internal plugin first
-                importlib.import_module(f"phenix_apps.apps.scale.plugins.{name}")
-                logger.debug(f"Loaded internal plugin: {name}")
-            except ImportError as e:
-                logger.error(f"Failed to load plugin '{name}': {e}")
-                continue
-            except Exception as e:
-                logger.error(f"An unexpected error occurred while loading plugin '{name}': {e}")
-                continue
-
-            # After attempting to load, check for registration
-            if name not in PLUGIN_REGISTRY:
-                logger.warning(
-                    f"Plugin module '{name}' was loaded but did not register itself with the name '{name}'."
-                )
 
     def _get_plugin_instance(self, profile: dict[str, Any]) -> ScalePlugin:
         """Dynamically loads the plugin specified in profile (default: builtin)."""
@@ -99,7 +74,9 @@ class Scale(AppBase):
         )
 
         try:
-            return get_plugin(name, version)
+            instance = get_plugin(name, version)
+            logger.debug(f"Loaded plugin instance: {instance.__class__.__name__} (requested: {version})")
+            return instance
         except ValueError as e:
             logger.error(
                 f"Failed to load scale plugin '{name}': {e}. Available: {list(PLUGIN_REGISTRY.keys())}",
