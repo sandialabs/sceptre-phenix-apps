@@ -187,8 +187,12 @@ def test_on_node_configured(wind_turbine, mocker):
     plugin.pre_configure(mock_app, profile)
 
     # Mock dependencies
-    mock_makedirs = mocker.patch("phenix_apps.apps.scale.plugins.wind_turbine.os.makedirs")
-    mock_tarfile = mocker.patch("phenix_apps.apps.scale.plugins.wind_turbine.tarfile.open")
+    mock_makedirs = mocker.patch(
+        "phenix_apps.apps.scale.plugins.wind_turbine.os.makedirs"
+    )
+    mock_tarfile = mocker.patch(
+        "phenix_apps.apps.scale.plugins.wind_turbine.tarfile.open"
+    )
     mocker.patch("phenix_apps.apps.scale.plugins.wind_turbine.shutil.copy")
 
     # Mock Config to avoid XML errors and file writing

@@ -1,4 +1,5 @@
 import pytest
+
 from phenix_apps.apps.scale.registry import PluginRegistry
 
 

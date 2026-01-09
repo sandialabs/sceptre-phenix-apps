@@ -1,22 +1,23 @@
+import io
+import json
 import os
 import re
 import signal
 import sys
 import time
-from contextlib import redirect_stdout, redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional, Tuple, Union
-import io
-import json
 
-from phenix_apps.common.settings import PHENIX_DIR
-from phenix_apps.common import utils
-from phenix_apps.common.logger import logger
-
+import minimega
 from box import Box
 from elasticsearch import Elasticsearch
-import minimega
+
+from phenix_apps.common import utils
+from phenix_apps.common.logger import logger
+from phenix_apps.common.settings import PHENIX_DIR
+
 
 class ComponentBase(object):
     valid_stages = ["configure", "start", "stop", "cleanup"]
@@ -30,14 +31,18 @@ class ComponentBase(object):
         """
 
         if len(sys.argv) != 6:
-            klass.eprint(f'must pass exactly five arguments to scorch component: was passed {len(sys.argv) - 1}')
-            klass.eprint("scorch component expects <run_stage> <component_name> <run_id> <current_loop> <current_loop_count> << <json_input>")
+            klass.eprint(
+                f"must pass exactly five arguments to scorch component: was passed {len(sys.argv) - 1}"
+            )
+            klass.eprint(
+                "scorch component expects <run_stage> <component_name> <run_id> <current_loop> <current_loop_count> << <json_input>"
+            )
 
             sys.exit(1)
 
         if sys.argv[1] not in klass.valid_stages:
-            klass.eprint(f'{sys.argv[1]} is not a valid stage')
-            klass.eprint(f'Valid stages are: {klass.valid_stages}')
+            klass.eprint(f"{sys.argv[1]} is not a valid stage")
+            klass.eprint(f"Valid stages are: {klass.valid_stages}")
 
             sys.exit(1)
 
@@ -51,8 +56,8 @@ class ComponentBase(object):
         print(msg, file=sys.stderr)
 
         if ui:
-            tstamp = time.strftime('%Y-%m-%dT%H:%M:%S')
-            print(f'[{tstamp}] ERROR : {msg}', flush=True)
+            tstamp = time.strftime("%Y-%m-%dT%H:%M:%S")
+            print(f"[{tstamp}] ERROR : {msg}", flush=True)
 
         logger.error(msg)  # write error to phenix log file
 
@@ -64,23 +69,33 @@ class ComponentBase(object):
         """
 
         if ts:
-            tstamp = time.strftime('%Y-%m-%dT%H:%M:%S')
-            print(f'[{tstamp}] {msg}', flush=True)
+            tstamp = time.strftime("%Y-%m-%dT%H:%M:%S")
+            print(f"[{tstamp}] {msg}", flush=True)
         else:
             print(msg, flush=True)
 
     def __init__(self, typ: str) -> None:
         self.type: str = typ
 
-        self.dryrun: bool = os.getenv('PHENIX_DRYRUN', 'false') == 'true'
+        self.dryrun: bool = os.getenv("PHENIX_DRYRUN", "false") == "true"
 
         self.check_stdin()
 
-        self.stage: str = sys.argv[1]  # stage name, one of: configure, start, stop, cleanup
-        self.name: str = sys.argv[2]  # component name (name given to component by the user in the Scorch app configuration)
-        self.run: int = int(sys.argv[3])  # Run number, usually 0 unless multiple runs are defined in scenario
-        self.loop: int = int(sys.argv[4])  # Loop number, usually 0 unless loops are defined, then it's...always 1?
-        self.count: int = int(sys.argv[5])  # Run iteration, usually 0 unless "count: <num>" is specified (multiple iterations of same run or loop)
+        self.stage: str = sys.argv[
+            1
+        ]  # stage name, one of: configure, start, stop, cleanup
+        self.name: str = sys.argv[
+            2
+        ]  # component name (name given to component by the user in the Scorch app configuration)
+        self.run: int = int(
+            sys.argv[3]
+        )  # Run number, usually 0 unless multiple runs are defined in scenario
+        self.loop: int = int(
+            sys.argv[4]
+        )  # Loop number, usually 0 unless loops are defined, then it's...always 1?
+        self.count: int = int(
+            sys.argv[5]
+        )  # Run iteration, usually 0 unless "count: <num>" is specified (multiple iterations of same run or loop)
 
         # Keep this around just in case components want direct access to it.
         self.raw_input: str = sys.stdin.read()
@@ -88,16 +103,23 @@ class ComponentBase(object):
         try:
             self.experiment: Box = Box.from_json(self.raw_input)
         except Exception as ex:
-            self.eprint(f"Failed to parse experiment JSON for scorch component '{self.name}': {ex}")
+            self.eprint(
+                f"Failed to parse experiment JSON for scorch component '{self.name}': {ex}"
+            )
             sys.exit(1)
 
         self.exp_name: str = self.experiment.spec.experimentName
         self.exp_dir: str = self.experiment.spec.baseDir
         self.metadata: Box | None = self.extract_metadata()
 
-        self.root_dir: str = os.path.join(PHENIX_DIR, 'images')
-        self.files_dir: str = os.getenv('PHENIX_FILES_DIR', os.path.join(self.root_dir, self.exp_name, 'files'))
-        self.base_dir: str = os.path.join(self.files_dir, f'scorch/run-{self.run}/{self.name}/loop-{self.loop}-count-{self.count}')
+        self.root_dir: str = os.path.join(PHENIX_DIR, "images")
+        self.files_dir: str = os.getenv(
+            "PHENIX_FILES_DIR", os.path.join(self.root_dir, self.exp_name, "files")
+        )
+        self.base_dir: str = os.path.join(
+            self.files_dir,
+            f"scorch/run-{self.run}/{self.name}/loop-{self.loop}-count-{self.count}",
+        )
 
         os.makedirs(self.base_dir, exist_ok=True)
 
@@ -116,10 +138,10 @@ class ComponentBase(object):
         """
 
         stages_dict = {
-            'configure' : self.configure,
-            'start'     : self.start,
-            'stop'      : self.stop,
-            'cleanup'   : self.cleanup
+            "configure": self.configure,
+            "start": self.start,
+            "stop": self.stop,
+            "cleanup": self.cleanup,
         }
 
         orig_logger_log = logger.log
@@ -133,7 +155,9 @@ class ComponentBase(object):
 
         # override phenix's logger to save to the buffer
         # we use a lambda function because level and msg do not exist until the logger calls this function
-        logger.log = lambda level, msg: self.buffer_logger_log(level, msg, log_buffer, orig_logger_log)
+        logger.log = lambda level, msg: self.buffer_logger_log(
+            level, msg, log_buffer, orig_logger_log
+        )
 
         start = time.time()
 
@@ -153,39 +177,39 @@ class ComponentBase(object):
         start_dt = datetime.fromtimestamp(start, tz=timezone.utc)
         end_dt = datetime.fromtimestamp(end, tz=timezone.utc)
 
-        start_ts = start_dt.isoformat(timespec='milliseconds').replace('+00:00', 'Z')
-        end_ts = end_dt.isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+        start_ts = start_dt.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        end_ts = end_dt.isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
         # filenames can't have colons, so replace with dashes
-        start_ts_filename = start_dt.strftime('%Y-%m-%dT%H-%M-%SZ')
+        start_ts_filename = start_dt.strftime("%Y-%m-%dT%H-%M-%SZ")
 
         info_file = os.path.join(
             self.base_dir,
-            f'{self.exp_name}-scorch-run-{self.run}-{self.name}-loop-{self.loop}-count-{self.count}-{self.stage}-{start_ts_filename}.json',
+            f"{self.exp_name}-scorch-run-{self.run}-{self.name}-loop-{self.loop}-count-{self.count}-{self.stage}-{start_ts_filename}.json",
         )
 
         content = {
-          "experiment_name": self.exp_name,
-          "scorch_run_index": self.run,
-          "component": self.name,
-          "loop": self.loop,
-          "count": self.count,
-          "stage": self.stage,
-          "start": start_ts,
-          "end": end_ts,
-          "return": out,
-          "stdout": self._format_stream(stdout_mirror.getvalue()),
-          "stderr": self._format_stream(stderr_mirror.getvalue()),
-          "logs": self._format_stream(log_buffer.getvalue())
+            "experiment_name": self.exp_name,
+            "scorch_run_index": self.run,
+            "component": self.name,
+            "loop": self.loop,
+            "count": self.count,
+            "stage": self.stage,
+            "start": start_ts,
+            "end": end_ts,
+            "return": out,
+            "stdout": self._format_stream(stdout_mirror.getvalue()),
+            "stderr": self._format_stream(stderr_mirror.getvalue()),
+            "logs": self._format_stream(log_buffer.getvalue()),
         }
-        with open(info_file, 'w') as f:
+        with open(info_file, "w") as f:
             json.dump(content, f, indent=2)
 
     # override phenix's logger buffer_logger_log to also save to our buffer
     def buffer_logger_log(self, level, msg, log_buffer, orig_logger_log):
         try:
             tstamp = time.strftime("%Y-%m-%dT%H:%M:%S")
-            log_buffer.write(f'[{tstamp}] {level} : {msg}\n')
+            log_buffer.write(f"[{tstamp}] {level} : {msg}\n")
         except Exception as ex:
             print(f"Error writing to log buffer: {ex}")
         orig_logger_log(level, msg)
@@ -216,7 +240,7 @@ class ComponentBase(object):
 
         saved_stdout = sys.stdout
 
-        sys.stdout = open('/dev/null', 'w')
+        sys.stdout = open("/dev/null", "w")
 
         mm = None
 
@@ -234,7 +258,9 @@ class ComponentBase(object):
     def es(self) -> Elasticsearch:
         """Connect to Elasticsearch and return the initialized object."""
         if not self._es:
-            self.print(f"Connecting to Elasticsearch: {self.metadata.elasticsearch.server}")
+            self.print(
+                f"Connecting to Elasticsearch: {self.metadata.elasticsearch.server}"
+            )
             self._es = utils.connect_elastic(self.metadata.elasticsearch.server)
         return self._es
 
@@ -246,28 +272,28 @@ class ComponentBase(object):
         apps = self.experiment.spec.scenario.apps
 
         for app in apps:
-            if app.name == 'scorch':
-                md = app.get('metadata', None)
+            if app.name == "scorch":
+                md = app.get("metadata", None)
 
                 if not md:
                     return None
 
                 for cmp in md.components:
                     if cmp.name == self.name and cmp.type == self.type:
-                        return cmp.get('metadata', None)
+                        return cmp.get("metadata", None)
 
     def extract_run_name(self) -> Optional[str]:
         app = self.extract_app("scorch")
         if not app:
             return None
 
-        md = app.get('metadata', {})
-        runs = md.get('runs', [])
+        md = app.get("metadata", {})
+        runs = md.get("runs", [])
 
         if len(runs) <= self.run:
             return str(self.run)
 
-        name = runs[self.run].get('name', str(self.run))
+        name = runs[self.run].get("name", str(self.run))
 
         # name might be an empty string...
         return name if name else str(self.run)
@@ -278,7 +304,9 @@ class ComponentBase(object):
                 return app
         self.eprint(f"failed to find app '{name}'")
 
-    def extract_node(self, hostname: str, wildcard: bool = False) -> Box | list[Box] | None:
+    def extract_node(
+        self, hostname: str, wildcard: bool = False
+    ) -> Box | list[Box] | None:
         if wildcard:
             extracted = []
             regex = re.compile(hostname)
@@ -313,9 +341,9 @@ class ComponentBase(object):
                     if i.name == iface:
                         return i.address
 
-                raise ValueError(f'interface {iface} does not exist on node {name}')
+                raise ValueError(f"interface {iface} does not exist on node {name}")
 
-        raise ValueError(f'node {name} does not exist')
+        raise ValueError(f"node {name} does not exist")
 
     def get_host_and_iface(self, config: Box) -> Tuple[str, int]:
         """
@@ -326,9 +354,9 @@ class ComponentBase(object):
         Returns:
             tuple with the hostname and the interface index
         """
-        hostname = config.get('hostname')
+        hostname = config.get("hostname")
         if not hostname:
-            self.eprint(f'no hostname provided for VM config {config}')
+            self.eprint(f"no hostname provided for VM config {config}")
             sys.exit(1)
 
         node = self.extract_node(hostname)
@@ -337,11 +365,13 @@ class ComponentBase(object):
             sys.exit(1)
 
         if not node.network.interfaces:
-            self.eprint(f'no interfaces defined for node {hostname}! (node={node}, config={config})')
+            self.eprint(
+                f"no interfaces defined for node {hostname}! (node={node}, config={config})"
+            )
             sys.exit(1)
 
         # Default to interface 0
-        interface = config.get('interface', 0)
+        interface = config.get("interface", 0)
 
         # If it's an integer, use as-is
         # If not, attempt to resolve the name to a index
@@ -353,7 +383,9 @@ class ComponentBase(object):
                     interface = idx
                     break
             else:
-                raise ValueError(f'interface {interface} does not exist on node {hostname}')
+                raise ValueError(
+                    f"interface {interface} does not exist on node {hostname}"
+                )
 
         return hostname, interface
 
@@ -400,7 +432,9 @@ class ComponentBase(object):
         )
 
         if resp["exitcode"] != 0:
-            self.eprint(f"failed to run '{cmd}'\nexitcode: {resp['exitcode']}\nstdout: {resp['stdout']}\nstderr: {resp['stderr']}")
+            self.eprint(
+                f"failed to run '{cmd}'\nexitcode: {resp['exitcode']}\nstdout: {resp['stdout']}\nstderr: {resp['stderr']}"
+            )
             sys.exit(1)
 
         return resp
@@ -410,9 +444,13 @@ class ComponentBase(object):
     ) -> bool:
         if os_type == "linux":
             # "ps -e" cuts off full command name, need "f" to get full command
-            ps_list = self.run_and_check_command(vm, "ps -ef", timeout=15.0, poll_rate=0.5)["stdout"]
+            ps_list = self.run_and_check_command(
+                vm, "ps -ef", timeout=15.0, poll_rate=0.5
+            )["stdout"]
         elif os_type == "windows":
-            ps_list = self.run_and_check_command(vm, "tasklist", timeout=15.0, poll_rate=0.5)["stdout"]
+            ps_list = self.run_and_check_command(
+                vm, "tasklist", timeout=15.0, poll_rate=0.5
+            )["stdout"]
         else:
             raise ValueError(f"unknown os_type '{os_type}' for VM {vm}")
 
@@ -434,6 +472,7 @@ class ComponentBase(object):
     def cleanup(self) -> None:
         pass
 
+
 class _MirrorAndBuffer:
     """
     Overwrites a stream to mirror output to the original stream and a buffer
@@ -448,6 +487,7 @@ class _MirrorAndBuffer:
         self.buffer.write(s)
         self.orig_stream.flush()
         self.buffer.flush()
+
     def flush(self):
         self.orig_stream.flush()
         self.buffer.flush()

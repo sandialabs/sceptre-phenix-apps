@@ -53,7 +53,9 @@ class Scale(AppBase):
     def _discover_plugins(self) -> None:
         # Discover plugins via console_scripts
         try:
-            logger.debug("Discovering plugins via 'phenix-scale-plugin-*' entry points...")
+            logger.debug(
+                "Discovering plugins via 'phenix-scale-plugin-*' entry points..."
+            )
             eps = entry_points(group="console_scripts")
             for ep in eps:
                 if ep.name.startswith("phenix-scale-plugin-"):
@@ -61,7 +63,9 @@ class Scale(AppBase):
                         ep.load()
                         logger.debug(f"Loaded plugin from console script: {ep.name}")
                     except Exception as e:
-                        logger.error(f"Failed to load plugin from script {ep.name}: {e}")
+                        logger.error(
+                            f"Failed to load plugin from script {ep.name}: {e}"
+                        )
         except Exception as e:
             logger.warning(f"Failed to discover plugins via entry_points: {e}")
 
@@ -79,7 +83,9 @@ class Scale(AppBase):
                 logger.error(f"Failed to load plugin '{name}': {e}")
                 continue
             except Exception as e:
-                logger.error(f"An unexpected error occurred while loading plugin '{name}': {e}")
+                logger.error(
+                    f"An unexpected error occurred while loading plugin '{name}': {e}"
+                )
                 continue
 
             # After attempting to load, check for registration
@@ -526,7 +532,9 @@ echo 'DONE!'
                 try:
                     getattr(self.experiment.status.vlans, gateway)
                 except (AttributeError, KeyError):
-                    logger.error(f"Gateway VLAN '{gateway}' not found in experiment status")
+                    logger.error(
+                        f"Gateway VLAN '{gateway}' not found in experiment status"
+                    )
                     return None
 
             tap_app = self.extract_app("tap")

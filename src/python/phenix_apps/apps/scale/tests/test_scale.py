@@ -337,7 +337,9 @@ def test_builtin_v2_methods(mocker):
     plugin.pre_configure(None, profile)
 
     # Verify logging
-    mock_logger.info.assert_called_with("Using builtin plugin v2.0.0 for profile 'my-profile'")
+    mock_logger.info.assert_called_with(
+        "Using builtin plugin v2.0.0 for profile 'my-profile'"
+    )
 
     # Verify hostname override
     assert plugin.get_hostname(1) == "v2-test-1"
@@ -435,4 +437,6 @@ def test_get_gateway(mocker):
     # Case 3: VLAN name (tap not found)
     app.extract_app = MagicMock(return_value=None)
     assert app._get_gateway("MGMT") is None
-    mock_logger.error.assert_called_with("Tap app not found! Required for gateway resolution.")
+    mock_logger.error.assert_called_with(
+        "Tap app not found! Required for gateway resolution."
+    )

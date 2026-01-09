@@ -1,15 +1,15 @@
 import argparse
 import csv
+import math
 import sys
 import timeit
-import math
 from collections import defaultdict
 from operator import itemgetter
 from pathlib import Path
 from typing import Optional
 
-from dateutil.parser import parse as parse_time
 import elasticsearch.helpers
+from dateutil.parser import parse as parse_time
 
 from phenix_apps.common import utils
 
@@ -34,12 +34,20 @@ def gen_csv(
         iperf_raw = {}  # type: dict[str, dict]
         for iperf_file in iperf_dir.glob("iperf_client-data_*.json"):
             # "iperf_server-data_client-load5_server-load8.json" => "load5_load8"
-            pair_name = iperf_file.name.replace(".json", "").split("-data_")[-1].replace("client-", "").replace("server-", "").replace("_", "-")
+            pair_name = (
+                iperf_file.name.replace(".json", "")
+                .split("-data_")[-1]
+                .replace("client-", "")
+                .replace("server-", "")
+                .replace("_", "-")
+            )
 
             try:
                 iperf_raw[pair_name] = utils.read_json(iperf_file)
             except Exception as ex:
-                utils.eprint(f"failed to read iperf data for pair {pair_name} from file {iperf_file}: {ex}")
+                utils.eprint(
+                    f"failed to read iperf data for pair {pair_name} from file {iperf_file}: {ex}"
+                )
                 sys.exit(1)
 
         iperf_data = {}  # type: dict[str, dict[int, dict]]
@@ -101,7 +109,11 @@ def gen_csv(
                     # Query a little past the end since times are already being trimmed later on
                     # This attempts to avoid being short by a single row.
                     # {"range": {"sceptre_time": {"gte": start_time, "lte": stop_time_modified}}},
-                    {"range": {"sceptre_time": {"gte": start_time, "lte": actual_stop_time}}},
+                    {
+                        "range": {
+                            "sceptre_time": {"gte": start_time, "lte": actual_stop_time}
+                        }
+                    },
                 ]
             }
         },
@@ -130,7 +142,9 @@ def gen_csv(
     index = utils.get_indices_from_range(es_index, start_time, actual_stop_time)
 
     utils.print_msg(f"Submitting scroll query to Elasticsearch (index: '{index}')")
-    iterator = elasticsearch.helpers.scan(client=es_rtds, query=query, index=index)  # generator
+    iterator = elasticsearch.helpers.scan(
+        client=es_rtds, query=query, index=index
+    )  # generator
 
     utils.print_msg("Starting Elasticsearch doc pull")
     all_docs = []
@@ -138,7 +152,9 @@ def gen_csv(
         all_docs.append({k: v[0] for k, v in doc["fields"].items()})
 
     scroll_duration = timeit.default_timer() - scroll_timer
-    utils.print_msg(f"Got {len(all_docs)} docs from Elasticsearch in {scroll_duration:.2f} seconds")
+    utils.print_msg(
+        f"Got {len(all_docs)} docs from Elasticsearch in {scroll_duration:.2f} seconds"
+    )
 
     es_rtds.close()  # disconnect from Elasticsearch
     if not all_docs:
@@ -155,7 +171,9 @@ def gen_csv(
         m_time = doc["measurement.time"]
         r_ts = parse_time(doc["rtds_time"]).timestamp()
         if not math.isclose(m_time, r_ts, rel_tol=1e-12):
-            utils.eprint(f"measurement.time {m_time} is not close to rtds_time {r_ts}, something is wrong with the rtds provider code")
+            utils.eprint(
+                f"measurement.time {m_time} is not close to rtds_time {r_ts}, something is wrong with the rtds provider code"
+            )
             sys.exit(1)
 
         sceptre_time = parse_time(doc["sceptre_time"])
@@ -176,11 +194,17 @@ def gen_csv(
     utils.print_msg(f"length of ground_truth: {len(ground_truth)}")
 
     if skipped_docs:
-        utils.print_msg(f"WARN: {len(skipped_docs)} docs were skipped due to being outside of time range")
+        utils.print_msg(
+            f"WARN: {len(skipped_docs)} docs were skipped due to being outside of time range"
+        )
 
     # ensure docs sorted by rtds_time have the same order when sorted by sceptre_time
-    by_sceptre = sorted(all_docs, key=itemgetter("pmu.name", "measurement.channel", "sceptre_time"))
-    by_rtds = sorted(all_docs, key=itemgetter("pmu.name", "measurement.channel", "rtds_time"))
+    by_sceptre = sorted(
+        all_docs, key=itemgetter("pmu.name", "measurement.channel", "sceptre_time")
+    )
+    by_rtds = sorted(
+        all_docs, key=itemgetter("pmu.name", "measurement.channel", "rtds_time")
+    )
     assert len(by_sceptre) == len(by_rtds)
     if by_sceptre != by_rtds:
         utils.eprint("all_docs sorted by sceptre_time != sorted by rtds_time!")
@@ -206,12 +230,16 @@ def gen_csv(
     # the provider to force the same timestamp.
     time_steps = sorted(ground_truth.keys())  # type: list[float]
     nested = {
-        time_step: {pmu_name: {channel: {} for channel in channels} for pmu_name in pmus.keys()}
+        time_step: {
+            pmu_name: {channel: {} for channel in channels} for pmu_name in pmus.keys()
+        }
         for time_step in time_steps
     }
     for doc in all_docs:
         sceptre_time = parse_time(doc["sceptre_time"])
-        nested[sceptre_time.timestamp()][doc["pmu.name"]][doc["measurement.channel"]] = doc
+        nested[sceptre_time.timestamp()][doc["pmu.name"]][
+            doc["measurement.channel"]
+        ] = doc
 
     utils.print_msg(
         f"Processed {len(all_docs)} docs in {timeit.default_timer() - proc_start:.2f} seconds"
@@ -220,26 +248,36 @@ def gen_csv(
     # checks that first doc and last doc are within the time range
     first_ts = parse_time(ground_truth[time_steps[0]][0]["sceptre_time"])
     if first_ts < start_time:
-        utils.eprint(f"first timestamp in time steps of {first_ts} < start_time of {start_time}!\nfirst_ts: {first_ts}\nstart_time: {start_time}")
+        utils.eprint(
+            f"first timestamp in time steps of {first_ts} < start_time of {start_time}!\nfirst_ts: {first_ts}\nstart_time: {start_time}"
+        )
         sys.exit(1)
     last_ts = parse_time(ground_truth[time_steps[-1]][0]["sceptre_time"])
     if last_ts > stop_time_modified:
-        utils.eprint(f"last timestamp in time steps of {last_ts} > stop_time_modified of {stop_time_modified}!\nlast_ts: {last_ts}\nstop_time_modified: {stop_time_modified}")
+        utils.eprint(
+            f"last timestamp in time steps of {last_ts} > stop_time_modified of {stop_time_modified}!\nlast_ts: {last_ts}\nstop_time_modified: {stop_time_modified}"
+        )
         sys.exit(1)
 
     # This assumes PMU polling rate of 30hz
     expected_count = int(30 * configured_duration)
     # sometimes we end up with an extra row, if that's the case, remove the last row
     if len(time_steps) - 1 == expected_count:
-        utils.print_msg(f"WARNING: there are {len(time_steps)} time steps but expected {expected_count}, removing the last time step")
+        utils.print_msg(
+            f"WARNING: there are {len(time_steps)} time steps but expected {expected_count}, removing the last time step"
+        )
         del time_steps[-1]
     # TODO: sometimes it's one time step less, and I don't know why. Allowing it for now
     elif len(time_steps) == expected_count - 1:
-        utils.print_msg(f"WARNING: there are {len(time_steps)} time steps, one fewer than expected {expected_count}, allowing it to pass so we can get these darn runs done")
+        utils.print_msg(
+            f"WARNING: there are {len(time_steps)} time steps, one fewer than expected {expected_count}, allowing it to pass so we can get these darn runs done"
+        )
     # elif len(time_steps) != expected_count:
     # TODO: loosening this quite a bit for now.
     elif len(time_steps) < expected_count - 10:
-        utils.eprint(f"number of time_steps {len(time_steps)} != expected count of {expected_count} (30 * {configured_duration} seconds)")
+        utils.eprint(
+            f"number of time_steps {len(time_steps)} != expected count of {expected_count} (30 * {configured_duration} seconds)"
+        )
         sys.exit(1)
 
     pmu_names = list(pmus.keys())
@@ -271,7 +309,9 @@ def gen_csv(
             pmu_zero = nested[time_step][pmu_names[0]][channels[0]]
 
             if not pmu_zero:
-                utils.eprint(f"No PMU data for time step {time_step} (sequence={sequence})")
+                utils.eprint(
+                    f"No PMU data for time step {time_step} (sequence={sequence})"
+                )
                 sys.exit(1)
 
             row = [
@@ -337,7 +377,9 @@ def main():
     parser.add_argument("-r", "--record-file", type=str, required=True)
     parser.add_argument("-e", "--elastic-server", type=str, required=True)
     parser.add_argument("-f", "--csv-path", type=str, required=True)
-    parser.add_argument("-i", "--elastic-index", type=str, default="rtds-clean", required=False)
+    parser.add_argument(
+        "-i", "--elastic-index", type=str, default="rtds-clean", required=False
+    )
     parser.add_argument("--iperf-dir", type=str, default=None, required=False)
     args = parser.parse_args()
 
