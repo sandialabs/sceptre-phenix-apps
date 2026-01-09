@@ -7,10 +7,9 @@ from phenix_apps.apps.scale.plugins.wind_turbine import WindTurbine, WindTurbine
 
 
 @pytest.fixture
-def wind_turbine():
+def wind_turbine(mock_scale_app):
     plugin = WindTurbine()
-    mock_app = MagicMock()
-    return plugin, mock_app
+    return plugin, mock_scale_app
 
 
 def test_pre_configure_defaults(wind_turbine):
@@ -77,6 +76,11 @@ def test_config_validation(wind_turbine):
     with pytest.raises(ValueError, match="external_network must be defined"):
         plugin.pre_configure(mock_app, profile_no_ext)
 
+    # Test that external_network is required when count > 0 (empty container_template)
+    profile_empty_tmpl = {"name": "invalid-profile", "count": 1, "container_template": {}}
+    with pytest.raises(ValueError, match="external_network must be defined"):
+        plugin.pre_configure(mock_app, profile_empty_tmpl)
+
 
 def test_config_alias_parsing(wind_turbine):
     """Test that Pydantic aliases (ground-truth-module) are parsed correctly."""
@@ -130,8 +134,8 @@ def test_ip_assignment_cidr_only(wind_turbine):
 
     # Mock app methods needed for _get_container_details
     # _process_networks returns (net_str, net_info_list)
-    mock_app._process_networks.return_value = ("test_net", [{"prefix": 24}])
-    mock_app._get_gateway.return_value = None
+    mock_app._process_networks = MagicMock(return_value=("test_net", [{"prefix": 24}]))
+    mock_app._get_gateway = MagicMock(return_value=None)
 
     # Case 1: Network address provided (e.g. .0/24) -> Should start at .1
     profile = {
@@ -169,14 +173,14 @@ def test_ip_assignment_cidr_only(wind_turbine):
 def test_on_node_configured(wind_turbine, mocker):
     """Test on_node_configured logic (file generation, injection)."""
     plugin, mock_app = wind_turbine
-    mock_app.app_dir = "/tmp/app_dir"
-    mock_app.exp_dir = "/tmp/exp_dir"
     # Mock _process_networks return
-    mock_app._process_networks.return_value = ("net_str", [])
+    mock_app._process_networks = MagicMock(return_value=("net_str", []))
     # Mock extract_node for HELICS broker resolution
     mock_node = MagicMock()
     mock_node.network.interfaces = [{"name": "eth0", "address": "10.0.0.1"}]
-    mock_app.extract_node.return_value = mock_node
+    mock_app.extract_node = MagicMock(return_value=mock_node)
+    mock_app.add_inject = MagicMock()
+    mock_app.add_annotation = MagicMock()
 
     profile = {
         "name": "test-wtg",
@@ -187,12 +191,12 @@ def test_on_node_configured(wind_turbine, mocker):
     plugin.pre_configure(mock_app, profile)
 
     # Mock dependencies
-    mock_makedirs = mocker.patch("phenix_apps.apps.scale.plugins.wind_turbine.os.makedirs")
-    mock_tarfile = mocker.patch("phenix_apps.apps.scale.plugins.wind_turbine.tarfile.open")
-    mocker.patch("phenix_apps.apps.scale.plugins.wind_turbine.shutil.copy")
+    mock_makedirs = mocker.patch("phenix_apps.apps.scale.plugins.wind_turbine.plugin.os.makedirs")
+    mock_tarfile = mocker.patch("phenix_apps.apps.scale.plugins.wind_turbine.plugin.tarfile.open")
+    mocker.patch("phenix_apps.apps.scale.plugins.wind_turbine.plugin.shutil.copy")
 
     # Mock Config to avoid XML errors and file writing
-    mock_config_cls = mocker.patch("phenix_apps.apps.scale.plugins.wind_turbine.Config")
+    mock_config_cls = mocker.patch("phenix_apps.apps.scale.plugins.wind_turbine.plugin.Config")
     mock_config_instance = mock_config_cls.return_value
 
     # Run
@@ -206,10 +210,10 @@ def test_on_node_configured(wind_turbine, mocker):
     assert mock_config_instance.to_file.call_count == 6
 
     # 3. Check tarball creation
-    mock_tarfile.assert_called_with("/tmp/exp_dir/wind-configs.tgz", "w:gz")
+    mock_tarfile.assert_called_with(f"{mock_app.exp_dir}/wind-configs.tgz", "w:gz")
 
     # 4. Check injection
     mock_app.add_inject.assert_any_call(
         hostname="test-wtg-1",
-        inject={"src": "/tmp/exp_dir/wind-configs.tgz", "dst": "/wind-configs.tgz"},
+        inject={"src": f"{mock_app.exp_dir}/wind-configs.tgz", "dst": "/wind-configs.tgz"},
     )
