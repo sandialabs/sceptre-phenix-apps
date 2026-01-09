@@ -15,8 +15,6 @@ class Sceptre(AppBase):
     def __init__(self, name: str, stage: str, dryrun: bool = False) -> None:
         super().__init__(name, stage, dryrun)
 
-        self.eprint(self.stage)
-
         self.startup_dir: str = f"{self.exp_dir}/startup"
         self.sceptre_dir: str = f"{self.exp_dir}/sceptre"
         self.elk_dir: str     = f"{self.exp_dir}/elk"
