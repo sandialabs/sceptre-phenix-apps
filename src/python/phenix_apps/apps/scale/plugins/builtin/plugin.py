@@ -22,7 +22,7 @@ class BuiltinConfig(BaseModel):
         return self.model_dump()
 
 
-@register_plugin("builtin", "1.0.0")
+@register_plugin("builtin", "1.0.0", deprecated=True)
 class BuiltinV1(ScalePlugin):
     """
     The default builtin plugin (v1.0.0) for the Scale app.

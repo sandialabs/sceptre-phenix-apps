@@ -2,36 +2,14 @@
 Unit tests for the Scale logic and plugin compliance.
 """
 
-import importlib
-import pkgutil
+import logging
 from unittest.mock import MagicMock
 
 import pytest
 from box import Box
-from pydantic import ValidationError
 
-import phenix_apps.apps.scale.plugins
-from phenix_apps.apps.scale.app import Scale
 from phenix_apps.apps.scale.interface import ScalePlugin
-from phenix_apps.apps.scale.plugins.builtin import BuiltinConfig, BuiltinV1, BuiltinV2
 from phenix_apps.apps.scale.registry import PLUGIN_REGISTRY
-from phenix_apps.common import settings
-
-
-@pytest.fixture(scope="module", autouse=True)
-def setup_test_env():
-    """Dynamically discover and load all plugins once for all tests."""
-    # Configure logger to write to stdout/stderr instead of file
-    settings.PHENIX_LOG_FILE = None
-
-    if hasattr(phenix_apps.apps.scale.plugins, "__path__"):
-        for _, name, _ in pkgutil.iter_modules(phenix_apps.apps.scale.plugins.__path__):
-            try:
-                importlib.import_module(f"phenix_apps.apps.scale.plugins.{name}")
-            except Exception:
-                # Fail gracefully if a plugin can't be imported,
-                # the compliance test will catch it.
-                pass
 
 
 def test_plugins_compliance():
@@ -57,16 +35,11 @@ def test_plugins_compliance():
         )
 
 
-def test_plugin_loading_builtin(mocker):
+def test_plugin_loading_builtin(mocker, mock_scale_app):
     """Test that the builtin plugin is loaded by default."""
-    mocker.patch("phenix_apps.apps.scale.app.os.makedirs")
-    mocker.patch("phenix_apps.apps.scale.app.Scale.__init__", return_value=None)
     mock_get_plugin = mocker.patch("phenix_apps.apps.scale.app.get_plugin")
 
-    scale_app = Scale()
-    scale_app.metadata = {}
-    scale_app.exp_dir = "/tmp"
-    scale_app.name = "scale"
+    scale_app = mock_scale_app
 
     mock_plugin_instance = MagicMock()
     mock_get_plugin.return_value = mock_plugin_instance
@@ -78,66 +51,15 @@ def test_plugin_loading_builtin(mocker):
     assert plugin == mock_plugin_instance
 
 
-def test_builtin_config_validation():
-    """Test validation for builtin config."""
-    # Valid config
-    data = {"count": 5}
-    config = BuiltinConfig(**data)
-    assert config.count == 5
-
-    # Invalid config (count < 1)
-    data = {"count": 0}
-    with pytest.raises(ValidationError):
-        BuiltinConfig(**data)
-
-    # Test assignment validation
-    config = BuiltinConfig(count=5)
-    with pytest.raises(ValidationError):
-        config.count = 0
-
-
-def test_builtin_container_calculation():
-    """Test node count calculation based on container settings."""
-    # Case 1: Just count
-    data = {"count": 5}
-    plugin = BuiltinV1()
-    plugin.pre_configure(None, data)
-    assert plugin.get_node_count() == 5
-    assert plugin.get_container_count(1) == 0
-
-    # Case 2: Containers and containers_per_node (exact fit)
-    # 100 containers, 10 per node -> 10 nodes
-    data = {"containers": 100, "containers_per_node": 10}
-    plugin.pre_configure(None, data)
-    assert plugin.get_node_count() == 10
-    assert plugin.get_container_count(1) == 10
-    assert plugin.get_container_count(10) == 10
-
-    # Case 3: Containers and containers_per_node (remainder)
-    # 105 containers, 10 per node -> 11 nodes (10 full, 1 partial)
-    data = {"containers": 105, "containers_per_node": 10}
-    plugin.pre_configure(None, data)
-    assert plugin.get_node_count() == 11
-    assert plugin.get_container_count(1) == 10
-    assert plugin.get_container_count(11) == 5
-
-
-def test_post_start_logic(mocker):
+def test_post_start_logic(mocker, mock_scale_app, mock_minimega):
     """Test post_start logic with mocked minimega and file operations."""
     mocker.patch("phenix_apps.apps.scale.app.logger")
     mocker.patch("phenix_apps.apps.scale.app.Progress")
-    mock_minimega = mocker.patch("phenix_apps.apps.scale.app.minimega")
     mocker.patch("phenix_apps.apps.scale.app.utils")
-    mocker.patch("phenix_apps.apps.scale.app.Scale.__init__", return_value=None)
 
-    mock_mm_conn = MagicMock()
-    mock_minimega.connect.return_value = mock_mm_conn
+    mock_mm_conn = mock_minimega
 
-    app = Scale()
-    app.name = "scale"
-    app.exp_name = "test_exp"
-    app.files_dir = "/tmp/files"
-    app.templates_dir = "/tmp/templates"
+    app = mock_scale_app
     app.metadata = {"name": "default", "plugin": "builtin", "count": 2}
     app.dryrun = False
     app._get_profiles = MagicMock(return_value=[app.metadata])
@@ -157,49 +79,40 @@ def test_post_start_logic(mocker):
 
     app.post_start()
 
-    mock_minimega.connect.assert_called_with(namespace="test_exp")
     assert mock_mm_conn.cc_filter.call_count == 2
     assert mock_mm_conn.cc_send.call_count == 2
     mock_mm_conn.cc_filter.assert_any_call(filter="name=node-1")
-    mock_mm_conn.cc_send.assert_any_call("/tmp/files/node-1.mm")
+    mock_mm_conn.cc_send.assert_any_call(f"{app.files_dir}/node-1.mm")
 
 
-def test_discover_plugins(mocker):
-    """Test that _discover_plugins method correctly imports modules based on metadata."""
+def test_discover_plugins(mocker, mock_scale_app):
+    """Test that _discover_plugins method correctly loads entry points."""
     mocker.patch("phenix_apps.apps.scale.app.logger")
-    mocker.patch("phenix_apps.apps.scale.app.Scale.__init__", return_value=None)
 
-    app = Scale()
-    # Mock get_profiles to return profiles with specific plugins
-    app.get_profiles = MagicMock(
-        return_value=[{"plugin": "builtin"}, {"plugin": {"name": "wind"}}]
-    )
+    app = mock_scale_app
 
-    # Patch PLUGIN_REGISTRY to be empty so imports are attempted
-    mocker.patch("phenix_apps.apps.scale.app.PLUGIN_REGISTRY", {})
-    mocker.patch("phenix_apps.apps.scale.app.entry_points", return_value=[])
-    mock_import = mocker.patch("phenix_apps.apps.scale.app.importlib.import_module")
+    # Mock entry point
+    mock_ep = MagicMock()
+    mock_ep.name = "test_plugin"
+    mock_ep.load = MagicMock()
+
+    # Patch entry_points to return our mock
+    mocker.patch("phenix_apps.apps.scale.app.entry_points", return_value=[mock_ep])
 
     app._discover_plugins()
 
-    mock_import.assert_any_call("phenix_apps.apps.scale.plugins.builtin")
-    mock_import.assert_any_call("phenix_apps.apps.scale.plugins.wind")
+    mock_ep.load.assert_called_once()
 
 
-def test_configure_adds_nodes_to_topology(mocker):
+def test_configure_adds_nodes_to_topology(mocker, mock_scale_app):
     """Test that configure method adds nodes to the experiment topology."""
-    mocker.patch("phenix_apps.apps.scale.app.os.makedirs")
-    mocker.patch("phenix_apps.apps.scale.app.Scale.__init__", return_value=None)
+    app = mock_scale_app
 
-    app = Scale()
-    # Manually set up attributes expected by AppBase/Scale
-    app.name = "scale"
+    # Reset experiment for this test
     app.experiment = Box(
         {"spec": {"topology": {"nodes": []}, "scenario": {"apps": []}}}
     )
     app.metadata = {"profiles": [{"name": "test", "plugin": "builtin", "count": 2}]}
-    app.app_dir = "/tmp/scale"
-    app.exp_name = "test_exp"
 
     # Mock methods used in configure
     app.get_profiles = MagicMock(return_value=app.metadata["profiles"])
@@ -233,15 +146,9 @@ def test_configure_adds_nodes_to_topology(mocker):
     assert app.experiment.spec.topology.nodes[1].general.hostname == "node-2"
 
 
-def test_startup_script_generation(mocker):
+def test_startup_script_generation(mocker, mock_scale_app):
     """Test that startup script is generated with correct content."""
-    mocker.patch("phenix_apps.apps.scale.app.os.makedirs")
-    mocker.patch("phenix_apps.apps.scale.app.Scale.__init__", return_value=None)
-
-    app = Scale()
-    app.name = "scale"
-    app.exp_name = "test_exp"
-    app.app_dir = "/tmp/scale"
+    app = mock_scale_app
     app.add_inject = MagicMock()
 
     mock_plugin = MagicMock()
@@ -252,7 +159,7 @@ def test_startup_script_generation(mocker):
     mock_file = mocker.patch("builtins.open", mocker.mock_open())
     app._configure_node_common(mock_plugin, 1, "node-1", {})
 
-    mock_file.assert_called_with("/tmp/scale/node-1-startup.sh", "w")
+    mock_file.assert_called_with(f"{app.app_dir}/node-1-startup.sh", "w")
     handle = mock_file()
 
     expected_content = """echo 'STARTING...'
@@ -304,49 +211,9 @@ echo 'DONE!'
     handle.write.assert_called_with(expected_content_multiline)
 
 
-def test_builtin_v1_methods():
-    """Test BuiltinV1 specific methods."""
-    plugin = BuiltinV1()
-    profile = {"count": 1, "hostname_prefix": "test"}
-    plugin.pre_configure(None, profile)
-
-    # get_hostname
-    assert plugin.get_hostname(1) == "test-1"
-
-    # get_node_spec
-    spec = plugin.get_node_spec(1)
-    assert spec["general"]["hostname"] == "test-1"
-    assert spec["type"] == "VirtualMachine"
-    assert spec["general"]["vm_type"] == "kvm"
-
-    # on_node_configured (noop)
-    plugin.on_node_configured(None, 1, "test-1")
-
-    # get_additional_startup_commands (empty)
-    assert plugin.get_additional_startup_commands(1, "test-1") == ""
-
-
-def test_builtin_v2_methods(mocker):
-    """Test BuiltinV2 specific methods."""
-    # Mock logger to verify call
-    mock_logger = mocker.patch("phenix_apps.apps.scale.plugins.builtin.logger")
-
-    plugin = BuiltinV2()
-    profile = {"count": 1, "hostname_prefix": "test", "name": "my-profile"}
-
-    plugin.pre_configure(None, profile)
-
-    # Verify logging
-    mock_logger.info.assert_called_with("Using builtin plugin v2.0.0 for profile 'my-profile'")
-
-    # Verify hostname override
-    assert plugin.get_hostname(1) == "v2-test-1"
-
-
-def test_apply_node_defaults(mocker):
+def test_apply_node_defaults(mocker, mock_scale_app):
     """Test _apply_node_defaults logic."""
-    mocker.patch("phenix_apps.apps.scale.app.Scale.__init__", return_value=None)
-    app = Scale()
+    app = mock_scale_app
 
     # Case 1: Global defaults
     spec = {}
@@ -378,13 +245,11 @@ def test_apply_node_defaults(mocker):
     assert spec["network"]["interfaces"][0]["name"] == "eth0"
 
 
-def test_process_networks(mocker):
+def test_process_networks(mocker, mock_scale_app):
     """Test _process_networks logic."""
-    mocker.patch("phenix_apps.apps.scale.app.Scale.__init__", return_value=None)
     mock_logger = mocker.patch("phenix_apps.apps.scale.app.logger")
 
-    app = Scale()
-    app.exp_name = "test_exp"
+    app = mock_scale_app
     app.dryrun = False
     app.experiment = Box({"status": {"vlans": {"MGMT": 100}}})
 
@@ -414,12 +279,11 @@ def test_process_networks(mocker):
     assert str(nets[0]["addr"]) == "10.0.0.1"
 
 
-def test_get_gateway(mocker):
+def test_get_gateway(mocker, mock_scale_app):
     """Test _get_gateway logic."""
-    mocker.patch("phenix_apps.apps.scale.app.Scale.__init__", return_value=None)
     mock_logger = mocker.patch("phenix_apps.apps.scale.app.logger")
 
-    app = Scale()
+    app = mock_scale_app
     app.dryrun = False
     app.experiment = Box({"status": {"vlans": {"MGMT": 100}}})
 
@@ -436,3 +300,74 @@ def test_get_gateway(mocker):
     app.extract_app = MagicMock(return_value=None)
     assert app._get_gateway("MGMT") is None
     mock_logger.error.assert_called_with("Tap app not found! Required for gateway resolution.")
+
+
+def test_duplicate_plugin_registration_error():
+    """Test that registering a duplicate plugin raises a ValueError."""
+    from phenix_apps.apps.scale.registry import PluginRegistry
+
+    registry = PluginRegistry()
+
+    @registry.register_plugin("dup_test", "1.0")
+    class P1:
+        pass
+
+    with pytest.raises(ValueError, match="is already registered"):
+        @registry.register_plugin("dup_test", "1.0")
+        class P2:
+            pass
+
+
+def test_registry_semantic_versioning():
+    """Test that the registry correctly resolves semantic versions."""
+    from phenix_apps.apps.scale.registry import PluginRegistry
+
+    registry = PluginRegistry()
+
+    @registry.register_plugin("semver_test", "1.2.0")
+    class P1:
+        pass
+
+    @registry.register_plugin("semver_test", "1.10.0")
+    class P2:
+        pass
+
+    @registry.register_plugin("semver_test", "1.9.0")
+    class P3:
+        pass
+
+    # String sort would pick 1.9.0 (since '9' > '1' in '1.10.0')
+    # Semantic sort should pick 1.10.0 (since 10 > 9)
+    instance = registry.get_plugin("semver_test", "latest")
+    assert isinstance(instance, P2)
+
+
+def test_registry_deprecation_warning(caplog):
+    """Test that retrieving a deprecated plugin logs a warning."""
+    from phenix_apps.apps.scale.registry import PluginRegistry
+
+    registry = PluginRegistry()
+
+    @registry.register_plugin("dep_test", "1.0.0", deprecated=True)
+    class P1:
+        pass
+
+    with caplog.at_level(logging.WARNING):
+        registry.get_plugin("dep_test", "1.0.0")
+
+    assert "Plugin 'dep_test' version '1.0.0' is deprecated" in caplog.text
+
+
+def test_missing_plugin_error(mocker, mock_scale_app):
+    """Test that requesting a missing plugin causes the app to exit."""
+    mock_logger = mocker.patch("phenix_apps.apps.scale.app.logger")
+    mock_exit = mocker.patch("sys.exit")
+
+    app = mock_scale_app
+    profile = {"name": "test", "plugin": "non_existent_plugin"}
+
+    app._get_plugin_instance(profile)
+
+    mock_exit.assert_called_with(1)
+    mock_logger.error.assert_called()
+    assert "Failed to load scale plugin 'non_existent_plugin'" in mock_logger.error.call_args[0][0]

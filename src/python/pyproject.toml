@@ -70,6 +70,10 @@ phenix-scorch-component-vmstats = "phenix_apps.apps.scorch.vmstats.vmstats:main"
 phenix-scorch-component-opcexport = "phenix_apps.apps.scorch.opcexport.opcexport:main"
 phenix-scorch-component-kafka = "phenix_apps.apps.scorch.kafka.kafka_component:main"
 
+[project.entry-points."phenix.scale.plugins"]
+builtin = "phenix_apps.apps.scale.plugins.builtin:BuiltinV1"
+wind_turbine = "phenix_apps.apps.scale.plugins.wind_turbine:WindTurbine"
+
 [project.urls]
 # Use PyPI-standard names here: https://docs.pypi.org/project_metadata/
 "Homepage" = "https://github.com/sandialabs/sceptre-phenix-apps/"
