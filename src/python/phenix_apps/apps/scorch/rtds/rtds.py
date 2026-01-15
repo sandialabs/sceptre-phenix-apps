@@ -1,6 +1,6 @@
 import sys
-from time import sleep
 from pathlib import PurePath
+from time import sleep
 
 import requests
 from elasticsearch import Elasticsearch
@@ -16,7 +16,7 @@ class RTDS(ComponentBase):
     """
 
     def __init__(self):
-        ComponentBase.__init__(self, 'rtds')
+        ComponentBase.__init__(self, "rtds")
 
         # Ensure proxy variables from environment are ignored (e.g. "http_proxy")
         self.session = requests.Session()
@@ -50,11 +50,15 @@ class RTDS(ComponentBase):
         if self.metadata.get("case_name"):
             case_name = PurePath(data["case_file"]).stem  # minus extension
             if self.metadata.case_name != case_name:
-                self.eprint(f"Expected RSCAD case '{self.metadata.case_name}', but '{case_name}' was started. Stopping case and exiting...")
+                self.eprint(
+                    f"Expected RSCAD case '{self.metadata.case_name}', but '{case_name}' was started. Stopping case and exiting..."
+                )
                 self._stop_case(allow_failure=True)
                 sys.exit(1)
 
-        self.print(f"Started RSCAD case '{data['case_file']}' (title='{data['case_title']}', status='{data['status']}')")
+        self.print(
+            f"Started RSCAD case '{data['case_file']}' (title='{data['case_title']}', status='{data['status']}')"
+        )
 
     def _stop_case(self, allow_failure: bool = False):
         url = f"{self.metadata.rscad_automation.url.rstrip('/')}/stop_case"
@@ -73,7 +77,9 @@ class RTDS(ComponentBase):
             if not allow_failure:
                 sys.exit(1)
 
-        self.print(f"Stopped RSCAD case '{data['case_file']}' (title='{data['case_title']}', status='{data['status']}')")
+        self.print(
+            f"Stopped RSCAD case '{data['case_file']}' (title='{data['case_title']}', status='{data['status']}')"
+        )
 
     def _stop_provider_if_running(self):
         if self.check_process_running(self.metadata.hostname, "pybennu-power-solver"):
@@ -88,11 +94,15 @@ class RTDS(ComponentBase):
             size=1,
             # time can get funky
             # TODO: use event.ingested instead of @timestamp?
-            query={"bool": {"filter": [{"range": {"@timestamp": {"gte": time_range}}}]}}
+            query={
+                "bool": {"filter": [{"range": {"@timestamp": {"gte": time_range}}}]}
+            },
         )
 
         if not response["hits"]["hits"]:
-            self.eprint("no data in response from elasticsearch! the provider might have be having issues.")
+            self.eprint(
+                "no data in response from elasticsearch! the provider might have be having issues."
+            )
             sys.exit(1)
 
         measurements = response["hits"]["hits"][0]["_source"]["measurement"]
@@ -105,7 +115,7 @@ class RTDS(ComponentBase):
         self.print("frequency verified")
 
     def configure(self):
-        logger.info(f'Configuring user component: {self.name}')
+        logger.info(f"Configuring user component: {self.name}")
 
         host = self.metadata.hostname  # type: str
 
@@ -113,15 +123,20 @@ class RTDS(ComponentBase):
 
         # Copy provider configs
         if self.metadata.get("export_config", True):
-            self.recv_file(vm=host, src=[
-                "/etc/sceptre/config.ini",
-                "/etc/sceptre/rtds_config.yaml",
-            ])
+            self.recv_file(
+                vm=host,
+                src=[
+                    "/etc/sceptre/config.ini",
+                    "/etc/sceptre/rtds_config.yaml",
+                ],
+            )
 
         self.print("verifying NTP is ok")
         ntp_output = self.run_and_check_command(host, "ntpq -p")["stdout"]
         if ntp_output is None or ".INIT." in ntp_output:
-            self.eprint(f"ntp on provider in INIT state, not synced. ntpq output: {ntp_output}")
+            self.eprint(
+                f"ntp on provider in INIT state, not synced. ntpq output: {ntp_output}"
+            )
             sys.exit(1)
 
         # Start simulation on the RTDS
@@ -136,13 +151,15 @@ class RTDS(ComponentBase):
             self.run_and_check_command(host, cmd)
 
             sleep_for = 8.0
-            self.print(f"sleeping for {sleep_for} seconds to give provider time to start and reconnect to PMUs...")
+            self.print(
+                f"sleeping for {sleep_for} seconds to give provider time to start and reconnect to PMUs..."
+            )
             sleep(sleep_for)
 
-        logger.info(f'Configured user component: {self.name}')
+        logger.info(f"Configured user component: {self.name}")
 
     def start(self):
-        logger.info(f'Starting user component: {self.name}')
+        logger.info(f"Starting user component: {self.name}")
 
         host = self.metadata.hostname  # type: str
 
@@ -164,16 +181,24 @@ class RTDS(ComponentBase):
             index = utils.get_dated_index(self.metadata.elasticsearch.index)
 
             # ** ground truth data being collected **
-            self.print(f"Verifying ground truth data is being collected in Elasticsearch (index={index})")
+            self.print(
+                f"Verifying ground truth data is being collected in Elasticsearch (index={index})"
+            )
             sleep_for = 3.0
             self.print("Getting index doc count")
-            doc_count_1 = self.es.indices.stats(index=index)["indices"][index]["total"]["docs"]["count"]  # type: int
+            doc_count_1 = self.es.indices.stats(index=index)["indices"][index]["total"][
+                "docs"
+            ]["count"]  # type: int
 
-            self.print(f"Sleeping for {sleep_for} seconds to wait for data to be generated...")
+            self.print(
+                f"Sleeping for {sleep_for} seconds to wait for data to be generated..."
+            )
             sleep(sleep_for)  # wait 3 seconds
 
             self.print("Getting index doc count")
-            doc_count_2 = self.es.indices.stats(index=index)["indices"][index]["total"]["docs"]["count"]  # type: int
+            doc_count_2 = self.es.indices.stats(index=index)["indices"][index]["total"][
+                "docs"
+            ]["count"]  # type: int
 
             self.print("Comparing doc counts")
             # 8 PMUs * 6 points * 30 updates/sec = 1440 docs/second
@@ -182,7 +207,9 @@ class RTDS(ComponentBase):
             expected_count_diff = (sleep_for - 1) * 1440
             count_diff = doc_count_2 - doc_count_1
             if count_diff < expected_count_diff:
-                self.eprint(f"expected {expected_count_diff} documents created, but only {count_diff} docs were created for index {index}")
+                self.eprint(
+                    f"expected {expected_count_diff} documents created, but only {count_diff} docs were created for index {index}"
+                )
                 sys.exit(1)
             self.print("ground truth data verified")
 
@@ -193,7 +220,9 @@ class RTDS(ComponentBase):
             # ** time drift between provider and RTDS is within acceptable limits **
             if self.metadata.elasticsearch.get("acceptable_time_drift"):
                 acceptable = self.metadata.elasticsearch.acceptable_time_drift
-                self.print(f"Verifying time drift between RTDS and SCEPTRE environment is within an acceptable range (acceptable={acceptable})")
+                self.print(
+                    f"Verifying time drift between RTDS and SCEPTRE environment is within an acceptable range (acceptable={acceptable})"
+                )
 
                 time_drift = get_time_drift(self.es, index, time_range="now-2m")
                 if time_drift > acceptable:
@@ -204,10 +233,10 @@ class RTDS(ComponentBase):
                     sys.exit(1)
                 self.print("time drift verified")
 
-        logger.info(f'Started user component: {self.name}')
+        logger.info(f"Started user component: {self.name}")
 
     def stop(self):
-        logger.info(f'Stopping user component: {self.name}')
+        logger.info(f"Stopping user component: {self.name}")
 
         host = self.metadata.hostname  # type: str
 
@@ -224,17 +253,23 @@ class RTDS(ComponentBase):
 
         # Copy provider log files
         if self.metadata.get("export_logs"):
-            self.recv_file(vm=host, src=[
-                "/var/log/bennu-pybennu.out",
-                "/var/log/bennu-pybennu.err",
-            ])
+            self.recv_file(
+                vm=host,
+                src=[
+                    "/var/log/bennu-pybennu.out",
+                    "/var/log/bennu-pybennu.err",
+                ],
+            )
 
         # Copy provider configs
         if self.metadata.get("export_config", True):
-            self.recv_file(vm=host, src=[
-                "/etc/sceptre/config.ini",
-                "/etc/sceptre/rtds_config.yaml",
-            ])
+            self.recv_file(
+                vm=host,
+                src=[
+                    "/etc/sceptre/config.ini",
+                    "/etc/sceptre/rtds_config.yaml",
+                ],
+            )
 
         # # Verify Elasticsearch data
         # if self.metadata.get("elasticsearch", {}).get("verify"):
@@ -243,10 +278,10 @@ class RTDS(ComponentBase):
         #     # This doubles as a check for the data in Elastic
         #     self._verify_frequency(index=index, time_range="now-20s")
 
-        logger.info(f'Stopped user component: {self.name}')
+        logger.info(f"Stopped user component: {self.name}")
 
     def cleanup(self):
-        logger.info(f'Cleaning up user component: {self.name}')
+        logger.info(f"Cleaning up user component: {self.name}")
 
         host = self.metadata.hostname  # type: str
 
@@ -267,12 +302,10 @@ class RTDS(ComponentBase):
         if self.metadata.get("rscad_automation", {}).get("enabled"):
             self._stop_case(allow_failure=True)
 
-        logger.info(f'Cleaned up user component: {self.name}')
+        logger.info(f"Cleaned up user component: {self.name}")
 
 
-def get_time_drift(
-    es: Elasticsearch, index: str, time_range: str = "now-5m"
-) -> float:
+def get_time_drift(es: Elasticsearch, index: str, time_range: str = "now-5m") -> float:
     response = es.search(
         index=index,
         size=0,
@@ -288,7 +321,7 @@ return Math.abs(differenceInMillis);
 """.strip()
                 }
             }
-        }
+        },
     )
 
     return response["aggregations"]["timestamp_diff"]["value"]
@@ -298,5 +331,5 @@ def main():
     RTDS()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

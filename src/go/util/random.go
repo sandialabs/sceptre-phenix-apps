@@ -20,6 +20,7 @@ func RandomString(n int) string {
 	)
 
 	for i := range buf {
+		//nolint:gosec // simple random string, not cryptographically relevant
 		buf[i] = chars[rand.Intn(len)]
 	}
 

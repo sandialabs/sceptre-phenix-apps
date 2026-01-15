@@ -31,7 +31,9 @@ class WindTurbineConfig(BaseModel):
     node_template: dict[str, Any] = Field(default_factory=dict)
     container_template: dict[str, Any] = Field(default_factory=dict)
     templates: dict[str, Any] = Field(default_factory=dict)
-    ground_truth: dict[str, Any] = Field(default_factory=dict, alias="ground-truth-module")
+    ground_truth: dict[str, Any] = Field(
+        default_factory=dict, alias="ground-truth-module"
+    )
     helics: dict[str, Any] = Field(default_factory=dict)
     labels: dict[str, Any] = Field(default_factory=dict)
     ext_net: dict[str, Any] | None = None

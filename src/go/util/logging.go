@@ -1,9 +1,10 @@
 package util
 
 import (
-	"golang.org/x/exp/slog"
 	"os"
 	"strings"
+
+	"golang.org/x/exp/slog"
 )
 
 func SetupLogging() {
@@ -15,17 +16,28 @@ func SetupLogging() {
 	if fname := os.Getenv("PHENIX_LOG_FILE"); fname != "" {
 		var err error
 
-		output, err = os.OpenFile(os.Getenv("PHENIX_LOG_FILE"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		output, err = os.OpenFile(
+			os.Getenv("PHENIX_LOG_FILE"),
+			os.O_APPEND|os.O_CREATE|os.O_WRONLY,
+			0o644,
+		)
 		if err != nil {
-			slog.Error("cannot open PHENIX_LOG_FILE for writing", "file", os.Getenv("PHENIX_LOG_FILE"))
+			slog.Error(
+				"cannot open PHENIX_LOG_FILE for writing",
+				"file",
+				os.Getenv("PHENIX_LOG_FILE"),
+			)
 		}
 	}
 
 	if lname := os.Getenv("PHENIX_LOG_LEVEL"); lname != "" {
 		err := level.UnmarshalText([]byte(strings.ToUpper(os.Getenv("PHENIX_LOG_LEVEL"))))
 		if err != nil {
-			slog.Error("unable to parse PHENIX_LOG_LEVEL. Expected one of: DEBUG, INFO, WARN, ERROR",
-				"level", os.Getenv("PHENIX_LOG_LEVEL"))
+			slog.Error(
+				"unable to parse PHENIX_LOG_LEVEL. Expected one of: DEBUG, INFO, WARN, ERROR",
+				"level",
+				os.Getenv("PHENIX_LOG_LEVEL"),
+			)
 		}
 	}
 

@@ -1,10 +1,10 @@
-import json, sys
+import json
+import sys
 
 from box import Box
 
 
 class SchedulerBase(object):
-
     @classmethod
     def check_stdin(klass):
         """
@@ -20,7 +20,6 @@ class SchedulerBase(object):
 
             sys.exit(1)
 
-
     @staticmethod
     def eprint(*args):
         """
@@ -28,7 +27,6 @@ class SchedulerBase(object):
         """
 
         print(*args, file=sys.stderr)
-
 
     def __init__(self, name):
         self.name = name

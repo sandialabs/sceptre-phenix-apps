@@ -1,5 +1,5 @@
-import sys
 import os.path
+import sys
 from collections import Counter
 from pathlib import Path
 from time import sleep
@@ -17,9 +17,10 @@ from phenix_apps.common.logger import logger
 
 # TODO: rename component to "netperf" or something like that
 
+
 class Iperf(ComponentBase):
     def __init__(self):
-        ComponentBase.__init__(self, 'iperf')
+        ComponentBase.__init__(self, "iperf")
         self.execute_stage()
 
     def _get_node_info(self) -> dict:
@@ -41,7 +42,9 @@ class Iperf(ComponentBase):
             if node.general.hostname in vms:
                 os_type = node.hardware.os_type.lower()
                 if os_type not in ["linux", "windows"]:
-                    self.eprint(f'unknown os_type "{os_type}" for {node.general.hostname}')
+                    self.eprint(
+                        f'unknown os_type "{os_type}" for {node.general.hostname}'
+                    )
                     sys.exit(1)
                 os_types[node.general.hostname] = os_type
 
@@ -71,8 +74,8 @@ class Iperf(ComponentBase):
                     mm=self.mm,
                     cc_filter=f"iperf=1 os={os_type}",
                     # process="iperf3" if os_type=="linux" else "iperf3.exe",
-                    process=linux_proc if os_type=="linux" else win_proc,
-                    os_type=os_type
+                    process=linux_proc if os_type == "linux" else win_proc,
+                    os_type=os_type,
                 )
 
         self.mm.clear_cc_filter()
@@ -104,7 +107,9 @@ class Iperf(ComponentBase):
 
         for server in self.metadata.servers:
             s_node = self.extract_node(server.hostname)
-            s_if = s_node.network.interfaces[0]  # TODO: be smarter about selecting interface
+            s_if = s_node.network.interfaces[
+                0
+            ]  # TODO: be smarter about selecting interface
             s_exe = Path(self.metadata.iperf_paths[s_node.hardware.os_type.lower()])
             s_map = {
                 **server,
@@ -119,10 +124,14 @@ class Iperf(ComponentBase):
 
             for client in server.clients:
                 c_node = self.extract_node(client.hostname)
-                c_if = c_node.network.interfaces[0]  # TODO: be smarter about selecting interface
+                c_if = c_node.network.interfaces[
+                    0
+                ]  # TODO: be smarter about selecting interface
 
                 if curr_port in all_ports:
-                    self.eprint(f"port {curr_port} is already defined! something is funky.\nclient: {client}\nserver: {server}")
+                    self.eprint(
+                        f"port {curr_port} is already defined! something is funky.\nclient: {client}\nserver: {server}"
+                    )
                     sys.exit(1)
                 all_ports.add(curr_port)
 
@@ -153,7 +162,7 @@ class Iperf(ComponentBase):
         return None
 
     def configure(self):
-        logger.info(f'Configuring user component: {self.name}')
+        logger.info(f"Configuring user component: {self.name}")
         node_info = self._get_node_info()
 
         # Generate iperf mapping and save it to a JSON file
@@ -171,15 +180,21 @@ class Iperf(ComponentBase):
 
         # only check if loops aren't defined or it's the first iteration of a loop
         if not bool(self.metadata.get("verify_execution", True)):
-            self.print("skipping iperf execution and version checks since verify_execution=false")
+            self.print(
+                "skipping iperf execution and version checks since verify_execution=false"
+            )
         elif self.count > 1:
-            self.print(f"skipping iperf execution and version checks since count {self.count} > 1")
+            self.print(
+                f"skipping iperf execution and version checks since count {self.count} > 1"
+            )
         else:
             iperf_ver = self.metadata.get("iperf_version")  # type: str
 
             for os_type in ["linux", "windows"]:
                 if node_info["os_count"].get(os_type):
-                    self.print(f"verifying verifying iperf execution and version for {node_info['os_count'][os_type]} {os_type} VMs")
+                    self.print(
+                        f"verifying verifying iperf execution and version for {node_info['os_count'][os_type]} {os_type} VMs"
+                    )
 
                     # /usr/bin/iperf3 --version
                     exe_path = self.metadata.iperf_paths[os_type]
@@ -195,7 +210,9 @@ class Iperf(ComponentBase):
                         stdout = response["stdout"]
 
                         if not self.metadata.get("use_rperf") and "iperf" not in stdout:
-                            self.eprint(f"iperf not in output for {vm} (path={exe_path})\nresponse: {response}")
+                            self.eprint(
+                                f"iperf not in output for {vm} (path={exe_path})\nresponse: {response}"
+                            )
                             sys.exit(1)
 
                         if iperf_ver is not None:
@@ -204,7 +221,9 @@ class Iperf(ComponentBase):
                             else:
                                 check_for = f"iperf {iperf_ver}"
                             if check_for not in stdout and iperf_ver not in stdout:
-                                self.eprint(f"incorrect iperf version for {vm}, expected {iperf_ver} (path={exe_path})\nresponse: {response}")
+                                self.eprint(
+                                    f"incorrect iperf version for {vm}, expected {iperf_ver} (path={exe_path})\nresponse: {response}"
+                                )
                                 sys.exit(1)
 
         # Ensure there are no lingering processes or files from previous runs
@@ -215,14 +234,16 @@ class Iperf(ComponentBase):
         self.mm.clear_cc_commands()
         self.mm.clear_cc_responses()
 
-        logger.info(f'Configured user component: {self.name}')
+        logger.info(f"Configured user component: {self.name}")
 
     def start(self):
-        logger.info(f'Starting user component: {self.name}')
+        logger.info(f"Starting user component: {self.name}")
         node_info = self._get_node_info()
         mapping = self._build_iperf_mapping()
 
-        self.print(f"starting iperf3 for {len(node_info['vms'])} VMs with {len(self.metadata.servers)} iperf servers")
+        self.print(
+            f"starting iperf3 for {len(node_info['vms'])} VMs with {len(self.metadata.servers)} iperf servers"
+        )
 
         # Start iperf server processes
         self.print("Starting iperf server processes...")
@@ -238,7 +259,9 @@ class Iperf(ComponentBase):
             else:
                 # Start a server process for each client it will be communicating with
                 for client in server.clients.values():
-                    self.print(f"starting iperf server process for client '{client.hostname}' on server '{server.hostname}'")
+                    self.print(
+                        f"starting iperf server process for client '{client.hostname}' on server '{server.hostname}'"
+                    )
 
                     idle_timeout = float(self.metadata.run_duration) + 5.0
                     server_cmd = f"{server.exe_path} --server --one-off --bind {server.ip} --json --port {client.port} --idle-timeout {idle_timeout}"
@@ -254,13 +277,17 @@ class Iperf(ComponentBase):
 
                     self.print(f"server_cmd for {server.hostname}: {server_cmd}")
                     retval = self.mm.cc_background(server_cmd)
-                    self.print(f"return val from 'cc background' for server_cmd: {retval}")
+                    self.print(
+                        f"return val from 'cc background' for server_cmd: {retval}"
+                    )
 
         self.mm.clear_cc_filter()
 
         # Wait for server processes to start user-configurable delay
         startup_delay = float(self.metadata.get("server_startup_delay", 5.0))
-        self.print(f"Waiting {startup_delay} seconds for iperf server processes to start...")
+        self.print(
+            f"Waiting {startup_delay} seconds for iperf server processes to start..."
+        )
         sleep(startup_delay)
 
         # TODO: generate a bash script that handles client processes
@@ -273,11 +300,15 @@ class Iperf(ComponentBase):
         self.print("Starting iperf client processes")
         for server in mapping.values():
             for client in server.clients.values():
-                self.print(f"starting iperf client process on {client.hostname} (client={client.hostname}, server={server.hostname})")
+                self.print(
+                    f"starting iperf client process on {client.hostname} (client={client.hostname}, server={server.hostname})"
+                )
                 run_for = float(self.metadata.run_duration)
 
                 if self.metadata.get("use_rperf"):
-                    client_cmd = f"{client.exe_path} --client {server.ip} --time {run_for}"
+                    client_cmd = (
+                        f"{client.exe_path} --client {server.ip} --time {run_for}"
+                    )
 
                     # Add bandwidth argument
                     bandwidth = self._get_setting("bandwidth", client)
@@ -289,7 +320,7 @@ class Iperf(ComponentBase):
                     # Basically, our client (this device) is connecting to a iperf server,
                     # which is this device's client.
                     # NOTE: don't use UDP, won't get rtt
-                    client_cmd = f"{client.exe_path} --client {server.ip} --json --port {client.port} --logfile {client.client_log_path} --bind {client.ip} --time {run_for} --cport {client.port+1000}"
+                    client_cmd = f"{client.exe_path} --client {server.ip} --json --port {client.port} --logfile {client.client_log_path} --bind {client.ip} --time {run_for} --cport {client.port + 1000}"
 
                     # Add bandwidth argument
                     bandwidth = self._get_setting("bandwidth", client)
@@ -309,21 +340,32 @@ class Iperf(ComponentBase):
                 self.mm.cc_background(client_cmd)
 
         self.print("finished starting all iperf processes")
-        logger.info(f'Started user component: {self.name}')
+        logger.info(f"Started user component: {self.name}")
 
-    def _run_multi(self, cmd: str, filter: str, prefix: str, num_responses: int, timeout: float = 10.0) -> list:
+    def _run_multi(
+        self,
+        cmd: str,
+        filter: str,
+        prefix: str,
+        num_responses: int,
+        timeout: float = 10.0,
+    ) -> list:
         self.mm.clear_cc_prefix()
         self.mm.cc_filter(filter)
         self.mm.cc_prefix(prefix)
         self.mm.cc_exec_once(cmd)
 
         # wait for responses count to reach count of VMs of the type
-        utils.mm_wait_for_prefix(self.mm, prefix, num_responses=num_responses, timeout=timeout)
+        utils.mm_wait_for_prefix(
+            self.mm, prefix, num_responses=num_responses, timeout=timeout
+        )
         responses = utils.mm_get_cc_responses(self.mm, prefix)
 
         for response in responses:
             if not response["stdout"] or response.get("exitcode") != 0:
-                self.eprint(f"failed to execute command '{cmd}' with filter '{filter}'\nresponse: {response}")
+                self.eprint(
+                    f"failed to execute command '{cmd}' with filter '{filter}'\nresponse: {response}"
+                )
                 sys.exit(1)
         self.mm.clear_cc_prefix()
 
@@ -387,15 +429,21 @@ class Iperf(ComponentBase):
         Path(self.base_dir, "ss_outputs.txt").write_text(ss_outputs)
 
     def stop(self):
-        logger.info(f'Stopping user component: {self.name}')
+        logger.info(f"Stopping user component: {self.name}")
         node_info = self._get_node_info()
         mapping = self._build_iperf_mapping()
 
         if not self.metadata.get("use_rperf"):
             sleep(5.0)
             # !!! WARNING: terminating iperf client early will cause JSON results to NOT be saved OR result in error flag being set !!!
-            if self.check_process_running(node_info["vms"][0], "iperf3", node_info["os_types"][node_info["vms"][0]]):
-                self.print(f"iperf is still running on {node_info['vms'][0]}, sleeping for 5 seconds to give it time to quit...")
+            if self.check_process_running(
+                node_info["vms"][0],
+                "iperf3",
+                node_info["os_types"][node_info["vms"][0]],
+            ):
+                self.print(
+                    f"iperf is still running on {node_info['vms'][0]}, sleeping for 5 seconds to give it time to quit..."
+                )
                 sleep(5.0)
 
         if self.metadata.get("collect_netstat_info", False):
@@ -421,16 +469,22 @@ class Iperf(ComponentBase):
                         mm=self.mm,
                         vm=client.hostname,
                         src=client["client_log_path"],
-                        dst=os.path.join(self.base_dir, os.path.basename(client["client_log_path"])),
+                        dst=os.path.join(
+                            self.base_dir, os.path.basename(client["client_log_path"])
+                        ),
                     )
 
                     # server results for this client
-                    self.print(f"collecting iperf server data for client '{client.hostname}' from server '{server.hostname}'")
+                    self.print(
+                        f"collecting iperf server data for client '{client.hostname}' from server '{server.hostname}'"
+                    )
                     utils.mm_recv(
                         mm=self.mm,
                         vm=server.hostname,
                         src=client["server_log_path"],
-                        dst=os.path.join(self.base_dir, os.path.basename(client["server_log_path"])),
+                        dst=os.path.join(
+                            self.base_dir, os.path.basename(client["server_log_path"])
+                        ),
                     )
 
                     # debugging logs
@@ -438,14 +492,20 @@ class Iperf(ComponentBase):
                         mm=self.mm,
                         vm=client.hostname,
                         src=f"/iperf_client-log_client-{client.hostname}_server-{server.hostname}.log",
-                        dst=os.path.join(self.base_dir, f"iperf_client-log_client-{client.hostname}_server-{server.hostname}.log"),
+                        dst=os.path.join(
+                            self.base_dir,
+                            f"iperf_client-log_client-{client.hostname}_server-{server.hostname}.log",
+                        ),
                     )
                     if node_info["os_types"][server.hostname] == "linux":
                         utils.mm_recv(
                             mm=self.mm,
                             vm=server.hostname,
                             src=f"/iperf_server-log_client-{client.hostname}_server-{server.hostname}.log",
-                            dst=os.path.join(self.base_dir, f"iperf_server-log_client-{client.hostname}_server-{server.hostname}.log"),
+                            dst=os.path.join(
+                                self.base_dir,
+                                f"iperf_server-log_client-{client.hostname}_server-{server.hostname}.log",
+                            ),
                         )
 
             # verify error field isn't set in iperf results
@@ -457,7 +517,9 @@ class Iperf(ComponentBase):
                     sys.exit(1)
 
                 if data.get("error"):
-                    self.eprint(f"error field set for iperf data from '{file}': {data['error']}")
+                    self.eprint(
+                        f"error field set for iperf data from '{file}': {data['error']}"
+                    )
                     sys.exit(1)
 
             # Generate RTT histograms
@@ -466,33 +528,51 @@ class Iperf(ComponentBase):
                 self.print("generating RTT histograms (create_histogram=true)")
                 for server in mapping.values():
                     for client in server.clients.values():
-                        self.print(f"generating RTT histogram for client '{client.hostname}' and server '{server.hostname}'")
-                        c_path = Path(self.base_dir, os.path.basename(client["client_log_path"]))
+                        self.print(
+                            f"generating RTT histogram for client '{client.hostname}' and server '{server.hostname}'"
+                        )
+                        c_path = Path(
+                            self.base_dir, os.path.basename(client["client_log_path"])
+                        )
                         results = utils.read_json(c_path)  # type: dict
 
                         # get number of intervals using jq:
                         # cat iperf_client-data_client-br14_server-control-scada.json | jq '.intervals | length'
                         rtt_times = []
                         for interval in results["intervals"]:
-                            rtt_times.append(utils.usec_to_sec(interval["streams"][0]["rtt"]))
+                            rtt_times.append(
+                                utils.usec_to_sec(interval["streams"][0]["rtt"])
+                            )
 
                         # RTT text file contents, one value per line
                         # Limit the float precision to 6
-                        hist_str = "\n".join(f"{t:.06f}" for t in rtt_times) + "\n"  # add final newline
+                        hist_str = (
+                            "\n".join(f"{t:.06f}" for t in rtt_times) + "\n"
+                        )  # add final newline
 
                         # "iperf_server-data_client-load5_server-load8.json" => "load5_load8"
-                        pair_name = c_path.name.replace(".json", "").split("-data_")[-1].replace("client-", "").replace("server-", "").replace("_", "-")
+                        pair_name = (
+                            c_path.name.replace(".json", "")
+                            .split("-data_")[-1]
+                            .replace("client-", "")
+                            .replace("server-", "")
+                            .replace("_", "-")
+                        )
 
-                        rtt_hist_file = Path(self.base_dir, f"rtt_histogram_{pair_name}.txt")
-                        self.print(f"Writing RTT histogram to {rtt_hist_file} (client={client.hostname}, server={server.hostname})")
+                        rtt_hist_file = Path(
+                            self.base_dir, f"rtt_histogram_{pair_name}.txt"
+                        )
+                        self.print(
+                            f"Writing RTT histogram to {rtt_hist_file} (client={client.hostname}, server={server.hostname})"
+                        )
                         rtt_hist_file.write_text(hist_str, encoding="utf-8")
         else:
             self.print("using rperf, skipping data collection and processing")
 
-        logger.info(f'Stopped user component: {self.name}')
+        logger.info(f"Stopped user component: {self.name}")
 
     def cleanup(self):
-        logger.info(f'Cleaning up user component: {self.name}')
+        logger.info(f"Cleaning up user component: {self.name}")
         node_info = self._get_node_info()
 
         self.mm.clear_cc_prefix()
@@ -503,12 +583,12 @@ class Iperf(ComponentBase):
         for vm in node_info["vms"]:
             self.mm.clear_vm_tag(vm, "iperf")
 
-        logger.info(f'Cleaned up user component: {self.name}')
+        logger.info(f"Cleaned up user component: {self.name}")
 
 
 def main():
     Iperf()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

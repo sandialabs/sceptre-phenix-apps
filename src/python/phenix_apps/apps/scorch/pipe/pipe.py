@@ -8,20 +8,20 @@ class Pipe(ComponentBase):
     """
 
     def __init__(self):
-        ComponentBase.__init__(self, 'pipe')
+        ComponentBase.__init__(self, "pipe")
         self.execute_stage()
 
     def start(self):
         logger.info(f"Starting user component: {self.name}")
 
-        pipe = self.metadata.get('pipe', None)
-        data = self.metadata.get('data', None)
-        via  = self.metadata.get('via',  None)
-        mode = self.metadata.get('mode', None)
-        log  = self.metadata.get('log',  None)
+        pipe = self.metadata.get("pipe", None)
+        data = self.metadata.get("data", None)
+        via = self.metadata.get("via", None)
+        mode = self.metadata.get("mode", None)
+        log = self.metadata.get("log", None)
 
         if not pipe:
-            self.eprint(f"pipe not specified but is required")
+            self.eprint("pipe not specified but is required")
             sys.exit(1)
 
         if via:
@@ -29,8 +29,10 @@ class Pipe(ComponentBase):
             self.mm.pipe_via(pipe, via)
 
         if mode:
-            if mode not in ['all', 'round-robin', 'random']:
-                self.eprint(f"mode invalid: {mode} - options are all|round-robin|random")
+            if mode not in ["all", "round-robin", "random"]:
+                self.eprint(
+                    f"mode invalid: {mode} - options are all|round-robin|random"
+                )
                 sys.exit(1)
             self.print(f"setting mode '{mode}' for pipe '{pipe}'")
             self.mm.pipe_mode(pipe, mode)
@@ -52,23 +54,23 @@ class Pipe(ComponentBase):
         logger.info(f"Started user component: {self.name}")
 
     def cleanup(self):
-        logger.info(f'Cleaning up user component: {self.name}')
+        logger.info(f"Cleaning up user component: {self.name}")
 
-        pipe = self.metadata.get('pipe', None)
+        pipe = self.metadata.get("pipe", None)
 
         if not pipe:
-            self.eprint(f"pipe not specified but is required")
+            self.eprint("pipe not specified but is required")
             sys.exit(1)
 
         self.print(f"clearing pipe '{pipe}'")
         self.mm.clear_pipe(pipe)
 
-        logger.info(f'Cleaned up user component: {self.name}')
+        logger.info(f"Cleaned up user component: {self.name}")
 
 
 def main():
     Pipe()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
