@@ -16,7 +16,7 @@ class Kafka(ComponentBase):
         # generate a universal uid so that multiple kafka components can run simultaneously
         config_str = json.dumps(self.metadata, sort_keys=True)
         component_uuid = uuid.uuid5(uuid.NAMESPACE_DNS, f"{self.exp_name}-{self.name}-{config_str}")
-        
+
         self.pid_file = (
             f"/tmp/phenix-scorch-kafka-{self.exp_name}-{component_uuid.hex}.pid"
         )
@@ -25,10 +25,10 @@ class Kafka(ComponentBase):
     def configure(self):
         # if the deterministic PID file already exists, don't configure the component again
         if os.path.exists(self.pid_file):
-            logger.log("INFO", f"User component {self.name} already configured, skipping")
+            logger.info(f"User component {self.name} already configured, skipping")
             return
-  
-        logger.log("INFO", f"Configuring user component: {self.name}")
+
+        logger.info(f"Configuring user component: {self.name}")
 
         # get kafka ip addresses and concatenate them into a list of
         # strings in format ip:port
@@ -131,12 +131,12 @@ class Kafka(ComponentBase):
         pid = self._consume_pid_file()
 
         if not pid:
-            logger.log("INFO", f"No PID, component already cleaned up")
+            logger.info(f"No PID, component already cleaned up")
             exit()
 
         try:
             os.kill(pid, 9)
-            logger.log("INFO", f"Cleaned up user component: {self.name}")
+            logger.info(f"Cleaned up user component: {self.name}")
         except Exception as e:
             self.eprint(
                 f"Error terminating listener at PID {pid}. See: {e}"
