@@ -31,29 +31,29 @@ type MirrorAppMetadataV1 struct {
 	} `mapstructure:"erspan"`
 }
 
-func (this *MirrorAppMetadataV1) Upgrade(md MirrorAppMetadata) {
-	this.MirrorNet = md.DirectGRE.MirrorNet
-	this.MirrorBridge = md.DirectGRE.MirrorBridge
-	this.MirrorVLAN = md.DirectGRE.MirrorVLAN
-	this.ERSPAN.Enabled = md.DirectGRE.ERSPAN.Enabled
-	this.ERSPAN.Version = md.DirectGRE.ERSPAN.Version
-	this.ERSPAN.Index = md.DirectGRE.ERSPAN.Index
-	this.ERSPAN.Direction = md.DirectGRE.ERSPAN.Direction
-	this.ERSPAN.HardwareID = md.DirectGRE.ERSPAN.HardwareID
+func (md *MirrorAppMetadataV1) Upgrade(old MirrorAppMetadata) {
+	md.MirrorNet = old.DirectGRE.MirrorNet
+	md.MirrorBridge = old.DirectGRE.MirrorBridge
+	md.MirrorVLAN = old.DirectGRE.MirrorVLAN
+	md.ERSPAN.Enabled = old.DirectGRE.ERSPAN.Enabled
+	md.ERSPAN.Version = old.DirectGRE.ERSPAN.Version
+	md.ERSPAN.Index = old.DirectGRE.ERSPAN.Index
+	md.ERSPAN.Direction = old.DirectGRE.ERSPAN.Direction
+	md.ERSPAN.HardwareID = old.DirectGRE.ERSPAN.HardwareID
 }
 
-func (this *MirrorAppMetadataV1) Init() {
+func (md *MirrorAppMetadataV1) Init() {
 	// Set some default values if missing from metadata.
-	if this.MirrorNet == "" {
-		this.MirrorNet = "10.248.171.0/24"
+	if md.MirrorNet == "" {
+		md.MirrorNet = "10.248.171.0/24"
 	}
 
-	if !strings.Contains(this.MirrorNet, "/") {
-		this.MirrorNet += "/24" // default to class C network
+	if !strings.Contains(md.MirrorNet, "/") {
+		md.MirrorNet += "/24" // default to class C network
 	}
 
-	if this.MirrorVLAN == "" {
-		this.MirrorVLAN = "mirror"
+	if md.MirrorVLAN == "" {
+		md.MirrorVLAN = "mirror"
 	}
 }
 

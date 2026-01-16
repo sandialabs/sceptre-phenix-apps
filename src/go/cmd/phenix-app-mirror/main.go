@@ -4,7 +4,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"phenix-apps/util"
 	"phenix/store"
@@ -64,7 +64,7 @@ func main() {
 		return
 	}
 
-	body, err := ioutil.ReadAll(os.Stdin)
+	body, err := io.ReadAll(os.Stdin)
 	if err != nil {
 		slog.Error("unable to read JSON from STDIN")
 	}
@@ -75,7 +75,9 @@ func main() {
 	}
 
 	endpoint := os.Getenv("PHENIX_STORE_ENDPOINT")
-	if err := store.Init(store.Endpoint(endpoint)); err != nil {
+
+	err = store.Init(store.Endpoint(endpoint))
+	if err != nil {
 		slog.Error("initializing store: %w", err)
 	}
 
@@ -219,7 +221,8 @@ func preStart(exp *types.Experiment, dryrun bool) error {
 			"0755", "",
 		)
 
-		if err := util.RestoreAsset(templates, setupFile, "templates/setup-ovs.tmpl"); err != nil {
+		err = util.RestoreAsset(templates, setupFile, "templates/setup-ovs.tmpl")
+		if err != nil {
 			return fmt.Errorf("writing OVS setup script to file: %w", err)
 		}
 	}
@@ -572,7 +575,9 @@ func cleanup(exp *types.Experiment, dryrun bool) error {
 	cluster := cluster(exp)
 
 	var status MirrorAppStatus
-	if err := exp.Status.ParseAppStatus("mirror", &status); err != nil {
+
+	err = exp.Status.ParseAppStatus("mirror", &status)
+	if err != nil {
 		return fmt.Errorf("decoding app status: %w", err)
 	}
 
@@ -583,7 +588,8 @@ func cleanup(exp *types.Experiment, dryrun bool) error {
 		}
 	}
 
-	if err := deleteTap(status.TapName, exp.Metadata.Name, cluster); err != nil {
+	err = deleteTap(status.TapName, exp.Metadata.Name, cluster)
+	if err != nil {
 		slog.Error("deleting tap from cluster", "tap", status.TapName, "err", err)
 	}
 
@@ -597,7 +603,11 @@ func deleteTap(name, exp string, cluster map[string][]string) error {
 		errs = multierror.Append(errs, deleteTapFromHost(name, exp, host))
 	}
 
-	return errs
+	if errs != nil {
+		return fmt.Errorf("error deleting tap: %w", errs)
+	}
+
+	return nil
 }
 
 func deleteTapFromHost(name, exp, host string) error {
@@ -623,7 +633,11 @@ func deleteMirror(mirror, bridge string, cluster map[string][]string) error {
 		errs = multierror.Append(errs, deleteMirrorFromHost(mirror, bridge, host))
 	}
 
-	return errs
+	if errs != nil {
+		return fmt.Errorf("error deleting mirror: %w", errs)
+	}
+
+	return nil
 }
 
 func deleteMirrorFromHost(mirror, bridge, host string) error {
@@ -666,7 +680,11 @@ func deleteMirrorFromHost(mirror, bridge, host string) error {
 		)
 	}
 
-	return errs
+	if errs != nil {
+		return fmt.Errorf("error deleting mirror from host: %w", errs)
+	}
+
+	return nil
 }
 
 func mirrorNet(md *MirrorAppMetadataV1) (netaddr.IPPrefix, error) {

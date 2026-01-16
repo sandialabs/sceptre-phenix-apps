@@ -126,7 +126,7 @@ class ComponentBase(object):
         self._mm: minimega.minimega | None = None  # minimega instance
         self._es: Elasticsearch | None = None  # Elasticsearch instance
 
-        def signal_handler(signum, stack):
+        def signal_handler(_, __):
             pass
 
         # handle signals for backgrounded components

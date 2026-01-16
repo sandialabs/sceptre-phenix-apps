@@ -4,7 +4,6 @@ import (
 	"embed"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"text/template"
@@ -24,7 +23,8 @@ func GenerateFromTemplate(name string, tmpl []byte, data any, w io.Writer) error
 func CreateFileFromTemplate(name string, tmpl []byte, data any, filename string) error {
 	dir := filepath.Dir(filename)
 
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	err := os.MkdirAll(dir, 0o755)
+	if err != nil {
 		return fmt.Errorf("creating template path: %w", err)
 	}
 
@@ -61,7 +61,7 @@ func RestoreAsset(templates embed.FS, path, name string) error {
 		return fmt.Errorf("creating directory for %q: %w", path, err)
 	}
 
-	err = ioutil.WriteFile(path, data, info.Mode())
+	err = os.WriteFile(path, data, info.Mode())
 	if err != nil {
 		return fmt.Errorf("writing file %q: %w", path, err)
 	}

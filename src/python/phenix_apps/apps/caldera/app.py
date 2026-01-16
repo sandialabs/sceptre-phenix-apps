@@ -138,7 +138,7 @@ class Caldera(AppBase):
         for host in hosts:
             try:
                 addr = ipaddr.ip_address(host.metadata.server)
-            except:
+            except ValueError:
                 tokens = host.metadata.server.split(":")
                 server = tokens[0]
 

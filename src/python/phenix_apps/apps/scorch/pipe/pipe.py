@@ -1,6 +1,8 @@
 from phenix_apps.apps.scorch import ComponentBase
 from phenix_apps.common.logger import logger
 
+import sys
+
 
 class Pipe(ComponentBase):
     """

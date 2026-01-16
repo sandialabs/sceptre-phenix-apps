@@ -194,7 +194,7 @@ class Config:
                     if not index:
                         try:
                             index = self.logs["elastic"]["default_index"]
-                        except:
+                        except KeyError:
                             index = None
 
                     logs = ET.SubElement(self.cpu, "logs")

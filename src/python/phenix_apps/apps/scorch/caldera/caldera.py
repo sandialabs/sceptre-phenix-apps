@@ -63,7 +63,7 @@ class Caldera(ComponentBase):
             op["adversary"] = adversary
 
             self.print("adversary provided as UUID - not verifying existence")
-        except:
+        except ValueError:
             self.print(f"looking up ID for '{adversary}' adversary...")
 
             cmd_file = f"run-{self.extract_run_name()}_{str(uuid.uuid4())}.sh"
@@ -108,7 +108,7 @@ class Caldera(ComponentBase):
             op["facts"] = facts
 
             self.print("fact source provided as UUID - not verifying existence")
-        except:
+        except ValueError:
             self.print(f"looking up ID for '{facts}' fact source...")
 
             cmd_file = f"run-{self.extract_run_name()}_{str(uuid.uuid4())}.sh"
@@ -153,7 +153,7 @@ class Caldera(ComponentBase):
             op["planner"] = planner
 
             self.print("planner provided as UUID - not verifying existence")
-        except:
+        except ValueError:
             self.print(f"looking up ID for '{planner}' planner...")
 
             cmd_file = f"run-{self.extract_run_name()}_{str(uuid.uuid4())}.sh"

@@ -125,13 +125,6 @@ class Snort(ComponentBase):
 
                 with open(f"{self.base_dir}/snort-stats.jsonl", "w") as f:
                     for row in data:
-                        out = {
-                            "timestamp": int(row["time"]),
-                            "total_alerts_per_second": int(
-                                row["total_alerts_per_second"]
-                            ),
-                        }
-
                         json.dump(row, f)
                         f.write("\n")
 

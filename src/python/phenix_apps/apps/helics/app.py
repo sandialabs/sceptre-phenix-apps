@@ -120,7 +120,7 @@ class Helics(AppBase):
                 entry[broker][0] += count
 
                 # only overwrite the log level if it wasn't already set
-                if entry[broker][1] == None:
+                if entry[broker][1] is None:
                     entry[broker][1] = level
 
                 brokers[hostname] = entry

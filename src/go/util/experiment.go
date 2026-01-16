@@ -34,12 +34,15 @@ func IsDryRun() bool {
 func DecodeExperiment(body []byte) (*types.Experiment, error) {
 	var mapper map[string]any
 
-	if err := json.Unmarshal(body, &mapper); err != nil {
+	err := json.Unmarshal(body, &mapper)
+	if err != nil {
 		return nil, fmt.Errorf("unable to parse JSON: %w", err)
 	}
 
 	var md store.ConfigMetadata
-	if err := mapstructure.Decode(mapper["metadata"], &md); err != nil {
+
+	err = mapstructure.Decode(mapper["metadata"], &md)
+	if err != nil {
 		return nil, fmt.Errorf("decoding experiment metadata: %w", err)
 	}
 
@@ -48,7 +51,8 @@ func DecodeExperiment(body []byte) (*types.Experiment, error) {
 		return nil, fmt.Errorf("getting versioned spec for experiment: %w", err)
 	}
 
-	if err := mapstructure.Decode(mapper["spec"], &iface); err != nil {
+	err = mapstructure.Decode(mapper["spec"], &iface)
+	if err != nil {
 		return nil, fmt.Errorf("decoding versioned spec: %w", err)
 	}
 
@@ -62,7 +66,8 @@ func DecodeExperiment(body []byte) (*types.Experiment, error) {
 		return nil, fmt.Errorf("getting versioned status for experiment: %w", err)
 	}
 
-	if err := mapstructure.Decode(mapper["status"], &iface); err != nil {
+	err = mapstructure.Decode(mapper["status"], &iface)
+	if err != nil {
 		return nil, fmt.Errorf("decoding versioned status: %w", err)
 	}
 

@@ -745,7 +745,7 @@ class Sceptre(AppBase):
         reg_config = {}
 
         # Write injections for fd-server
-        # type: fd-server
+        # for type: fd-server
         fds = self.extract_nodes_type("fd-server")
         fd_counter = 0
 
@@ -886,7 +886,7 @@ class Sceptre(AppBase):
                 device=fd_,
                 kwargs={
                     "name": sceptre_type,
-                    # type: ignition
+                    # for type: ignition
                     "needrestart": True
                     if self.extract_nodes_type("ignition")
                     else False,
@@ -1058,7 +1058,7 @@ class Sceptre(AppBase):
             self.render("helics_config.mako", f"{vm_dir}/helics.json", config=config)
 
         # Write fd client file injections
-        # type: fd-client
+        # for type: fd-client
         fd_clients = self.extract_nodes_type("fd-client")
 
         for fd_ in fd_clients:
@@ -1101,7 +1101,7 @@ class Sceptre(AppBase):
             self.render_sceptre_start(fd_, {"name": "field-device"})
 
         # Write fep file injections
-        # type: fep
+        # for type: fep
         feps = self.extract_nodes_type("fep")
         fep_counter = 0
 

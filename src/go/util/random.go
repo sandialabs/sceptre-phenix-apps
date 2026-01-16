@@ -4,24 +4,19 @@ package util
 
 import (
 	"math/rand"
-	"time"
 )
 
 var chars = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
-
 func RandomString(n int) string {
 	var (
 		buf = make([]rune, n)
-		len = len(chars)
+		l   = len(chars)
 	)
 
 	for i := range buf {
 		//nolint:gosec // simple random string, not cryptographically relevant
-		buf[i] = chars[rand.Intn(len)]
+		buf[i] = chars[rand.Intn(l)]
 	}
 
 	return string(buf)

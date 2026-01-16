@@ -52,14 +52,14 @@ class PowerTransmissionInfrastructure(Infrastructure):
 
     @staticmethod
     def create_device(device_type, device_name, protocol, reg_config, **kwargs):
-        if type(device_type) == str and device_type.lower() == "generator":
+        if type(device_type) is str and device_type.lower() == "generator":
             device_kwargs = {
                 "range": (-600, 1800),
                 "analog-read": kwargs.get("analog-read", ["voltage", "mw", "mvar"]),
                 "binary-read": kwargs.get("binary-read", ["active"]),
                 "binary-read-write": kwargs.get("binary-read-write", ["active"]),
             }
-        elif type(device_type) == str and device_type.lower() == "bus":
+        elif type(device_type) is str and device_type.lower() == "bus":
             device_kwargs = {
                 "range": (-600, 1800),
                 "analog-read": kwargs.get(
@@ -77,14 +77,14 @@ class PowerTransmissionInfrastructure(Infrastructure):
                 "binary-read": kwargs.get("binary-read", ["active", "slack"]),
                 "binary-read-write": kwargs.get("binary-read-write", ["active"]),
             }
-        elif type(device_type) == str and device_type.lower() == "load":
+        elif type(device_type) is str and device_type.lower() == "load":
             device_kwargs = {
                 "range": (-600, 1800),
                 "analog-read": kwargs.get("analog-read", ["mw", "mvar"]),
                 "binary-read": kwargs.get("binary-read", ["active"]),
                 "binary-read-write": kwargs.get("binary-read-write", ["active"]),
             }
-        elif type(device_type) == str and device_type.lower() == "branch":
+        elif type(device_type) is str and device_type.lower() == "branch":
             device_kwargs = {
                 "range": (-600, 1800),
                 "analog-read": kwargs.get(
@@ -94,14 +94,14 @@ class PowerTransmissionInfrastructure(Infrastructure):
                 "binary-read": kwargs.get("binary-read", ["active"]),
                 "binary-read-write": kwargs.get("binary-read-write", ["active"]),
             }
-        elif type(device_type) == str and device_type.lower() == "shunt":
+        elif type(device_type) is str and device_type.lower() == "shunt":
             device_kwargs = {
                 "range": (-600, 1800),
                 "analog-read": kwargs.get("analog-read", ["actual_mvar"]),
                 "binary-read": kwargs.get("binary-read", ["active"]),
                 "binary-read-write": kwargs.get("binary-read-write", ["active"]),
             }
-        elif type(device_type) == str and device_type.lower() == "inverter":
+        elif type(device_type) is str and device_type.lower() == "inverter":
             device_kwargs = {
                 "infrastructure": "PowerTransmission",
                 "analog-read-write": kwargs.get(
@@ -129,7 +129,7 @@ class PowerDistributionInfrastructure(Infrastructure):
 
     @staticmethod
     def create_device(device_type, device_name, protocol, reg_config, **kwargs):
-        if type(device_type) == str and device_type.lower() == "generator":
+        if type(device_type) is str and device_type.lower() == "generator":
             device_kwargs = {
                 "range": (-600, 1800),
                 "analog-read": kwargs.get(
@@ -163,7 +163,7 @@ class PowerDistributionInfrastructure(Infrastructure):
                 "binary-read": kwargs.get("binary-read", ["active"]),
                 "binary-read-write": kwargs.get("binary-read-write", ["active"]),
             }
-        elif type(device_type) == str and device_type.lower() == "bus":
+        elif type(device_type) is str and device_type.lower() == "bus":
             device_kwargs = {
                 "range": (-600, 1800),
                 "analog-read": kwargs.get(
@@ -178,36 +178,7 @@ class PowerDistributionInfrastructure(Infrastructure):
                     ],
                 ),
             }
-        elif type(device_type) == str and device_type.lower() == "load":
-            device_kwargs = {
-                "range": (-600, 1800),
-                "analog-read": kwargs.get(
-                    "analog-read",
-                    [
-                        "voltage_mag_p1",
-                        "voltage_mag_p2",
-                        "voltage_mag_p3",
-                        "voltage_ang_p1",
-                        "voltage_ang_p2",
-                        "voltage_ang_p3",
-                        "current_mag_p1",
-                        "current_mag_p2",
-                        "current_mag_p3",
-                        "current_ang_p1",
-                        "current_ang_p2",
-                        "current_ang_p3",
-                        "real_power_p1",
-                        "real_power_p2",
-                        "real_power_p3",
-                        "reactive_power_p1",
-                        "reactive_power_p2",
-                        "reactive_power_p3",
-                    ],
-                ),
-                "binary-read": kwargs.get("binary-read", ["active"]),
-                "binary-read-write": kwargs.get("binary-read-write", ["active"]),
-            }
-        elif type(device_type) == str and device_type.lower() == "shunt":
+        elif type(device_type) is str and device_type.lower() == "load":
             device_kwargs = {
                 "range": (-600, 1800),
                 "analog-read": kwargs.get(
@@ -236,7 +207,36 @@ class PowerDistributionInfrastructure(Infrastructure):
                 "binary-read": kwargs.get("binary-read", ["active"]),
                 "binary-read-write": kwargs.get("binary-read-write", ["active"]),
             }
-        elif type(device_type) == str and device_type.lower() == "branch":
+        elif type(device_type) is str and device_type.lower() == "shunt":
+            device_kwargs = {
+                "range": (-600, 1800),
+                "analog-read": kwargs.get(
+                    "analog-read",
+                    [
+                        "voltage_mag_p1",
+                        "voltage_mag_p2",
+                        "voltage_mag_p3",
+                        "voltage_ang_p1",
+                        "voltage_ang_p2",
+                        "voltage_ang_p3",
+                        "current_mag_p1",
+                        "current_mag_p2",
+                        "current_mag_p3",
+                        "current_ang_p1",
+                        "current_ang_p2",
+                        "current_ang_p3",
+                        "real_power_p1",
+                        "real_power_p2",
+                        "real_power_p3",
+                        "reactive_power_p1",
+                        "reactive_power_p2",
+                        "reactive_power_p3",
+                    ],
+                ),
+                "binary-read": kwargs.get("binary-read", ["active"]),
+                "binary-read-write": kwargs.get("binary-read-write", ["active"]),
+            }
+        elif type(device_type) is str and device_type.lower() == "branch":
             device_kwargs = {
                 "range": (-600, 1800),
                 "analog-read": kwargs.get(
@@ -265,7 +265,7 @@ class PowerDistributionInfrastructure(Infrastructure):
                 "binary-read": kwargs.get("binary-read", ["active"]),
                 "binary-read-write": kwargs.get("binary-read-write", ["active"]),
             }
-        elif type(device_type) == str and device_type.lower() == "transformer":
+        elif type(device_type) is str and device_type.lower() == "transformer":
             device_kwargs = {
                 "range": (-600, 1800),
                 "analog-read": kwargs.get(
@@ -311,7 +311,7 @@ class PowerDistributionInfrastructure(Infrastructure):
                 "binary-read": kwargs.get("binary-read", ["active"]),
                 "binary-read-write": kwargs.get("binary-read-write", ["active"]),
             }
-        elif type(device_type) == str and device_type.lower() == "inverter":
+        elif type(device_type) is str and device_type.lower() == "inverter":
             device_kwargs = {
                 "range": (-600, 1800),
                 "analog-read": kwargs.get(
@@ -365,7 +365,7 @@ class BatchProcessInfrastructure(Infrastructure):
 
     @staticmethod
     def create_device(device_type, device_name, protocol, reg_config, **kwargs):
-        if type(device_type) == str and device_type.lower() == "storagetank":
+        if type(device_type) is str and device_type.lower() == "storagetank":
             device_kwargs = {
                 "range": (0, 1000),
                 "analog-read": kwargs.get(
@@ -391,7 +391,7 @@ class BatchProcessInfrastructure(Infrastructure):
                     "binary-read-write", ["fill_control", "empty_control"]
                 ),
             }
-        elif type(device_type) == str and device_type.lower() == "heatingtank":
+        elif type(device_type) is str and device_type.lower() == "heatingtank":
             device_kwargs = {
                 "range": (0, 1000),
                 "analog-read": kwargs.get(
@@ -425,7 +425,7 @@ class BatchProcessInfrastructure(Infrastructure):
                     ["fill_control", "empty_control", "heater_control"],
                 ),
             }
-        elif type(device_type) == str and device_type.lower() == "mixingtank":
+        elif type(device_type) is str and device_type.lower() == "mixingtank":
             device_kwargs = {
                 "range": (0, 1000),
                 "analog-read": kwargs.get(
@@ -462,7 +462,7 @@ class BatchProcessInfrastructure(Infrastructure):
                     ["fill_control", "empty_control", "mixing_control"],
                 ),
             }
-        elif type(device_type) == str and device_type.lower() == "pump":
+        elif type(device_type) is str and device_type.lower() == "pump":
             device_kwargs = {
                 "range": (0, 1000),
                 "analog-read": kwargs.get("analog-read", ["flow", "temperature"]),
@@ -472,19 +472,19 @@ class BatchProcessInfrastructure(Infrastructure):
                     "binary-read-write", ["active", "control"]
                 ),
             }
-        elif type(device_type) == str and device_type.lower() == "generator":
+        elif type(device_type) is str and device_type.lower() == "generator":
             device_kwargs = {
                 "range": (0, 1000),
                 "analog-read": kwargs.get("analog-read", ["fuel"]),
             }
-        elif type(device_type) == str and device_type.lower() == "fillingstation":
+        elif type(device_type) is str and device_type.lower() == "fillingstation":
             device_kwargs = {
                 "range": (0, 1000),
                 "analog-read": kwargs.get(
                     "analog-read", ["request", "volume_wasted", "backlog"]
                 ),
             }
-        elif type(device_type) == str and device_type.lower() == "valve":
+        elif type(device_type) is str and device_type.lower() == "valve":
             device_kwargs = {
                 "range": (0, 1000),
                 "binary-read": kwargs.get("binary-read", ["open"]),
@@ -511,12 +511,12 @@ class HVACInfrastructure(Infrastructure):
 
     @staticmethod
     def create_device(device_type, device_name, protocol, reg_config, **kwargs):
-        if type(device_type) == str and device_type.lower() == "room":
+        if type(device_type) is str and device_type.lower() == "room":
             device_kwargs = {
                 "range": (0, 1000),
                 "analog-read": kwargs.get("analog-read", ["temperature"]),
             }
-        elif type(device_type) == str and device_type.lower() == "thermostat":
+        elif type(device_type) is str and device_type.lower() == "thermostat":
             device_kwargs = {
                 "range": (0, 1000),
                 "analog-read": kwargs.get("analog-read", ["setpoint", "margin"]),
@@ -524,19 +524,19 @@ class HVACInfrastructure(Infrastructure):
                     "analog-read-write", ["change_setpoint", "change_margin"]
                 ),
             }
-        elif type(device_type) == str and device_type.lower() == "fan":
+        elif type(device_type) is str and device_type.lower() == "fan":
             device_kwargs = {
                 "range": (0, 1000),
                 "analog-read": kwargs.get("analog-read", ["speed"]),
                 "analog-read-write": kwargs.get("analog-read-write", ["change_speed"]),
             }
-        elif type(device_type) == str and device_type.lower() == "heater":
+        elif type(device_type) is str and device_type.lower() == "heater":
             device_kwargs = {
                 "range": (0, 1000),
                 "binary-read-write": kwargs.get("binary-read-write", ["turn_on"]),
                 "binary-read": kwargs.get("binary-read", ["on"]),
             }
-        elif type(device_type) == str and device_type.lower() == "cooler":
+        elif type(device_type) is str and device_type.lower() == "cooler":
             device_kwargs = {
                 "range": (0, 1000),
                 "binary-read-write": kwargs.get("binary-read-write", ["turn_on"]),
@@ -563,7 +563,7 @@ class FuelInfrastructure(Infrastructure):
 
     @staticmethod
     def create_device(device_type, device_name, protocol, reg_config, **kwargs):
-        if type(device_type) == str and device_type.lower() == "storagetank":
+        if type(device_type) is str and device_type.lower() == "storagetank":
             device_kwargs = {
                 "range": (0, 1000),
                 "analog-read": kwargs.get(
@@ -576,7 +576,7 @@ class FuelInfrastructure(Infrastructure):
                 "binary-read": kwargs.get("binary-read", ["fill_control"]),
                 "binary-read-write": kwargs.get("binary-read-write", ["fill_control"]),
             }
-        elif type(device_type) == str and device_type.lower() == "pump":
+        elif type(device_type) is str and device_type.lower() == "pump":
             device_kwargs = {
                 "range": (0, 1000),
                 "analog-read": kwargs.get("analog-read", ["flow", "voltage_in"]),
@@ -588,19 +588,19 @@ class FuelInfrastructure(Infrastructure):
                     "binary-read-write", ["active", "control"]
                 ),
             }
-        elif type(device_type) == str and device_type.lower() == "generator":
+        elif type(device_type) is str and device_type.lower() == "generator":
             device_kwargs = {
                 "range": (0, 1000),
                 "analog-read": kwargs.get("analog-read", ["fuel"]),
             }
-        elif type(device_type) == str and device_type.lower() == "fillingstation":
+        elif type(device_type) is str and device_type.lower() == "fillingstation":
             device_kwargs = {
                 "range": (0, 1000),
                 "analog-read": kwargs.get(
                     "analog-read", ["request", "volume_wasted", "backlog"]
                 ),
             }
-        elif type(device_type) == str and device_type.lower() == "valve":
+        elif type(device_type) is str and device_type.lower() == "valve":
             device_kwargs = {
                 "range": (0, 1000),
                 "binary-read": kwargs.get("binary-read", ["open"]),
@@ -627,7 +627,7 @@ class OPALRTInfrastructure(Infrastructure):
 
     @staticmethod
     def create_device(device_type, device_name, protocol, reg_config, **kwargs):
-        if type(device_type) == str and device_type.lower() == "analog-read":
+        if type(device_type) is str and device_type.lower() == "analog-read":
             device_kwargs = {
                 "range": (-32767.0, 32767.0),
                 "analog-read": kwargs.get("analog-read", ["value"]),
@@ -635,7 +635,7 @@ class OPALRTInfrastructure(Infrastructure):
             return Device(
                 device_type, device_name, protocol, reg_config, **device_kwargs
             )
-        elif type(device_type) == str and device_type.lower() == "analog-read-write":
+        elif type(device_type) is str and device_type.lower() == "analog-read-write":
             device_kwargs = {
                 "range": (-32767.0, 32767.0),
                 "analog-read-write": kwargs.get("analog-read-write", ["value"]),
@@ -643,7 +643,7 @@ class OPALRTInfrastructure(Infrastructure):
             return Device(
                 device_type, device_name, protocol, reg_config, **device_kwargs
             )
-        elif type(device_type) == str and device_type.lower() == "binary-read":
+        elif type(device_type) is str and device_type.lower() == "binary-read":
             device_kwargs = {
                 "range": (0, 1000),
                 "binary-read": kwargs.get("binary-read", ["value"]),
@@ -651,7 +651,7 @@ class OPALRTInfrastructure(Infrastructure):
             return Device(
                 device_type, device_name, protocol, reg_config, **device_kwargs
             )
-        elif type(device_type) == str and device_type.lower() == "binary-read-write":
+        elif type(device_type) is str and device_type.lower() == "binary-read-write":
             device_kwargs = {
                 "range": (0, 1000),
                 "binary-read-write": kwargs.get("binary-read-write", ["value"]),
@@ -671,7 +671,7 @@ class RTDSInfrastructure(Infrastructure):
 
     @staticmethod
     def create_device(device_type, device_name, protocol, reg_config, **kwargs):
-        if type(device_type) == str and device_type.lower() == "analog-read":
+        if type(device_type) is str and device_type.lower() == "analog-read":
             device_kwargs = {
                 "range": (-32767.0, 32767.0),
                 "analog-read": kwargs.get("analog-read", ["real", "angle"]),
@@ -679,7 +679,7 @@ class RTDSInfrastructure(Infrastructure):
             return Device(
                 device_type, device_name, protocol, reg_config, **device_kwargs
             )
-        elif type(device_type) == str and device_type.lower() == "analog-read-write":
+        elif type(device_type) is str and device_type.lower() == "analog-read-write":
             device_kwargs = {
                 "range": (-32767.0, 32767.0),
                 "analog-read-write": kwargs.get("analog-read-write", ["value"]),
@@ -687,7 +687,7 @@ class RTDSInfrastructure(Infrastructure):
             return Device(
                 device_type, device_name, protocol, reg_config, **device_kwargs
             )
-        elif type(device_type) == str and device_type.lower() == "binary-read-write":
+        elif type(device_type) is str and device_type.lower() == "binary-read-write":
             device_kwargs = {
                 "range": (0, 1000),
                 "binary-read-write": kwargs.get("binary-read-write", ["closed"]),
@@ -707,34 +707,34 @@ class WaterwayInfrastructure(Infrastructure):
 
     @staticmethod
     def create_device(device_type, device_name, protocol, reg_config, **kwargs):
-        if type(device_type) == str and device_type.lower() == "water":
+        if type(device_type) is str and device_type.lower() == "water":
             device_kwargs = {
                 "range": (0, 1000),
                 "analog-read": kwargs.get("analog-read", ["height"]),
             }
-        elif type(device_type) == str and device_type.lower() == "gate":
+        elif type(device_type) is str and device_type.lower() == "gate":
             device_kwargs = {
                 "range": (0, 1000),
                 "analog-read": kwargs.get("analog-read", ["open"]),
                 "analog-read-write": kwargs.get("analog-read-write", ["open"]),
             }
-        elif type(device_type) == str and device_type.lower() == "valve":
+        elif type(device_type) is str and device_type.lower() == "valve":
             device_kwargs = {
                 "range": (0, 1000),
                 "analog-read": kwargs.get("analog-read", ["open"]),
                 "analog-read-write": kwargs.get("analog-read-write", ["open"]),
             }
-        elif type(device_type) == str and device_type.lower() == "boat-sensor":
+        elif type(device_type) is str and device_type.lower() == "boat-sensor":
             device_kwargs = {
                 "range": (0, 1000),
                 "analog-read": kwargs.get("analog-read", ["active", "direction"]),
             }
-        elif type(device_type) == str and device_type.lower() == "boat":
+        elif type(device_type) is str and device_type.lower() == "boat":
             device_kwargs = {
                 "range": (0, 1000),
                 "analog-read": kwargs.get("analog-read", ["location", "direction"]),
             }
-        infra = infrastructure = WaterwayInfrastructure.INFRA
+        infra = WaterwayInfrastructure.INFRA
         return Device(
             device_type,
             device_name,
@@ -777,7 +777,7 @@ class BatteryInfrastructure(Infrastructure):
 
     @staticmethod
     def create_device(device_type, device_name, protocol, reg_config, **kwargs):
-        if type(device_type) != str:
+        if type(device_type) is not str:
             return None
 
         if device_type not in BatteryInfrastructure.MAPPING:

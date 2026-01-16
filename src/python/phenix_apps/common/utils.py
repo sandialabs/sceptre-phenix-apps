@@ -440,8 +440,10 @@ def mm_wait_for_cmd(
     poll_rate: float = 1.0,
     debug: bool = False,
 ) -> None:
-    last_test = lambda c: c[0] == cmd_id
-    done_test = lambda c: int(c[3]) > 0
+    def last_test(c):
+        return c[0] == cmd_id
+    def done_test(c):
+        return int(c[3]) > 0
 
     waiting = True
     counter = 0
@@ -483,8 +485,10 @@ def mm_wait_for_prefix(
 ) -> None:
     # 'Header': ['id', 'prefix', 'command', 'responses', 'background', 'once', 'sent', 'received', 'connectivity', 'level', 'filter']
     # 'Tabular': [['1', 'testing', '[/usr/bin/iperf3 --version]', '15', 'false', 'true', '[]', '[]', '', '', 'os=linux && iperf=1']]
-    last_test = lambda c: c[1] == prefix
-    done_test = lambda c: int(c[3]) == num_responses
+    def last_test(c):
+        return c[1] == prefix
+    def done_test(c):
+        return int(c[3]) == num_responses
 
     waiting = True
     counter = 0
