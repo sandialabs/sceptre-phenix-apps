@@ -3,12 +3,12 @@ import json
 import os
 import re
 import shutil
-from typing import Optional, Dict
+from typing import Dict, Optional
 
 from phenix_apps.apps import AppBase
+from phenix_apps.apps.sceptre.configs import configs
 from phenix_apps.common import error, utils
 from phenix_apps.common.logger import logger
-from phenix_apps.apps.sceptre.configs import configs
 
 
 class Sceptre(AppBase):
@@ -17,7 +17,7 @@ class Sceptre(AppBase):
 
         self.startup_dir: str = f"{self.exp_dir}/startup"
         self.sceptre_dir: str = f"{self.exp_dir}/sceptre"
-        self.elk_dir: str     = f"{self.exp_dir}/elk"
+        self.elk_dir: str = f"{self.exp_dir}/elk"
 
         os.makedirs(self.startup_dir, exist_ok=True)
         os.makedirs(self.sceptre_dir, exist_ok=True)
@@ -42,11 +42,7 @@ class Sceptre(AppBase):
             kwargs["metadata"] = dict(device.metadata)
 
         # File extension, .ps1 (PowerShell) for Windows, .sh (bash) for Linux
-        ext = (
-            ".ps1"
-            if device.topology.hardware.os_type == "windows"
-            else ".sh"
-        )
+        ext = ".ps1" if device.topology.hardware.os_type == "windows" else ".sh"
 
         startup_file = f"{self.startup_dir}/{device.hostname}-start{ext}"
         self.render("sceptre_start.mako", startup_file, **kwargs)
@@ -90,25 +86,28 @@ class Sceptre(AppBase):
             kwargs = self.find_override(f"{opc.hostname}_opc.xml")
             if kwargs is None:
                 kwargs = {"src": f"{opc_directory}/opc.xml"}
-            kwargs.update({
-                "dst": "Users/wwuser/Documents/Configs/Inject/opc.xml",
-                "description": "OPC configuration for TopServer",
-            })
+            kwargs.update(
+                {
+                    "dst": "Users/wwuser/Documents/Configs/Inject/opc.xml",
+                    "description": "OPC configuration for TopServer",
+                }
+            )
             self.add_inject(hostname=opc.hostname, inject=kwargs)
 
             # Create TopServer startup script injection
             kwargs = self.find_override(f"{opc.hostname}_topserver.ps1")
             if kwargs is None:
                 kwargs = {"src": f"{opc_directory}/topserver.ps1"}
-            kwargs.update({
-                "dst": "/sceptre/startup/30-topserver.ps1",
-                "description": "OPC TopServer startup script",
-            })
+            kwargs.update(
+                {
+                    "dst": "/sceptre/startup/30-topserver.ps1",
+                    "description": "OPC TopServer startup script",
+                }
+            )
             self.add_inject(hostname=opc.hostname, inject=kwargs)
 
             # sceptre startup scheduler injections
             self.add_sceptre_startup_injects_windows(opc.hostname)
-
 
         ######################## Field device configure ###################################
         # Identify servers, clients, and feps
@@ -122,21 +121,25 @@ class Sceptre(AppBase):
             kwargs = self.find_override(f"{fd_.hostname}_sceptre-start.sh")
             if kwargs is None:
                 kwargs = {"src": f"{self.startup_dir}/{fd_.hostname}-start.sh"}
-            kwargs.update({
-                "dst": "/etc/phenix/startup/sceptre-start.sh",
-                "description": f"{fd_.hostname} startup script",
-                "permissions": "0744",
-            })
+            kwargs.update(
+                {
+                    "dst": "/etc/phenix/startup/sceptre-start.sh",
+                    "description": f"{fd_.hostname} startup script",
+                    "permissions": "0744",
+                }
+            )
             self.add_inject(hostname=fd_.hostname, inject=kwargs)
 
             # Create field device config injection
             kwargs = self.find_override(f"{fd_.hostname}_config.xml")
             if kwargs is None:
                 kwargs = {"src": f"{fd_directory}/config.xml"}
-            kwargs.update({
-                "dst": "/etc/sceptre/config.xml",
-                "description": f"{fd_.hostname} config"
-            })
+            kwargs.update(
+                {
+                    "dst": "/etc/sceptre/config.xml",
+                    "description": f"{fd_.hostname} config",
+                }
+            )
             self.add_inject(hostname=fd_.hostname, inject=kwargs)
 
         ######################## HMI configure ###################################
@@ -149,10 +152,12 @@ class Sceptre(AppBase):
             kwargs = self.find_override(f"{hmi.hostname}_hmi.ps1")
             if kwargs is None:
                 kwargs = {"src": f"{hmi_directory}/hmi.ps1"}
-            kwargs.update({
-                "dst": "/sceptre/startup/30-hmi.ps1",
-                "description": "HMI startup script",
-            })
+            kwargs.update(
+                {
+                    "dst": "/sceptre/startup/30-hmi.ps1",
+                    "description": "HMI startup script",
+                }
+            )
             self.add_inject(hostname=hmi.hostname, inject=kwargs)
 
             # sceptre startup scheduler injections
@@ -168,7 +173,7 @@ class Sceptre(AppBase):
                 continue
 
             # If given a project file, add project file and associated automation injections
-            if 'project' in scada_server.metadata:
+            if "project" in scada_server.metadata:
                 # Create SCADA project file injection
                 kwargs = {
                     "src": f"{scada_server.metadata.project}",
@@ -178,7 +183,7 @@ class Sceptre(AppBase):
                 self.add_inject(hostname=scada_server.hostname, inject=kwargs)
 
                 # If given an automation executatble, use that. Else, the scada.mako will use alternative automation
-                if 'automation' in scada_server.metadata:
+                if "automation" in scada_server.metadata:
                     # Create automation injection
                     kwargs = {
                         "src": f"{scada_server.metadata.automation}",
@@ -191,10 +196,12 @@ class Sceptre(AppBase):
                 kwargs = self.find_override(f"{scada_server.hostname}_scada.ps1")
                 if kwargs is None:
                     kwargs = {"src": f"{scada_directory}/scada.ps1"}
-                kwargs.update({
-                    "dst": "/sceptre/startup/30-scada.ps1",
-                    "description": "scada",
-                })
+                kwargs.update(
+                    {
+                        "dst": "/sceptre/startup/30-scada.ps1",
+                        "description": "scada",
+                    }
+                )
                 self.add_inject(hostname=scada_server.hostname, inject=kwargs)
 
             # else, add autogenerated project files and associated automation injections
@@ -208,13 +215,17 @@ class Sceptre(AppBase):
                 self.add_inject(hostname=scada_server.hostname, inject=kwargs)
 
                 # Create startup script injection
-                kwargs = self.find_override(f"{scada_server.hostname}_scada_autoproject.ps1")
+                kwargs = self.find_override(
+                    f"{scada_server.hostname}_scada_autoproject.ps1"
+                )
                 if kwargs is None:
                     kwargs = {"src": f"{scada_directory}/scada_autoproject.ps1"}
-                kwargs.update({
-                    "dst": "/sceptre/startup/30-scada.ps1",
-                    "description": "scada",
-                })
+                kwargs.update(
+                    {
+                        "dst": "/sceptre/startup/30-scada.ps1",
+                        "description": "scada",
+                    }
+                )
                 self.add_inject(hostname=scada_server.hostname, inject=kwargs)
 
             # sceptre startup scheduler injections
@@ -224,27 +235,33 @@ class Sceptre(AppBase):
         engineer_workstations = self.extract_nodes_type("engineer-workstation")
 
         for engineer_workstation in engineer_workstations:
-            engineer_directory = (f"{self.sceptre_dir}/{engineer_workstation.hostname}")
+            engineer_directory = f"{self.sceptre_dir}/{engineer_workstation.hostname}"
 
             # Create putty startup script injection
             kwargs = self.find_override(f"{engineer_workstation.hostname}_putty.ps1")
             if kwargs is None:
                 kwargs = {"src": f"{engineer_directory}/putty.ps1"}
-            kwargs.update({
-                "dst": "/sceptre/startup/30-putty.ps1",
-                "description": "Engineer workstation PuTTY configurations",
-            })
+            kwargs.update(
+                {
+                    "dst": "/sceptre/startup/30-putty.ps1",
+                    "description": "Engineer workstation PuTTY configurations",
+                }
+            )
             self.add_inject(hostname=engineer_workstation.hostname, inject=kwargs)
 
             # Create auto putty connection startup script injection
             if "connect_interval" in engineer_workstation.metadata:
-                kwargs = self.find_override(f"{engineer_workstation.hostname}_auto_winscp.ps1")
+                kwargs = self.find_override(
+                    f"{engineer_workstation.hostname}_auto_winscp.ps1"
+                )
                 if kwargs is None:
                     kwargs = {"src": f"{engineer_directory}/auto_winscp.ps1"}
-                kwargs.update({
-                    "dst": "/sceptre/startup/40-auto_winscp.ps1",
-                    "description": "Engineer workstation auto putty connections",
-                })
+                kwargs.update(
+                    {
+                        "dst": "/sceptre/startup/40-auto_winscp.ps1",
+                        "description": "Engineer workstation auto putty connections",
+                    }
+                )
                 self.add_inject(hostname=engineer_workstation.hostname, inject=kwargs)
 
             # sceptre startup scheduler injections
@@ -260,20 +277,24 @@ class Sceptre(AppBase):
             kwargs = self.find_override(f"{historian.hostname}_historian_config.txt")
             if kwargs is None:
                 kwargs = {"src": f"{historian_directory}/historian_config.txt"}
-            kwargs.update({
-                "dst": "Users/wwuser/Documents/Configs/Inject/historian_config.txt",
-                "description": "Historian configuration",
-            })
+            kwargs.update(
+                {
+                    "dst": "Users/wwuser/Documents/Configs/Inject/historian_config.txt",
+                    "description": "Historian configuration",
+                }
+            )
             self.add_inject(hostname=historian.hostname, inject=kwargs)
 
             # Create historian startup script injection
             kwargs = self.find_override(f"{historian.hostname}_historian.ps1")
             if kwargs is None:
                 kwargs = {"src": f"{historian_directory}/historian.ps1"}
-            kwargs.update({
-                "dst": "/sceptre/startup/30-historian.ps1",
-                "description": "Historian startup script",
-            })
+            kwargs.update(
+                {
+                    "dst": "/sceptre/startup/30-historian.ps1",
+                    "description": "Historian startup script",
+                }
+            )
             self.add_inject(hostname=historian.hostname, inject=kwargs)
 
             # sceptre startup scheduler injections
@@ -288,7 +309,9 @@ class Sceptre(AppBase):
 
         for provider in providers:
             if "metadata" not in provider:
-                logger.warning(f"No metadata for provider '{provider.hostname}', skipping...")
+                logger.warning(
+                    f"No metadata for provider '{provider.hostname}', skipping..."
+                )
                 continue
 
             vm_directory = f"{self.sceptre_dir}/{provider.hostname}"
@@ -296,7 +319,9 @@ class Sceptre(AppBase):
             # NOTE: names are case-sensitive, used here, in power_daemon.py in bennu, and in Phenix schemas
             simulator = provider.metadata.get("simulator", "")  # type: str
             if not simulator:
-                logger.warning(f"No simulator specified for provider '{provider.hostname}', will fall back to default config")
+                logger.warning(
+                    f"No simulator specified for provider '{provider.hostname}', will fall back to default config"
+                )
 
             # Create power world provider injections
             if simulator in ["PowerWorld", "PowerWorldHelics"]:
@@ -304,20 +329,24 @@ class Sceptre(AppBase):
                 kwargs = self.find_override(f"{provider.hostname}_config.ini")
                 if kwargs is None:
                     kwargs = {"src": f"{vm_directory}/config.ini"}
-                kwargs.update({
-                    "dst": "sceptre/config.ini",
-                    "description": "PowerWorld config",
-                })
+                kwargs.update(
+                    {
+                        "dst": "sceptre/config.ini",
+                        "description": "PowerWorld config",
+                    }
+                )
                 self.add_inject(hostname=provider.hostname, inject=kwargs)
 
                 # objects
                 kwargs = self.find_override(f"{provider.hostname}_objects.txt")
                 if kwargs is None:
                     kwargs = {"src": f"{vm_directory}/objects.txt"}
-                kwargs.update({
-                    "dst": "sceptre/objects.txt",
-                    "description": "PowerWorld objects",
-                })
+                kwargs.update(
+                    {
+                        "dst": "sceptre/objects.txt",
+                        "description": "PowerWorld objects",
+                    }
+                )
                 self.add_inject(hostname=provider.hostname, inject=kwargs)
 
                 # case file
@@ -342,20 +371,24 @@ class Sceptre(AppBase):
                 kwargs = self.find_override(f"{provider.hostname}_config.ini")
                 if kwargs is None:
                     kwargs = {"src": f"{vm_directory}/config.ini"}
-                kwargs.update({
-                    "dst": "/etc/sceptre/config.ini",
-                    "description": "PowerWorldDynamics config",
-                })
+                kwargs.update(
+                    {
+                        "dst": "/etc/sceptre/config.ini",
+                        "description": "PowerWorldDynamics config",
+                    }
+                )
                 self.add_inject(hostname=provider.hostname, inject=kwargs)
 
                 # objects
                 kwargs = self.find_override(f"{provider.hostname}_objects.txt")
                 if kwargs is None:
                     kwargs = {"src": f"{vm_directory}/objects.txt"}
-                kwargs.update({
-                    "dst": "/etc/sceptre/objects.txt",
-                    "description": "PowerWorldDynamics objects",
-                })
+                kwargs.update(
+                    {
+                        "dst": "/etc/sceptre/objects.txt",
+                        "description": "PowerWorldDynamics objects",
+                    }
+                )
                 self.add_inject(hostname=provider.hostname, inject=kwargs)
 
             # Create Simulink provider injections
@@ -410,10 +443,12 @@ class Sceptre(AppBase):
                 kwargs = self.find_override(f"{provider.hostname}_config.ini")
                 if kwargs is None:
                     kwargs = {"src": f"{vm_directory}/config.ini"}
-                kwargs.update({
-                    "dst": "/etc/sceptre/config.ini",
-                    "description": "PyPower config",
-                })
+                kwargs.update(
+                    {
+                        "dst": "/etc/sceptre/config.ini",
+                        "description": "PyPower config",
+                    }
+                )
                 self.add_inject(hostname=provider.hostname, inject=kwargs)
 
                 # case file
@@ -430,28 +465,32 @@ class Sceptre(AppBase):
                 kwargs = self.find_override(f"{provider.hostname}_config.ini")
                 if kwargs is None:
                     kwargs = {"src": f"{vm_directory}/config.ini"}
-                kwargs.update({
-                    "dst": "/etc/sceptre/config.ini",
-                    "description": "Provider config",
-                })
+                kwargs.update(
+                    {
+                        "dst": "/etc/sceptre/config.ini",
+                        "description": "Provider config",
+                    }
+                )
                 self.add_inject(hostname=provider.hostname, inject=kwargs)
 
             # Create provider startup script injections
             win = "phenix/startup/30-sceptre-start.ps1"
             nix = "/etc/phenix/startup/sceptre-start.sh"
-            dst = (
-                win if provider.topology.hardware.os_type == "windows" else nix
-            )
+            dst = win if provider.topology.hardware.os_type == "windows" else nix
             startup_file = (
                 f"{self.startup_dir}/{provider.hostname}-start.{dst.split('.')[1]}"
             )
-            kwargs = self.find_override(f"{provider.hostname}_sceptre-start.{dst.split('.')[1]}")
+            kwargs = self.find_override(
+                f"{provider.hostname}_sceptre-start.{dst.split('.')[1]}"
+            )
             if kwargs is None:
                 kwargs = {"src": startup_file}
-            kwargs.update({
-                "dst": dst,
-                "description": "provider_startup_scripts",
-            })
+            kwargs.update(
+                {
+                    "dst": dst,
+                    "description": "provider_startup_scripts",
+                }
+            )
             self.add_inject(hostname=provider.hostname, inject=kwargs)
 
         ######################## HELICS configure ###################################
@@ -463,17 +502,17 @@ class Sceptre(AppBase):
             # Create HELICS config injection
             win = "sceptre/helics.json"
             nix = "/etc/sceptre/helics.json"
-            dst = (
-                nix if fed.topology.hardware.os_type == "linux" else win
-            )
+            dst = nix if fed.topology.hardware.os_type == "linux" else win
             helics_config = f"{vm_dir}/helics.json"
             kwargs = self.find_override(f"{fed.hostname}_helics.json")
             if kwargs is None:
                 kwargs = {"src": helics_config}
-            kwargs.update({
-                "dst": dst,
-                "description": "HELICS config",
-            })
+            kwargs.update(
+                {
+                    "dst": dst,
+                    "description": "HELICS config",
+                }
+            )
             self.add_inject(hostname=fed.hostname, inject=kwargs)
 
         # HELICS broker
@@ -481,8 +520,10 @@ class Sceptre(AppBase):
         for bkr in brokers:
             # Create and write startup injection
             if bkr.topology.hardware.os_type == "linux":
-                loglevel = bkr.metadata.get('helics_broker_loglevel', 3) # 3 = summary
-                logfile = bkr.metadata.get('helics_broker_logfile', '/etc/sceptre/log/helics_broker.log')
+                loglevel = bkr.metadata.get("helics_broker_loglevel", 3)  # 3 = summary
+                logfile = bkr.metadata.get(
+                    "helics_broker_logfile", "/etc/sceptre/log/helics_broker.log"
+                )
 
                 startup_file = f"{self.startup_dir}/{bkr.hostname}-helics.sh"
                 with open(startup_file, "w") as file_:
@@ -496,12 +537,13 @@ class Sceptre(AppBase):
                 kwargs = self.find_override(f"{bkr.hostname}_helics.sh")
                 if kwargs is None:
                     kwargs = {"src": startup_file}
-                kwargs.update({
-                    "dst": "/etc/phenix/startup/helics-broker-start.sh",
-                    "description": "HELICS broker start",
-                })
+                kwargs.update(
+                    {
+                        "dst": "/etc/phenix/startup/helics-broker-start.sh",
+                        "description": "HELICS broker start",
+                    }
+                )
                 self.add_inject(hostname=bkr.hostname, inject=kwargs)
-
 
         ######################## ELK configure ###################################
         vms = self.extract_nodes_label("elk")
@@ -520,11 +562,13 @@ class Sceptre(AppBase):
                 kwargs = self.find_override(f"{vm.hostname}_elk-start.sh")
                 if kwargs is None:
                     kwargs = {"src": startup_file}
-                kwargs.update({
-                    "dst": "/etc/phenix/startup/elk-start.sh",
-                    "description": "vm_elk_startup",
-                    "permissions": "0774",
-                })
+                kwargs.update(
+                    {
+                        "dst": "/etc/phenix/startup/elk-start.sh",
+                        "description": "vm_elk_startup",
+                        "permissions": "0774",
+                    }
+                )
                 self.add_inject(hostname=vm.hostname, inject=kwargs)
 
         # Create field device list injection for elk box
@@ -552,14 +596,11 @@ class Sceptre(AppBase):
             ]
 
             for inj in injects:
-                elk_filename = inj[0].split('/')[-1]
+                elk_filename = inj[0].split("/")[-1]
                 kwargs = self.find_override(f"{elk[0].hostname}_{elk_filename}")
                 if kwargs is None:
                     kwargs = {"src": inj[0]}
-                kwargs.update({
-                    "dst": inj[1],
-                    "description": "elk"
-                })
+                kwargs.update({"dst": inj[1], "description": "elk"})
                 self.add_inject(hostname=elk[0].hostname, inject=kwargs)
 
     def pre_start(self):
@@ -577,19 +618,22 @@ class Sceptre(AppBase):
         # Note: This is taken from the hil_tags found in a providers metadata in the scenario file
         hil_object_list = []
 
-
         ######################## Provider pre-start ###################################
-        providers    = self.extract_nodes_type("provider")
+        providers = self.extract_nodes_type("provider")
         provider_map = {}
         objects_file_path = None
 
         for provider in providers:
             if "metadata" not in provider:
-                logger.warning(f"No metadata for provider '{provider.hostname}', skipping...")
+                logger.warning(
+                    f"No metadata for provider '{provider.hostname}', skipping..."
+                )
                 continue
 
             provider_map[provider.hostname] = provider
-            pub_endpoint = provider.metadata.get("publish_endpoint", "udp://*;239.0.0.1:40000")
+            pub_endpoint = provider.metadata.get(
+                "publish_endpoint", "udp://*;239.0.0.1:40000"
+            )
             ipv4_address = provider.topology.network.interfaces[0].address
             srv_endpoint = f"tcp://{ipv4_address}:5555"
 
@@ -601,13 +645,17 @@ class Sceptre(AppBase):
                     "publish_endpoint": pub_endpoint,
                     # if ignition hmi is being used, provider needs to sleep
                     # labels: - ignition
-                    "needsleep": True if self.extract_nodes_label("ignition") else False,
-                }
+                    "needsleep": True
+                    if self.extract_nodes_label("ignition")
+                    else False,
+                },
             )
 
             simulator = provider.metadata.get("simulator", "")
             if not simulator:
-                logger.warning(f"No simulator specified for provider '{provider.hostname}'")
+                logger.warning(
+                    f"No simulator specified for provider '{provider.hostname}'"
+                )
 
             # Create provider config file directory
             provider_directory = f"{self.sceptre_dir}/{provider.hostname}"
@@ -626,10 +674,12 @@ class Sceptre(AppBase):
                 kwargs["case_file"] = "case.PWB"
                 kwargs["oneline_file"] = "oneline.pwd"
                 # Adding HIL tags
-                hil_object_list = provider.metadata.get('hil_tags', [])
+                hil_object_list = provider.metadata.get("hil_tags", [])
 
             if simulator == "PowerWorldDynamics":
-                kwargs["pwds_endpoint"] = provider.metadata.get('pwds_endpoint', '127.0.0.1')
+                kwargs["pwds_endpoint"] = provider.metadata.get(
+                    "pwds_endpoint", "127.0.0.1"
+                )
             elif simulator == "PyPower":
                 kwargs["case_file"] = os.path.basename(provider.metadata.case)
             elif "Helics" in simulator:
@@ -649,14 +699,20 @@ class Sceptre(AppBase):
                     kwargs["config_file"] = provider.metadata.config_file
                 else:
                     local_path = f"{provider_directory}/{simulator.lower()}_config.yaml"
-                    kwargs["config_file"] = f"/etc/sceptre/{simulator.lower()}_config.yaml"  # This will be added to INI file
+                    kwargs["config_file"] = (
+                        f"/etc/sceptre/{simulator.lower()}_config.yaml"  # This will be added to INI file
+                    )
 
                     if not provider.metadata.get("data_dir"):
                         provider.metadata.data_dir = f"/root/{simulator.lower()}/"
 
                     # add metadata to YAML
-                    provider.metadata.sceptre_topology = self.experiment.metadata.annotations.topology
-                    provider.metadata.sceptre_scenario = self.experiment.metadata.annotations.scenario
+                    provider.metadata.sceptre_topology = (
+                        self.experiment.metadata.annotations.topology
+                    )
+                    provider.metadata.sceptre_scenario = (
+                        self.experiment.metadata.annotations.scenario
+                    )
                     provider.metadata.sceptre_experiment = self.exp_name
                     provider.metadata.provider_hostname = provider.hostname
                     provider.metadata.provider_ip = ipv4_address
@@ -665,11 +721,14 @@ class Sceptre(AppBase):
                     provider.metadata.to_yaml(filename=local_path)
 
                     # add injection with the yaml file to injections
-                    self.add_inject(hostname=provider.hostname, inject={
-                        "src": local_path,
-                        "dst": kwargs["config_file"],
-                        "description": "YAML configuration file for Provider"
-                    })
+                    self.add_inject(
+                        hostname=provider.hostname,
+                        inject={
+                            "src": local_path,
+                            "dst": kwargs["config_file"],
+                            "description": "YAML configuration file for Provider",
+                        },
+                    )
 
             # Generate ("render") the config.ini file for the provider
             # TODO: only render this if there isn't a override file?
@@ -686,7 +745,7 @@ class Sceptre(AppBase):
         reg_config = {}
 
         # Write injections for fd-server
-        # type: fd-server
+        # for type: fd-server
         fds = self.extract_nodes_type("fd-server")
         fd_counter = 0
 
@@ -713,9 +772,16 @@ class Sceptre(AppBase):
 
                 simulator = provider.metadata.get("simulator", "")
                 if simulator in [
-                    'PowerWorld', 'PowerWorldHelics', 'PowerWorldDynamics', 'PyPower'
+                    "PowerWorld",
+                    "PowerWorldHelics",
+                    "PowerWorldDynamics",
+                    "PyPower",
                 ]:
-                    fd_objects = [x['name'] for _, v in parsed.devices_by_protocol.items() for x in v]
+                    fd_objects = [
+                        x["name"]
+                        for _, v in parsed.devices_by_protocol.items()
+                        for x in v
+                    ]
                     power_object_list.extend(fd_objects)
             except Exception as e:
                 msg = f"There was a problem parsing metadata for '{fd_.hostname}'.\nPROBLEM: {e}"
@@ -727,7 +793,9 @@ class Sceptre(AppBase):
 
             # If server name isn't specified in metadata, assume it's the provider
             provider_ipv4_address = provider.topology.network.interfaces[0].address
-            srv_endpoint = f"tcp://{provider_ipv4_address}:5555" if not srv_name else None
+            srv_endpoint = (
+                f"tcp://{provider_ipv4_address}:5555" if not srv_name else None
+            )
             if not srv_endpoint:
                 server = self.extract_node(srv_name)
                 server_ip = server.network.interfaces[0].address
@@ -739,14 +807,18 @@ class Sceptre(AppBase):
 
             for interface in ifaces:
                 if not fd_interfaces.get("tcp", ""):
-                    if (not interface.type == "serial" and
-                        (interface.vlan and interface.vlan.lower() != "mgmt")):
-                        fd_interfaces['tcp'] = interface.address
-                    elif (len(fd_.topology.network.interfaces) == 2 and interface.type == "serial"):
-                        fd_interfaces['tcp'] = interface.address
+                    if not interface.type == "serial" and (
+                        interface.vlan and interface.vlan.lower() != "mgmt"
+                    ):
+                        fd_interfaces["tcp"] = interface.address
+                    elif (
+                        len(fd_.topology.network.interfaces) == 2
+                        and interface.type == "serial"
+                    ):
+                        fd_interfaces["tcp"] = interface.address
                     # hack for siren. please direct all objections to this hack to /dev/null
                     elif simulator == "Siren" and not interface.type == "serial":
-                        fd_interfaces['tcp'] = interface.address
+                        fd_interfaces["tcp"] = interface.address
 
                 # the provider publish_endpoint should look like 'udp://*;127.0.0.1:40000',
                 # but the rtu needs to bind specifically to the mgmt interface
@@ -755,9 +827,9 @@ class Sceptre(AppBase):
 
             serial_interfaces = [x for x in ifaces if x.type == "serial"]
             if serial_interfaces:
-                fd_interfaces['serial'] = []
+                fd_interfaces["serial"] = []
                 for serial_interface in serial_interfaces:
-                    fd_interfaces['serial'].append(serial_interface.device)
+                    fd_interfaces["serial"].append(serial_interface.device)
 
             # get the class of FieldDeviceConfig based on the type of infrastructure
             InfrastructureFieldDeviceConfig = configs.get_fdconfig_class(
@@ -783,12 +855,12 @@ class Sceptre(AppBase):
             # Write fd server config file injection
             config_file = f"{fd_directory}/config.xml"
 
-            sceptre_type = 'field-device'
-            if 'sunspec' in parsed.devices_by_protocol:
-                sceptre_type = 'sunspec'
+            sceptre_type = "field-device"
+            if "sunspec" in parsed.devices_by_protocol:
+                sceptre_type = "sunspec"
 
             # Write fd server config file injection
-            if sceptre_type == 'sunspec':
+            if sceptre_type == "sunspec":
                 self.render(
                     "sunspec.mako",
                     config_file,
@@ -814,9 +886,11 @@ class Sceptre(AppBase):
                 device=fd_,
                 kwargs={
                     "name": sceptre_type,
-                    # type: ignition
-                    "needrestart": True if self.extract_nodes_type("ignition") else False,
-                }
+                    # for type: ignition
+                    "needrestart": True
+                    if self.extract_nodes_type("ignition")
+                    else False,
+                },
             )
 
             # generate fdlist
@@ -867,96 +941,116 @@ class Sceptre(AppBase):
 
             config = {}
             md = fed.metadata
-            helics_md = md.get('helics', {})
-            broker = helics_md.get('broker', None) # should be hostname
+            helics_md = md.get("helics", {})
+            broker = helics_md.get("broker", None)  # should be hostname
             # If broker isn't specified in metadata, assume it's local
             broker = self.extract_node(broker) if broker else fed.topology
             ip = broker.network.interfaces[0].address
-            config['name'] = helics_md.get('name', fed.hostname)
-            config['broker_address'] = ip
-            config['log_level'] = helics_md.get('log_level', 3) # 3 = summary
-            if 'request_time' in helics_md:
-                config['request_time'] = ('"max"'
-                                          if helics_md['request_time'] == 'max'
-                                          else helics_md['request_time'])
-            if 'period' in helics_md:
-                config['period'] = helics_md['period']
-            if 'real_time' in helics_md:
-                config['real_time'] = 'true' if helics_md['real_time'] else 'false'
-            if 'end_time' in helics_md:
-                config['end_time'] = helics_md['end_time']
-            input_regs = ['analog-input', 'binary-input', 'input-register',
-                          'discrete-input']
-            config['subs'] = []
-            config['pubs'] = []
-            config['ends'] = []
-            if md.get('simulator', None) == 'Helics':
+            config["name"] = helics_md.get("name", fed.hostname)
+            config["broker_address"] = ip
+            config["log_level"] = helics_md.get("log_level", 3)  # 3 = summary
+            if "request_time" in helics_md:
+                config["request_time"] = (
+                    '"max"'
+                    if helics_md["request_time"] == "max"
+                    else helics_md["request_time"]
+                )
+            if "period" in helics_md:
+                config["period"] = helics_md["period"]
+            if "real_time" in helics_md:
+                config["real_time"] = "true" if helics_md["real_time"] else "false"
+            if "end_time" in helics_md:
+                config["end_time"] = helics_md["end_time"]
+            input_regs = [
+                "analog-input",
+                "binary-input",
+                "input-register",
+                "discrete-input",
+            ]
+            config["subs"] = []
+            config["pubs"] = []
+            config["ends"] = []
+            if md.get("simulator", None) == "Helics":
                 # get all possible [<provider>/]<tag>,<type> from fd configs
-                subs = [(
-                    f'{f"{c.provider}/" if r.regtype in input_regs else ""}'
-                    f'{r.devname}.{r.field},'
-                    f'{"bool" if r.fieldtype.split("-")[0] == "binary" else "double"}')
-                    for _,c in fd_server_configs.items() \
-                        for p in c.protocols \
-                            for d in p.devices \
-                                for r in d.registers if r.regtype in input_regs]
+                subs = [
+                    (
+                        f"{f'{c.provider}/' if r.regtype in input_regs else ''}"
+                        f"{r.devname}.{r.field},"
+                        f"{'bool' if r.fieldtype.split('-')[0] == 'binary' else 'double'}"
+                    )
+                    for _, c in fd_server_configs.items()
+                    for p in c.protocols
+                    for d in p.devices
+                    for r in d.registers
+                    if r.regtype in input_regs
+                ]
                 # remove duplicates and sort list
                 subs = sorted(list(dict.fromkeys(subs)))
-                config['subs'] = subs
+                config["subs"] = subs
                 # get all possible <tag>,<provider>/<tag> from fd configs
-                ends = [(
-                    f'{r.devname}.{r.field},'
-                    f'{c.provider}/{r.devname}.{r.field}')
-                    for _,c in fd_server_configs.items() \
-                        for p in c.protocols \
-                            for d in p.devices \
-                                for r in d.registers]
+                ends = [
+                    (f"{r.devname}.{r.field},{c.provider}/{r.devname}.{r.field}")
+                    for _, c in fd_server_configs.items()
+                    for p in c.protocols
+                    for d in p.devices
+                    for r in d.registers
+                ]
                 # remove duplicates and sort list
                 ends = sorted(list(dict.fromkeys(ends)))
-                config['ends'] = ends
+                config["ends"] = ends
             else:
                 # get all possible <tag>,<type> from fd configs
-                pubs = [(
-                    f'{r.devname}.{r.field},'
-                    f'{"bool" if r.fieldtype.split("-")[0] == "binary" else "double"}')
-                    for _,c in fd_server_configs.items() \
-                        for p in c.protocols \
-                            for d in p.devices \
-                                for r in d.registers if c.provider == config['name']]
+                pubs = [
+                    (
+                        f"{r.devname}.{r.field},"
+                        f"{'bool' if r.fieldtype.split('-')[0] == 'binary' else 'double'}"
+                    )
+                    for _, c in fd_server_configs.items()
+                    for p in c.protocols
+                    for d in p.devices
+                    for r in d.registers
+                    if c.provider == config["name"]
+                ]
                 # remove duplicates and sort list
                 pubs = sorted(list(dict.fromkeys(pubs)))
-                config['pubs'] = pubs
+                config["pubs"] = pubs
                 # get all possible <tag> from fd configs
-                ends = [f'{r.devname}.{r.field}'
-                    for _,c in fd_server_configs.items() \
-                        for p in c.protocols \
-                            for d in p.devices \
-                                for r in d.registers if c.provider == config['name']]
+                ends = [
+                    f"{r.devname}.{r.field}"
+                    for _, c in fd_server_configs.items()
+                    for p in c.protocols
+                    for d in p.devices
+                    for r in d.registers
+                    if c.provider == config["name"]
+                ]
                 # remove duplicates and sort list
                 ends = sorted(list(dict.fromkeys(ends)))
-                config['ends'] = ends
+                config["ends"] = ends
             # add any additional pubs/subs/ends (e.g. new sub for interdependency logic)
-            if 'publications' in helics_md:
-                config['pubs'].extend(
-                    '{key},{type_}'.format(
-                    key=pub['key'],
-                    type_=pub['type'])
-                    for pub in helics_md['publications'])
-            if 'subscriptions' in helics_md:
+            if "publications" in helics_md:
+                config["pubs"].extend(
+                    "{key},{type_}".format(key=pub["key"], type_=pub["type"])
+                    for pub in helics_md["publications"]
+                )
+            if "subscriptions" in helics_md:
                 # not a typo: {info} will add a comma if necessary
-                config['subs'].extend(
-                    '{key},{type_}{info}'.format(
-                    key=sub['key'],
-                    type_=sub['type'],
-                    info=',' + sub['info'] if 'info' in sub else '')
-                    for sub in helics_md['subscriptions'])
-            if 'endpoints' in helics_md:
+                config["subs"].extend(
+                    "{key},{type_}{info}".format(
+                        key=sub["key"],
+                        type_=sub["type"],
+                        info="," + sub["info"] if "info" in sub else "",
+                    )
+                    for sub in helics_md["subscriptions"]
+                )
+            if "endpoints" in helics_md:
                 # not a typo: {dest} will add a comma if necessary
-                config['ends'].extend(
-                    '{name}{dest}'.format(
-                    name=end['name'],
-                    dest=',' + end['destination'] if 'destination' in end else '')
-                    for end in helics_md['endpoints'])
+                config["ends"].extend(
+                    "{name}{dest}".format(
+                        name=end["name"],
+                        dest="," + end["destination"] if "destination" in end else "",
+                    )
+                    for end in helics_md["endpoints"]
+                )
             # remove any empty config keys
             config = {k: v for k, v in config.items() if v}
 
@@ -964,12 +1058,14 @@ class Sceptre(AppBase):
             self.render("helics_config.mako", f"{vm_dir}/helics.json", config=config)
 
         # Write fd client file injections
-        # type: fd-client
+        # for type: fd-client
         fd_clients = self.extract_nodes_type("fd-client")
 
         for fd_ in fd_clients:
             if not fd_.metadata:
-                logger.warning(f"No metadata for fd-client '{fd_.hostname}', skipping...")
+                logger.warning(
+                    f"No metadata for fd-client '{fd_.hostname}', skipping..."
+                )
                 continue
 
             fd_directory = f"{self.sceptre_dir}/{fd_.hostname}"
@@ -977,15 +1073,12 @@ class Sceptre(AppBase):
 
             for _, iface in enumerate(fd_.topology.network.interfaces):
                 if not iface.type == "serial" and (
-                        iface.vlan and iface.vlan.lower() != "mgmt"
+                    iface.vlan and iface.vlan.lower() != "mgmt"
                 ):
                     fd_ip = iface.address
                     break
 
-                if (
-                        len(fd_.topology.network.interfaces) == 2
-                        and iface.type == "serial"
-                ):
+                if len(fd_.topology.network.interfaces) == 2 and iface.type == "serial":
                     fd_ip = iface.address
 
             server_configs = []
@@ -1008,7 +1101,7 @@ class Sceptre(AppBase):
             self.render_sceptre_start(fd_, {"name": "field-device"})
 
         # Write fep file injections
-        # type: fep
+        # for type: fep
         feps = self.extract_nodes_type("fep")
         fep_counter = 0
 
@@ -1032,19 +1125,18 @@ class Sceptre(AppBase):
             fd_interfaces = {}
             for _, iface in enumerate(fd_.topology.network.interfaces):
                 if "upstream" in iface.name.lower():
-                    fd_interfaces['tcp'] = iface.address
+                    fd_interfaces["tcp"] = iface.address
                     break
 
                 if not iface.type == "serial" and (
-                        iface.vlan and iface.vlan.lower() != "mgmt"
+                    iface.vlan and iface.vlan.lower() != "mgmt"
                 ):
-                    fd_interfaces['tcp'] = iface.address
+                    fd_interfaces["tcp"] = iface.address
                 elif (
-                        len(fd_.topology.network.interfaces) == 2
-                        and iface.type == "serial"
+                    len(fd_.topology.network.interfaces) == 2 and iface.type == "serial"
                 ):
                     if not fd_interfaces.get("tcp", ""):
-                        fd_interfaces['tcp'] = iface.address
+                        fd_interfaces["tcp"] = iface.address
 
             for _, iface in enumerate(fd_.topology.network.interfaces):
                 # the provider publish_endpoint should look like 'udp://*;127.0.0.1:40000',
@@ -1056,15 +1148,13 @@ class Sceptre(AppBase):
                     break
 
             serial_interfaces = [
-                x
-                for x in fd_.topology.network.interfaces
-                if x.type == "serial"
+                x for x in fd_.topology.network.interfaces if x.type == "serial"
             ]
 
             if serial_interfaces:
-                fd_interfaces['serial'] = []
+                fd_interfaces["serial"] = []
                 for serial_iface in serial_interfaces:
-                    fd_interfaces['serial'].append(serial_iface.device)
+                    fd_interfaces["serial"].append(serial_iface.device)
 
             # add underlying field device servers to tracked config
             server_configs = []
@@ -1078,14 +1168,16 @@ class Sceptre(AppBase):
                     for protocol in fd_server_configs[server].protocols:
                         for device in protocol.devices:
                             if protocol.protocol not in parsed.devices_by_protocol:
-                                parsed.devices_by_protocol.update({
-                                    protocol.protocol: [
-                                        {
-                                            "type": device.device_type,
-                                            "name": device.device_name,
-                                        }
-                                    ]
-                                })
+                                parsed.devices_by_protocol.update(
+                                    {
+                                        protocol.protocol: [
+                                            {
+                                                "type": device.device_type,
+                                                "name": device.device_name,
+                                            }
+                                        ]
+                                    }
+                                )
                             else:
                                 parsed.devices_by_protocol[protocol.protocol].append(
                                     {
@@ -1258,7 +1350,7 @@ class Sceptre(AppBase):
             scada_directory = f"{self.sceptre_dir}/{scada_server.hostname}"
             os.makedirs(scada_directory, exist_ok=True)
 
-            if 'project' in scada_server.metadata:
+            if "project" in scada_server.metadata:
                 # Write scada server startup script injection
                 self.render("scada.mako", f"{scada_directory}/scada.ps1")
             else:
@@ -1293,24 +1385,30 @@ class Sceptre(AppBase):
                     opc_ip = next(iter(opc_configs))
                     opc_config = opc_configs[opc_ip]
 
-                #copy over all base scada files
-                shutil.copytree(f"{self.templates_dir}/mydesigner", f"{scada_directory}/autoproject", dirs_exist_ok=True)
+                # copy over all base scada files
+                shutil.copytree(
+                    f"{self.templates_dir}/mydesigner",
+                    f"{scada_directory}/autoproject",
+                    dirs_exist_ok=True,
+                )
                 # write autoproject files
                 self.render(
-                "scada_connectionsdef.mako",
-                f"{scada_directory}/autoproject/connectionsdef.json",
-                opc_ip=opc_ip,
+                    "scada_connectionsdef.mako",
+                    f"{scada_directory}/autoproject/connectionsdef.json",
+                    opc_ip=opc_ip,
                 )
 
                 # write Table.svg
                 self.render(
-                "scada_table.mako",
-                f"{scada_directory}/autoproject/Table.svg",
-                opc_config=opc_config,
+                    "scada_table.mako",
+                    f"{scada_directory}/autoproject/Table.svg",
+                    opc_config=opc_config,
                 )
 
                 # Write scada server startup script injection
-                self.render("scada_autoproject.mako", f"{scada_directory}/scada_autoproject.ps1")
+                self.render(
+                    "scada_autoproject.mako", f"{scada_directory}/scada_autoproject.ps1"
+                )
 
         ######################## HMI pre-start ###################################
         # Create hmi files
@@ -1319,19 +1417,21 @@ class Sceptre(AppBase):
 
         for hmi in hmis:
             hmi_ip = hmi.topology.network.interfaces[0].address
-            #add scada connection based on metadata or based on subnet if not metadata
+            # add scada connection based on metadata or based on subnet if not metadata
             hmi_scada_ips = []
             if "connected_scadas" in hmi.metadata:
                 for hmi_scada_server in hmi.metadata.connected_scadas:
                     for scada_server in scada_servers:
                         if hmi_scada_server == scada_server.hostname:
-                            hmi_scada_ips.append(scada_server.topology.network.interfaces[0].address)
+                            hmi_scada_ips.append(
+                                scada_server.topology.network.interfaces[0].address
+                            )
             else:
                 if len(scada_ips) == 1:
                     hmi_scada_ips = scada_ips
                 else:
                     for scada_ip in scada_ips:
-                        if scada_ip.split('.')[:-1] == hmi_ip.split('.')[:-1]:
+                        if scada_ip.split(".")[:-1] == hmi_ip.split(".")[:-1]:
                             hmi_scada_ips.append(scada_ip)
 
             hmi_directory = f"{self.sceptre_dir}/{hmi.hostname}"
@@ -1349,9 +1449,7 @@ class Sceptre(AppBase):
         # Create engineer workstation files
         rtus = self.extract_nodes_type("fd-server")
 
-        engineer_workstations = self.extract_nodes_type(
-            "engineer-workstation"
-        )
+        engineer_workstations = self.extract_nodes_type("engineer-workstation")
 
         # get rtus that engineer workstation can connect to. Connect to all if none given.
         for engineer_workstation in engineer_workstations:
@@ -1365,9 +1463,7 @@ class Sceptre(AppBase):
                 for rtu in rtus:
                     eng_fd.append(rtu)
 
-            engineer_directory = (
-                f"{self.sceptre_dir}/{engineer_workstation.hostname}"
-            )
+            engineer_directory = f"{self.sceptre_dir}/{engineer_workstation.hostname}"
             os.makedirs(engineer_directory, exist_ok=True)
 
             # Write engineer workstation putty injection
@@ -1384,9 +1480,8 @@ class Sceptre(AppBase):
                     "auto_winscp.mako",
                     f"{engineer_directory}/auto_winscp.ps1",
                     eng_fd=eng_fd,
-                    connect_interval=engineer_workstation.metadata.connect_interval
+                    connect_interval=engineer_workstation.metadata.connect_interval,
                 )
-
 
         ######################## Historian pre-start ###################################
         # Determine primary/secondary historian
@@ -1495,8 +1590,8 @@ class Sceptre(AppBase):
             )
 
 
-class SceptreMetadataParser():
-    protocols = ['bacnet', 'dnp3', 'dnp3-serial', 'modbus', 'sunspec', 'iec60870-5-104']
+class SceptreMetadataParser:
+    protocols = ["bacnet", "dnp3", "dnp3-serial", "modbus", "sunspec", "iec60870-5-104"]
 
     def __init__(self, metadata):
         try:
@@ -1534,18 +1629,25 @@ class SceptreMetadataParser():
         register_map = {}
         config_path = topo_dir + topology + ".json"
 
-        logger.debug(f"Retriving register mapping from {register_map}")
+        logger.debug(f"Retrieving register mapping from {register_map}")
 
         with open(config_path) as topo:
             config = json.load(topo)
 
         for i in range(len(config["nodes"])):
             # only parse if its an rtu that is manually configurable
-            if (("metadata" in config["nodes"][i].keys()) and "manual_register_config" in config["nodes"][i]["metadata"].keys()) and "true"==config["nodes"][i]["metadata"]["manual_register_config"].lower():
+            if (
+                ("metadata" in config["nodes"][i].keys())
+                and "manual_register_config" in config["nodes"][i]["metadata"].keys()
+            ) and "true" == config["nodes"][i]["metadata"][
+                "manual_register_config"
+            ].lower():
                 register_map[config["nodes"][i]["general"]["hostname"]] = {}
 
                 for proto in supported_protocols:
                     if proto in config["nodes"][i]["metadata"].keys():
-                        register_map[config["nodes"][i]["general"]["hostname"]][proto] = config["nodes"][i]["metadata"][proto]
+                        register_map[config["nodes"][i]["general"]["hostname"]][
+                            proto
+                        ] = config["nodes"][i]["metadata"][proto]
 
         return register_map

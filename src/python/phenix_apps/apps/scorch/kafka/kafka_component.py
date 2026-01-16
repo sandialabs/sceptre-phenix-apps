@@ -15,7 +15,9 @@ class Kafka(ComponentBase):
 
         # generate a universal uid so that multiple kafka components can run simultaneously
         config_str = json.dumps(self.metadata, sort_keys=True)
-        component_uuid = uuid.uuid5(uuid.NAMESPACE_DNS, f"{self.exp_name}-{self.name}-{config_str}")
+        component_uuid = uuid.uuid5(
+            uuid.NAMESPACE_DNS, f"{self.exp_name}-{self.name}-{config_str}"
+        )
 
         self.pid_file = (
             f"/tmp/phenix-scorch-kafka-{self.exp_name}-{component_uuid.hex}.pid"
@@ -44,31 +46,23 @@ class Kafka(ComponentBase):
         logger.info(f"Kafka_ips list: {kafka_ips}")
 
         topics = self.metadata.get("topics", [])
-        csv_bool = self.metadata.get(
-            "csv", True
-        )  # if false output a JSON
+        csv_bool = self.metadata.get("csv", True)  # if false output a JSON
 
         # get and output the output directory to the logger
         output_dir = self.base_dir
         logger.info(f"Output Directory: {output_dir}")
         os.makedirs(output_dir, exist_ok=True)
         if csv_bool:
-            self.path = os.path.join(
-                output_dir, f"{self.name}_output.csv"
-            )
+            self.path = os.path.join(output_dir, f"{self.name}_output.csv")
         else:
-            self.path = os.path.join(
-                output_dir, f"{self.name}_output.ndjson"
-            )
+            self.path = os.path.join(output_dir, f"{self.name}_output.ndjson")
 
         kafka_ips_str = ",".join(kafka_ips)
         topics_str = json.dumps(topics)
 
         # pass the inputs to the python file (which we execute as a
         # separate process)
-        executable = str(
-            Path(Path(__file__).parent, "kafka_listener.py")
-        )
+        executable = str(Path(Path(__file__).parent, "kafka_listener.py"))
         arguments = (
             f"python3 {executable} {csv_bool} '{self.path}' "
             f"{kafka_ips_str} '{topics_str}' "
@@ -87,16 +81,12 @@ class Kafka(ComponentBase):
 
             # write PID to a file so that it can be found
             # and killed later
-            self._create_pid_file(
-                response.pid
-            )
+            self._create_pid_file(response.pid)
 
             # prevents hang
             response.poll()
         except Exception as e:
-            self.eprint(
-                f"Error running listener executable. See: {e}"
-            )
+            self.eprint(f"Error running listener executable. See: {e}")
 
     def _create_pid_file(self, pid):
         # writes PID to unique .pid file under /tmp directory
@@ -131,16 +121,14 @@ class Kafka(ComponentBase):
         pid = self._consume_pid_file()
 
         if not pid:
-            logger.info(f"No PID, component already cleaned up")
+            logger.info("No PID, component already cleaned up")
             exit()
 
         try:
             os.kill(pid, 9)
             logger.info(f"Cleaned up user component: {self.name}")
         except Exception as e:
-            self.eprint(
-                f"Error terminating listener at PID {pid}. See: {e}"
-            )
+            self.eprint(f"Error terminating listener at PID {pid}. See: {e}")
 
 
 def main():

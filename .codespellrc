@@ -1,0 +1,4 @@
+[codespell]
+ignore-words-list = ot
+skip = ./src/python/phenix_apps/apps/sceptre/protocols/sunspec/models/smdx/smdx_*.xml,
+       ./src/python/phenix_apps/apps/sceptre/protocols/sunspec/models/smdx/CHANGELOG

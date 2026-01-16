@@ -13,13 +13,13 @@ class VMStats(ComponentBase):
     """
 
     def __init__(self):
-        ComponentBase.__init__(self, 'vmstats')
+        ComponentBase.__init__(self, "vmstats")
         self.execute_stage()
 
     def start(self):
-        logger.info(f'Starting user component: {self.name}')
+        logger.info(f"Starting user component: {self.name}")
 
-        freq = self.metadata.get('pollPeriod', 1)
+        freq = self.metadata.get("pollPeriod", 1)
         vms = self.__vm_list()
 
         for vm in vms:
@@ -30,10 +30,10 @@ class VMStats(ComponentBase):
         self.mm.cc_background(f"bash -c 'vmstat -n -t {freq} >> /vmstat.out'")
         self.mm.clear_cc_filter()
 
-        logger.info(f'Started user component: {self.name}')
+        logger.info(f"Started user component: {self.name}")
 
     def stop(self):
-        logger.info(f'Stopping user component: {self.name}')
+        logger.info(f"Stopping user component: {self.name}")
 
         vms = self.__vm_list()
 
@@ -45,9 +45,9 @@ class VMStats(ComponentBase):
         time.sleep(5.0)
 
         for i, vm in enumerate(vms):
-            self.print(f"transferring /vmstat.out from {vm} ({i+1} of {len(vms)})")
+            self.print(f"transferring /vmstat.out from {vm} ({i + 1} of {len(vms)})")
             try:
-                utils.mm_recv(self.mm, vm, '/vmstat.out', f'{self.base_dir}/{vm}.out')
+                utils.mm_recv(self.mm, vm, "/vmstat.out", f"{self.base_dir}/{vm}.out")
             except ValueError as ex:
                 self.eprint(f"Failed to get vmstat.out from {vm}: {ex}")
                 sys.exit(1)
@@ -61,11 +61,11 @@ class VMStats(ComponentBase):
 
         self.print("reading vmstat.out files")
         for vm in vms:
-            with open(f'{self.base_dir}/{vm}.out', 'r') as f:
+            with open(f"{self.base_dir}/{vm}.out", "r") as f:
                 lines = f.readlines()
 
                 for i, line in enumerate(lines):
-                    if i in (0,1):
+                    if i in (0, 1):
                         continue
 
                     items = []
@@ -76,25 +76,25 @@ class VMStats(ComponentBase):
                         except ValueError:
                             items.append(item)
 
-                    items[-2] = f'{items[-2]} {items[-1]}'
+                    items[-2] = f"{items[-2]} {items[-1]}"
                     del items[-1]
 
                     stat = dict(zip(lines[1].split(), items))
-                    stat['vm_name'] = vm
+                    stat["vm_name"] = vm
 
                     stats.append(stat)
 
-        stats_path = f'{self.base_dir}/vm_stats.jsonl'
+        stats_path = f"{self.base_dir}/vm_stats.jsonl"
         self.print(f"writing consolidated vmstats to {stats_path}")
-        with open(stats_path, 'a+') as f:
+        with open(stats_path, "a+") as f:
             for datum in stats:
                 json_record = json.dumps(datum)
-                f.write(json_record + '\n')
+                f.write(json_record + "\n")
 
-        logger.info(f'Stopped user component: {self.name}')
+        logger.info(f"Stopped user component: {self.name}")
 
     def __vm_list(self) -> list:
-        vms = self.metadata.get('vms', None)
+        vms = self.metadata.get("vms", None)
         compatible_os = ["linux", "centos", "rhel"]
 
         if vms:  # if specific vms are configured in metadata
@@ -112,7 +112,9 @@ class VMStats(ComponentBase):
                 if node.get("hardware", {}).get("os_type", "") in compatible_os:
                     vms.append(vm)
                 else:
-                    self.print(f"Skipping VM {vm} with incompatible os_type '{node.get('hardware', {}).get('os_type', '')}' (must be one of {compatible_os})")
+                    self.print(
+                        f"Skipping VM {vm} with incompatible os_type '{node.get('hardware', {}).get('os_type', '')}' (must be one of {compatible_os})"
+                    )
 
         return vms
 
@@ -121,5 +123,5 @@ def main():
     VMStats()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

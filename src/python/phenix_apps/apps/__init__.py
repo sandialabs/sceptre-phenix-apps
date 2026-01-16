@@ -7,8 +7,8 @@ from typing import Any, Optional
 
 from box import Box
 
-from phenix_apps.common import settings, utils
-from phenix_apps.common.logger import logger, configure_logging
+from phenix_apps.common import utils
+from phenix_apps.common.logger import configure_logging, logger
 
 
 class AppBase(object):
