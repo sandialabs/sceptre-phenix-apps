@@ -22,7 +22,6 @@ all: format lint
 check:
 	ruff check .
 	ruff format --check .
-	ruff check --select I .
 
 # Clean build artifacts
 clean:
@@ -37,7 +36,7 @@ coverage:
 
 # Run scale app in dry-run mode
 dry-run:
-	@INPUT=$(or $(INPUT),phenix_apps/apps/scale/plugins/wind_turbine/tests/test_wind_turbine_input.yaml); \
+	@INPUT=$(or $(INPUT),phenix_apps/apps/scale/tests/test_wind_turbine_input.yaml); \
 	STAGE=$(or $(STAGE),post-start); \
 	case "$$STAGE" in \
 		configure|pre-start|post-start|running|cleanup) ;; \
@@ -66,7 +65,7 @@ install-dev:
 lint:
 	ruff check . --fix
 	codespell
-	vulture .
+	vulture
 
 # Run unit tests
 test:

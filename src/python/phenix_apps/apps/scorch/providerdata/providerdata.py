@@ -15,11 +15,11 @@ class ProviderData(ComponentBase):
     """
 
     def __init__(self):
-        ComponentBase.__init__(self, 'providerdata')
+        ComponentBase.__init__(self, "providerdata")
         self.execute_stage()
 
     def configure(self):
-        logger.info(f'Configuring user component: {self.name}')
+        logger.info(f"Configuring user component: {self.name}")
 
         host = self.metadata.hostname  # type: str
 
@@ -34,13 +34,17 @@ class ProviderData(ComponentBase):
             pconf.read(os.path.join(self.base_dir, "config.ini"))
 
             # read the yaml file based on what's in the config
-            config_path = pconf.get(section="power-solver-service", option="config-file")
+            config_path = pconf.get(
+                section="power-solver-service", option="config-file"
+            )
             self.recv_file(vm=host, src=config_path)
 
         self.print("verifying NTP is ok")
         ntp_output = self.run_and_check_command(host, "ntpq -p")["stdout"]
         if ntp_output is None or ".INIT." in ntp_output:
-            self.eprint(f"ntp on provider in INIT state, not synced. ntpq output: {ntp_output}")
+            self.eprint(
+                f"ntp on provider in INIT state, not synced. ntpq output: {ntp_output}"
+            )
             sys.exit(1)
 
         # Start provider
@@ -51,13 +55,15 @@ class ProviderData(ComponentBase):
             self.run_and_check_command(host, cmd)
 
             sleep_for = 8.0
-            self.print(f"sleeping for {sleep_for} seconds to give provider time to start and reconnect to PMUs...")
+            self.print(
+                f"sleeping for {sleep_for} seconds to give provider time to start and reconnect to PMUs..."
+            )
             sleep(sleep_for)
 
-        logger.info(f'Configured user component: {self.name}')
+        logger.info(f"Configured user component: {self.name}")
 
     def start(self):
-        logger.info(f'Starting user component: {self.name}')
+        logger.info(f"Starting user component: {self.name}")
 
         host = self.metadata.hostname  # type: str
 
@@ -74,31 +80,37 @@ class ProviderData(ComponentBase):
             self.run_and_check_command(host, f"ls -lh {csv_path}")
 
         # Verify elasticsearch
-        logger.info(f'{self.name}: checking ES')
+        logger.info(f"{self.name}: checking ES")
         if self.metadata.get("elasticsearch", {}).get("verify"):
             self.print("Verifying data in Elasticsearch (elasticsearch.verify=true)")
             index = utils.get_dated_index(self.metadata.elasticsearch.index)
 
             # ** ground truth data being collected **
-            self.print(f"Verifying ground truth data is being collected in Elasticsearch (index={index})")
+            self.print(
+                f"Verifying ground truth data is being collected in Elasticsearch (index={index})"
+            )
             # sleep_for = 3.0
             self.print("Getting index doc count")
-            doc_count_1 = self.es.indices.stats(index=index)["indices"][index]["total"]["docs"]["count"]  # type: int
+            doc_count_1 = self.es.indices.stats(index=index)["indices"][index]["total"][
+                "docs"
+            ]["count"]  # type: int
             self.print(f"ES doc count is: {doc_count_1}")
 
             # For now, just make sure there are docs getting to ES
             # TODO figure out how to verify frequency is correct for generalized bennu provider
             if doc_count_1 < 100:
                 self.eprint("Elasticsearch does not appear to be running, exiting...")
-                logger.error(f'{self.name}: Elasticsearch does not appear to be running, exiting...')
+                logger.error(
+                    f"{self.name}: Elasticsearch does not appear to be running, exiting..."
+                )
                 sys.exit(1)
 
             # TODO: compare doc count after certain amount of time, use es.indices.stats()
 
-        logger.info(f'Started user component: {self.name}')
+        logger.info(f"Started user component: {self.name}")
 
     def stop(self):
-        logger.info(f'Stopping user component: {self.name}')
+        logger.info(f"Stopping user component: {self.name}")
 
         host = self.metadata.hostname  # type: str
 
@@ -110,10 +122,13 @@ class ProviderData(ComponentBase):
 
         # Copy provider log files
         if self.metadata.get("export_logs"):
-            self.recv_file(vm=host, src=[
-                "/var/log/bennu-pybennu.out",
-                "/var/log/bennu-pybennu.err",
-            ])
+            self.recv_file(
+                vm=host,
+                src=[
+                    "/var/log/bennu-pybennu.out",
+                    "/var/log/bennu-pybennu.err",
+                ],
+            )
 
         # TODO: doing copy here as well so it's available to collector, stupid loop numbers...
         # Copy provider configs
@@ -125,15 +140,17 @@ class ProviderData(ComponentBase):
             pconf.read(os.path.join(self.base_dir, "config.ini"))
 
             # read the yaml file based on what's in the config
-            config_path = pconf.get(section="power-solver-service", option="config-file")
+            config_path = pconf.get(
+                section="power-solver-service", option="config-file"
+            )
             self.recv_file(vm=host, src=config_path)
 
-        logger.info(f'Stopped user component: {self.name}')
+        logger.info(f"Stopped user component: {self.name}")
 
 
 def main():
     ProviderData()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -5,7 +5,7 @@ import (
 	ifaces "phenix/types/interfaces"
 )
 
-func ExtractVersion(md map[string]interface{}) string {
+func ExtractVersion(md map[string]any) string {
 	val, ok := md["version"]
 	if ok {
 		version, ok := val.(string)
@@ -17,6 +17,7 @@ func ExtractVersion(md map[string]interface{}) string {
 	return "v0"
 }
 
+//nolint:ireturn // App spec inherently is an interface
 func ExtractApp(scenario ifaces.ScenarioSpec, name string) ifaces.ScenarioApp {
 	if scenario == nil || scenario.Apps() == nil {
 		return nil
@@ -31,6 +32,7 @@ func ExtractApp(scenario ifaces.ScenarioSpec, name string) ifaces.ScenarioApp {
 	return nil
 }
 
+//nolint:ireturn // Node spec inherently is an interface
 func ExtractNode(topo ifaces.TopologySpec, hostname string) ifaces.NodeSpec {
 	for _, node := range topo.Nodes() {
 		if node.General().Hostname() == hostname {
@@ -48,6 +50,7 @@ func ExtractNodesTopologyType(topo ifaces.TopologySpec, types ...string) []iface
 		for _, typ := range types {
 			if node.Type() == typ {
 				nodes = append(nodes, node)
+
 				break
 			}
 		}
@@ -56,7 +59,11 @@ func ExtractNodesTopologyType(topo ifaces.TopologySpec, types ...string) []iface
 	return nodes
 }
 
-func ExtractNodesType(scenario ifaces.ScenarioSpec, name string, types ...string) []ifaces.ScenarioAppHost {
+func ExtractNodesType(
+	scenario ifaces.ScenarioSpec,
+	name string,
+	types ...string,
+) []ifaces.ScenarioAppHost {
 	app := ExtractApp(scenario, name)
 
 	var hosts []ifaces.ScenarioAppHost
@@ -72,7 +79,11 @@ func ExtractNodesType(scenario ifaces.ScenarioSpec, name string, types ...string
 	return hosts
 }
 
-func ExtractNodesLabel(scenario ifaces.ScenarioSpec, name string, labels ...string) []ifaces.ScenarioAppHost {
+func ExtractNodesLabel(
+	scenario ifaces.ScenarioSpec,
+	name string,
+	labels ...string,
+) []ifaces.ScenarioAppHost {
 	app := ExtractApp(scenario, name)
 
 	var hosts []ifaces.ScenarioAppHost

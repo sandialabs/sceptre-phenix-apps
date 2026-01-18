@@ -11,7 +11,7 @@ def main():
     args = parser.parse_args()
 
     es = Elasticsearch(args.elasticsearch_endpoint)
-    es.indices.delete(index='opc-dirty*')
+    es.indices.delete(index="opc-dirty*")
     es.close()
 
 

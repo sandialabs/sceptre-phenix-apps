@@ -19,10 +19,9 @@ import logging
 import platform
 import sys
 from configparser import ConfigParser
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Dict, List, Set
 
 from asyncua import Client, Node
 from asyncua.common.subscription import DataChangeNotif
@@ -79,7 +78,7 @@ INDEX_CACHE = set()  # type: Set[str]
 async def index_exists(es_obj: AsyncElasticsearch, index: str) -> bool:
     if index in INDEX_CACHE:
         return True
-    elif await es_obj.indices.exists(index=index):
+    if await es_obj.indices.exists(index=index):
         INDEX_CACHE.add(index)
         return True
     return False
@@ -91,10 +90,7 @@ class SubscriptionHandler:
         self.types_cache: dict[str, str] = {}
 
     async def datachange_notification(
-        self,
-        node: Node,
-        val: float,
-        data: DataChangeNotif
+        self, node: Node, val: float, data: DataChangeNotif
     ) -> None:
         """
         This callback method is called for every data change notification from OPC server.
@@ -132,8 +128,8 @@ class SubscriptionHandler:
         # ng8_ats_state_binary_output_value_opset => "output"
         # ng8_ats_state_binary_output_value => "output"
         direction = var_parts[offset]  # output
-        typ = var_parts[offset-1]  # binary
-        tag = "_".join(var_parts[:offset-1])  # ng8_ats_state
+        typ = var_parts[offset - 1]  # binary
+        tag = "_".join(var_parts[: offset - 1])  # ng8_ats_state
 
         es_data = {
             "@timestamp": data.monitored_item.Value.ServerTimestamp,
@@ -232,7 +228,9 @@ async def setup_logging(verbose: bool = False):
 
     # Suppress extraneous messages from asyncua
     logging.getLogger("asyncua.client.ua_client.UaClient").setLevel(logging.INFO)
-    logging.getLogger("asyncua.client.ua_client.UASocketProtocol").setLevel(logging.INFO)
+    logging.getLogger("asyncua.client.ua_client.UASocketProtocol").setLevel(
+        logging.INFO
+    )
 
 
 async def main():
@@ -240,29 +238,36 @@ async def main():
         description="Export 'dirty' process data from a SCADA server (OPC) to an Elasticsearch server"
     )
     parser.add_argument(
-        "-v", "--verbose",
+        "-v",
+        "--verbose",
         action="store_true",
-        help="Show DEBUG-level output on the console (stdout)"
+        help="Show DEBUG-level output on the console (stdout)",
     )
     parser.add_argument(
-        "-u", "--opc-url", type=str,
+        "-u",
+        "--opc-url",
+        type=str,
         default="opc.tcp://control-scada:4840",
-        help="URL of OPC server (default: 'opc.tcp://control-scada:4840')"
+        help="URL of OPC server (default: 'opc.tcp://control-scada:4840')",
     )
     parser.add_argument(
-        "-f", "--opc-variables", type=str,
+        "-f",
+        "--opc-variables",
+        type=str,
         default="/opc_variables.json",
-        help="Path to the OPC variables JSON file (default: '/opc_variables.json')"
+        help="Path to the OPC variables JSON file (default: '/opc_variables.json')",
     )
     parser.add_argument(
-        "-e", "--elastic-server", type=str,
+        "-e",
+        "--elastic-server",
+        type=str,
         default=None,
         help=(
             "Elasticsearch server to connect to. If unspecified, this "
             "script will attempt to read the URL from 'elastic-host' key in "
             "/power-provider_config.ini. If that file doesn't exist, then it "
             "will default to 'http://172.16.0.254:9200'."
-        )
+        ),
     )
 
     args = parser.parse_args()
@@ -325,18 +330,11 @@ async def main():
         # Only need to create this dict once
         es_additions = {
             "event": {},  # event.ingested
-            "ecs": {
-                "version": "8.1.0"
-            },
-            "agent": {
-                "type": "scada-to-elastic",
-                "version": __version__
-            },
+            "ecs": {"version": "8.1.0"},
+            "agent": {"type": "scada-to-elastic", "version": __version__},
             "observer": {
                 "hostname": platform.node(),
-                "geo": {
-                    "timezone": str(datetime.now(timezone.utc).astimezone().tzinfo)
-                }
+                "geo": {"timezone": str(datetime.now(UTC).astimezone().tzinfo)},
             },
             "network": {
                 "protocol": "opc-ua",
@@ -367,7 +365,9 @@ async def main():
 
             # Push pre-defined type mapping when creating index
             if not await index_exists(es_obj, index):
-                create_res = await es_obj.indices.create(index=index, mappings=INDEX_TYPE_MAPPING)
+                create_res = await es_obj.indices.create(
+                    index=index, mappings=INDEX_TYPE_MAPPING
+                )
                 log.info(f"Created index {index} (result: {create_res})")
 
             # Push to Elasticsearch

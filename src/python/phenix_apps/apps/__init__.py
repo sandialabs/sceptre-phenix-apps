@@ -3,16 +3,22 @@ import copy
 import os
 import re
 import sys
-from typing import Any, Optional
+from typing import Any, ClassVar
 
 from box import Box
 
-from phenix_apps.common import settings, utils
-from phenix_apps.common.logger import logger, configure_logging
+from phenix_apps.common import utils
+from phenix_apps.common.logger import configure_logging, logger
 
 
-class AppBase(object):
-    valid_stages = ["configure", "pre-start", "post-start", "running", "cleanup"]
+class AppBase:
+    valid_stages: ClassVar[list[str]] = [
+        "configure",
+        "pre-start",
+        "post-start",
+        "running",
+        "cleanup",
+    ]
 
     def __init__(self, name: str, stage: str, dryrun: bool = False) -> None:
         self.name = name
@@ -103,7 +109,7 @@ class AppBase(object):
 
         return None
 
-    def extract_app(self, name: Optional[str] = None) -> Box | None:
+    def extract_app(self, name: str | None = None) -> Box | None:
         """
         Return the app definition from the Scenario matching "name",
         otherwise this app's definition if "name" is None.
@@ -115,6 +121,7 @@ class AppBase(object):
         for app in apps:
             if app.name == name:
                 return app
+        return None
 
     def extract_node(
         self, hostname: str, wildcard: bool = False
@@ -132,8 +139,7 @@ class AppBase(object):
 
         if wildcard:
             return extracted
-        else:
-            return None
+        return None
 
     def extract_topology_nodes_by_attribute(
         self, attribute: str, vals: str | list[str]
@@ -315,16 +321,14 @@ class AppBase(object):
                 if i["name"] == iface and "address" in i:
                     if include_mask:
                         return i["address"], i["mask"]
-                    else:
-                        return i["address"]
+                    return i["address"]
         elif len(node.network.interfaces) > 0:
             i = node.network.interfaces[0]
 
             if "address" in i:
                 if include_mask:
                     return i["address"], i["mask"]
-                else:
-                    return i["address"]
+                return i["address"]
 
         return None
 

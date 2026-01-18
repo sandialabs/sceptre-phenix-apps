@@ -77,7 +77,11 @@ def test_config_validation(wind_turbine):
         plugin.pre_configure(mock_app, profile_no_ext)
 
     # Test that external_network is required when count > 0 (empty container_template)
-    profile_empty_tmpl = {"name": "invalid-profile", "count": 1, "container_template": {}}
+    profile_empty_tmpl = {
+        "name": "invalid-profile",
+        "count": 1,
+        "container_template": {},
+    }
     with pytest.raises(ValueError, match="external_network must be defined"):
         plugin.pre_configure(mock_app, profile_empty_tmpl)
 
@@ -191,12 +195,18 @@ def test_on_node_configured(wind_turbine, mocker):
     plugin.pre_configure(mock_app, profile)
 
     # Mock dependencies
-    mock_makedirs = mocker.patch("phenix_apps.apps.scale.plugins.wind_turbine.plugin.os.makedirs")
-    mock_tarfile = mocker.patch("phenix_apps.apps.scale.plugins.wind_turbine.plugin.tarfile.open")
+    mock_makedirs = mocker.patch(
+        "phenix_apps.apps.scale.plugins.wind_turbine.plugin.os.makedirs"
+    )
+    mock_tarfile = mocker.patch(
+        "phenix_apps.apps.scale.plugins.wind_turbine.plugin.tarfile.open"
+    )
     mocker.patch("phenix_apps.apps.scale.plugins.wind_turbine.plugin.shutil.copy")
 
     # Mock Config to avoid XML errors and file writing
-    mock_config_cls = mocker.patch("phenix_apps.apps.scale.plugins.wind_turbine.plugin.Config")
+    mock_config_cls = mocker.patch(
+        "phenix_apps.apps.scale.plugins.wind_turbine.plugin.Config"
+    )
     mock_config_instance = mock_config_cls.return_value
 
     # Run
@@ -215,5 +225,8 @@ def test_on_node_configured(wind_turbine, mocker):
     # 4. Check injection
     mock_app.add_inject.assert_any_call(
         hostname="test-wtg-1",
-        inject={"src": f"{mock_app.exp_dir}/wind-configs.tgz", "dst": "/wind-configs.tgz"},
+        inject={
+            "src": f"{mock_app.exp_dir}/wind-configs.tgz",
+            "dst": "/wind-configs.tgz",
+        },
     )

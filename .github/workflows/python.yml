@@ -1,0 +1,51 @@
+name: python
+
+env:
+  PYTHON_VERSION: "3.12"
+
+on:
+  pull_request:
+    branches: [ "**" ]
+    paths:
+      - 'src/python/**.py'
+      - '.github/workflows/python.yml'
+
+jobs:
+
+  ruff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/ruff-action@v3
+        with:
+          src: src/python
+
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: pytest
+        working-directory: src/python
+        run: |
+          python3 -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          make install-dev
+          make install
+          make test
+
+  vulture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install vulture
+        run: pip install vulture
+      - name: Run vulture
+        working-directory: src/python
+        run: vulture

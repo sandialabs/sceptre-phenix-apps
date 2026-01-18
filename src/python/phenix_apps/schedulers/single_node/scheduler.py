@@ -1,13 +1,11 @@
-import sys
-
 from phenix_apps.schedulers import SchedulerBase
 
 
 class SingleNode(SchedulerBase):
     def __init__(self):
-        SchedulerBase.__init__(self, 'single-node')
+        SchedulerBase.__init__(self, "single-node")
 
-        spec  = self.experiment.spec
+        spec = self.experiment.spec
         hosts = self.experiment.hosts
 
         for vm in spec.topology.nodes:

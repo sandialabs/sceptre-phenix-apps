@@ -1,4 +1,4 @@
-/**** Obarveni tabulek - bohuzel se nepovedlo udelat pouze pres barvy ****/
+/**** Obarveni tabulek - bohuzel se nepovedlo udelat pouze press barvy ****/
 .slick-row.even {background-color: rgb(220,220,220) !important; }
 .slick-row.odd {background-color: rgb(220,220,220) !important; }
 .slick-cell {border-bottom-color: silver !important;}
