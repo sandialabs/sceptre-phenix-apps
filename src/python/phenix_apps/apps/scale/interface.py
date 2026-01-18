@@ -10,7 +10,7 @@ class ScalePlugin(ABC):
     Enforces implementation of required lifecycle methods.
     """
 
-    def validate_profile(self, app: AppBase, profile: dict[str, Any]) -> None:
+    def validate_profile(self, app: AppBase, profile: dict[str, Any]) -> None:  # noqa: ARG002
         """Ensure required profile fields are present."""
         if "name" not in profile:
             raise ValueError("Profile missing required field 'name'")
@@ -74,7 +74,7 @@ class ScalePlugin(ABC):
         """Return the name of the minimega template to use."""
         return "minimega.mako"
 
-    def update_template_config(self, cfg: dict[str, Any]) -> None:
+    def update_template_config(self, cfg: dict[str, Any]) -> None:  # noqa: B027 # hook for subclass
         """Update the template configuration dictionary."""
         pass
 

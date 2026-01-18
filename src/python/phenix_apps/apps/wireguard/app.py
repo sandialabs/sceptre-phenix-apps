@@ -9,11 +9,10 @@ class Wireguard(AppBase):
 
         self.startup_dir: str = f"{self.exp_dir}/startup"
 
-
     def pre_start(self):
-        logger.info(f'Starting user application: {self.name}')
+        logger.info(f"Starting user application: {self.name}")
 
-        templates = utils.abs_path(__file__, 'templates/')
+        templates = utils.abs_path(__file__, "templates/")
 
         guards = self.extract_all_nodes()
 
@@ -21,30 +20,30 @@ class Wireguard(AppBase):
             path = f"{self.startup_dir}/{vm.hostname}-wireguard.conf"
 
             kwargs = {
-                'src': path,
-                'dst': '/etc/wireguard/wg0.conf',
+                "src": path,
+                "dst": "/etc/wireguard/wg0.conf",
             }
 
             self.add_inject(hostname=vm.hostname, inject=kwargs)
 
-            with open(path, 'w') as f:
+            with open(path, "w") as f:
                 utils.mako_serve_template(
-                    'wireguard_config.mako', templates, f, wireguard=vm.metadata
+                    "wireguard_config.mako", templates, f, wireguard=vm.metadata
                 )
 
-            if vm.metadata.get('boot', False):
+            if vm.metadata.get("boot", False):
                 path = f"{self.startup_dir}/{vm.hostname}-wireguard-enable.sh"
 
                 kwargs = {
-                    'src': path,
-                    'dst': '/etc/phenix/startup/wireguard-enable.sh',
+                    "src": path,
+                    "dst": "/etc/phenix/startup/wireguard-enable.sh",
                 }
 
                 self.add_inject(hostname=vm.hostname, inject=kwargs)
 
-                with open(path, 'w') as f:
+                with open(path, "w") as f:
                     utils.mako_serve_template(
-                        'wireguard_enable.mako', templates, f, name='wg0'
+                        "wireguard_enable.mako", templates, f, name="wg0"
                     )
 
-        logger.info(f'Started user application: {self.name}')
+        logger.info(f"Started user application: {self.name}")

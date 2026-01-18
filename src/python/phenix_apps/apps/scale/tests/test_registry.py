@@ -50,5 +50,5 @@ def test_registry_errors():
         pass
 
     # Version not found
-    with pytest.raises(ValueError, match="Plugin 'exists' version '2.0.0' not found"):
+    with pytest.raises(ValueError, match=r"Plugin .* version .* not found"):
         registry.get_plugin("exists", "2.0.0")

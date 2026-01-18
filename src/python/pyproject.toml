@@ -8,7 +8,7 @@ name = "phenix-apps"
 dynamic = ["version"]  # see section below, [tool.setuptools.dynamic]
 description = "phenix user apps, schedulers, and Scorch components"
 readme = {file = "README.md", content-type = "text/markdown"}
-requires-python = ">=3.10,<4"
+requires-python = ">=3.12,<4"
 license = {file = "LICENSE"}
 authors = [
     {name = "Sandia National Laboratories", email = "emulytics@sandia.gov"},
@@ -19,8 +19,6 @@ classifiers = [
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Natural Language :: English",
     "Operating System :: POSIX :: Linux",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: Implementation :: CPython",
 ]
@@ -70,10 +68,6 @@ phenix-scorch-component-vmstats = "phenix_apps.apps.scorch.vmstats.vmstats:main"
 phenix-scorch-component-opcexport = "phenix_apps.apps.scorch.opcexport.opcexport:main"
 phenix-scorch-component-kafka = "phenix_apps.apps.scorch.kafka.kafka_component:main"
 
-[project.entry-points."phenix.scale.plugins"]
-builtin = "phenix_apps.apps.scale.plugins.builtin:BuiltinV1"
-wind_turbine = "phenix_apps.apps.scale.plugins.wind_turbine:WindTurbine"
-
 [project.urls]
 # Use PyPI-standard names here: https://docs.pypi.org/project_metadata/
 "Homepage" = "https://github.com/sandialabs/sceptre-phenix-apps/"
@@ -108,5 +102,70 @@ phenix_apps = [
 [tool.setuptools.dynamic]
 version = {attr = "phenix_apps.__version__"}
 
+[tool.ruff]
+# Same as Black.
+line-length = 88
+indent-width = 4
+
+# coupled with default on phenix image (ubuntu:24.04)
+target-version = "py312"
+
+# exclude 'vendored' directory outright
+exclude = [
+    "phenix_apps/apps/sceptre/protocols/sunspec/models/smdx/"
+]
+
+[tool.ruff.lint]
+select = [
+    "E",        # pycodestyle errors
+    "W",        # pycodestyle warnings
+    "F",        # pyflakes
+    "I",        # isort
+    "UP",       # pyupgrade
+    "A",        # flake8-builtins
+    "B",        # flake8-bugbear
+    "C4",       # flake8-comprehensions
+    "PT",       # flake8-pytest-style
+    "RSE",      # flake8-raise
+    "RET",      # flake8-return
+    "ARG",      # flake8-unused-arguments
+    "RUF",      # Ruff-specific rules
+]
+ignore = [
+    "E501"      # line-too-long https://docs.astral.sh/ruff/rules/line-too-long/
+]
+
+# Allow fix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = []
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.lint.per-file-ignores]
+"test_*.py" = ["ARG"] # ignore unused-argument in test files
+
 [tool.ruff.lint.isort]
 known-first-party = ["phenix_apps"]
+
+[tool.ruff.format]
+# Like Black
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+# Enable auto-formatting of code examples in docstrings
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
+
+[tool.vulture]
+min_confidence = 80
+paths = ["."]
+exclude = [
+    ".venv",
+    "build",
+    "dist",
+    "phenix_apps/apps/__init__.py",
+    "phenix_apps/common/",
+]

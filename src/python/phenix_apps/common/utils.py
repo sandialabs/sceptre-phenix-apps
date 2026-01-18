@@ -8,23 +8,23 @@ import random
 import re
 import shutil
 import stat
+import subprocess
+import sys
 import tempfile
 import time
-import sys
-import subprocess
 from io import StringIO
 from pathlib import Path
-from typing import Union, Optional, List, IO
 from socket import inet_ntoa
 from struct import pack
-
-import phenix_apps.common.settings as phenix_settings
-from phenix_apps.common.logger import logger
+from typing import IO
 
 import mako.lookup
 import mako.template
 import minimega
 from elasticsearch import Elasticsearch
+
+import phenix_apps.common.settings as phenix_settings
+from phenix_apps.common.logger import logger
 
 
 def utc_now() -> datetime.datetime:
@@ -33,7 +33,7 @@ def utc_now() -> datetime.datetime:
 
     Further reading: https://blog.miguelgrinberg.com/post/it-s-time-for-a-change-datetime-utcnow-is-now-deprecated
     """
-    return datetime.datetime.now(datetime.timezone.utc)
+    return datetime.datetime.now(datetime.UTC)
 
 
 def kibana_format_time(ts: datetime.datetime) -> str:
@@ -70,7 +70,7 @@ def mako_serve_template(
         kwargs: Arbitrary keyword arguments to pass to the template
     """
 
-    mylookup   = mako.lookup.TemplateLookup(directories=[templates_dir])
+    mylookup = mako.lookup.TemplateLookup(directories=[templates_dir])
     mytemplate = mylookup.get_template(template_name)
 
     # print is a workaround for different encodings, I think
@@ -92,13 +92,20 @@ def generate_mac_addr() -> str:
         string: The MAC address as a string.
     """
 
-    return ':'.join(map(lambda x: f'{x:02x}', [0x00, 0x16, 0x3E,
-                                               random.randint(0x00, 0x7F),
-                                               random.randint(0x00, 0xFF),
-                                               random.randint(0x00, 0xFF)]))
+    return ":".join(
+        f"{x:02x}"
+        for x in [
+            0x00,
+            0x16,
+            0x3E,
+            random.randint(0x00, 0x7F),
+            random.randint(0x00, 0xFF),
+            random.randint(0x00, 0xFF),
+        ]
+    )
 
 
-def validate_mac_addr(macs: List[str]) -> bool:
+def validate_mac_addr(macs: list[str]) -> bool:
     """Check if MAC address is valid.
 
     Simple check to see if the MAC looks right.
@@ -111,13 +118,13 @@ def validate_mac_addr(macs: List[str]) -> bool:
     """
 
     for mac in macs:
-        if len(mac.strip()) != 17 or mac.count(':') != 5:
+        if len(mac.strip()) != 17 or mac.count(":") != 5:
             return False
 
     return True
 
 
-def abs_path(file_: str, relative_path: Optional[str] = None) -> Union[str, Path]:
+def abs_path(file_: str, relative_path: str | None = None) -> str | Path:
     """Return absolute path to file_ with optional relative resource.
 
     Args:
@@ -133,20 +140,18 @@ def abs_path(file_: str, relative_path: Optional[str] = None) -> Union[str, Path
 
 
 def cidr_to_netmask(cidr: int) -> str:
-    """Convert CIDR notation (24) to a subnet mask (255.255.255.0)
-    """
+    """Convert CIDR notation (24) to a subnet mask (255.255.255.0)"""
 
     cidr = int(cidr)
-    bits = 0xffffffff ^ (1 << 32 - cidr) - 1
+    bits = 0xFFFFFFFF ^ (1 << 32 - cidr) - 1
 
-    return inet_ntoa(pack('>I', bits))
+    return inet_ntoa(pack(">I", bits))
 
 
 def netmask_to_cidr(netmask: str) -> int:
-    """Convert netmask (255.255.255.0) to CIDR notation (24)
-    """
+    """Convert netmask (255.255.255.0) to CIDR notation (24)"""
 
-    return sum([bin(int(x)).count('1') for x in netmask.split('.')])
+    return sum([bin(int(x)).count("1") for x in netmask.split(".")])
 
 
 def hms_to_timedelta(uptime: str) -> str:
@@ -159,32 +164,33 @@ def hms_to_timedelta(uptime: str) -> str:
         str: time delta as a pretty string.
     """
     timedelta = None
-    if 'ms' in uptime:
-        temp = uptime.split('ms')
+    if "ms" in uptime:
+        temp = uptime.split("ms")
         ms = math.floor(float(temp[0]))
         timedelta = datetime.timedelta(milliseconds=ms)
-    elif 'h' in uptime:
-        temp = uptime.split('h')
+    elif "h" in uptime:
+        temp = uptime.split("h")
         hrs = int(temp[0])
-        temp = temp[1].split('m')
+        temp = temp[1].split("m")
         minutes = int(temp[0])
-        temp = temp[1].split('s')
+        temp = temp[1].split("s")
         sec = math.floor(float(temp[0]))
         timedelta = datetime.timedelta(hours=hrs, minutes=minutes, seconds=sec)
-    elif 'm' in uptime:
-        temp = uptime.split('m')
+    elif "m" in uptime:
+        temp = uptime.split("m")
         minutes = int(temp[0])
-        temp = temp[1].split('s')
+        temp = temp[1].split("s")
         sec = math.floor(float(temp[0]))
         timedelta = datetime.timedelta(minutes=minutes, seconds=sec)
-    elif 's' in uptime:
-        temp = uptime.split('s')
+    elif "s" in uptime:
+        temp = uptime.split("s")
         sec = math.floor(float(temp[0]))
         timedelta = datetime.timedelta(seconds=sec)
     return str(timedelta)
 
 
 SECONDS_PER_UNIT = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800}
+
 
 def convert_to_seconds(time: str) -> str:
     """Convert time string to seconds (e.g. 30s, 24h).
@@ -215,12 +221,12 @@ def expand_shorthand(short: str) -> list:
     if match:
         expanded = []
 
-        base  = match.group(1)
+        base = match.group(1)
         start = int(match.group(2))
-        end   = int(match.group(3)) + 1
+        end = int(match.group(3)) + 1
 
         for i in range(start, end):
-            expanded.append(f'{base}{i}')
+            expanded.append(f"{base}{i}")
 
         return expanded
 
@@ -229,7 +235,7 @@ def expand_shorthand(short: str) -> list:
 
 def mm_send(mm: minimega.minimega, vm: str, src: str, dst: str) -> None:
     if not os.path.exists(src):
-        raise ValueError(f'{src} not found locally')
+        raise ValueError(f"{src} not found locally")
 
     # Use PHENIX_DIR as base directory to ensure minimega has access to it. This
     # assumes PHENIX_DIR is mounted into the containers if containers are being
@@ -240,11 +246,11 @@ def mm_send(mm: minimega.minimega, vm: str, src: str, dst: str) -> None:
     # as the base directory instead. This is common when deploying minimega and
     # phenix as a Kubernetes deployment, wherein bidirectional mount propagation
     # has to be enabled (and is done so via a Kubernetes `emptyDir` volume).
-    if Path('/tmp/miniccc-mounts').is_dir():
-        base = '/tmp/miniccc-mounts'
+    if Path("/tmp/miniccc-mounts").is_dir():
+        base = "/tmp/miniccc-mounts"
 
     with tempfile.TemporaryDirectory(dir=base) as tmp:
-        vm_dst  = os.path.join(tmp, dst.strip('/'))
+        vm_dst = os.path.join(tmp, dst.strip("/"))
         dst_dir = os.path.dirname(vm_dst)
 
         try:
@@ -265,7 +271,7 @@ def mm_send(mm: minimega.minimega, vm: str, src: str, dst: str) -> None:
             time.sleep(1.0)
 
 
-def mm_recv(mm: minimega.minimega, vm: str, src: Union[List[str], str], dst: str) -> None:
+def mm_recv(mm: minimega.minimega, vm: str, src: list[str] | str, dst: str) -> None:
     """
     Transfer one or more files from a VM to a destination on the host using miniccc mounts.
     """
@@ -279,14 +285,14 @@ def mm_recv(mm: minimega.minimega, vm: str, src: Union[List[str], str], dst: str
     # as the base directory instead. This is common when deploying minimega and
     # phenix as a Kubernetes deployment, wherein bidirectional mount propagation
     # has to be enabled (and is done so via a Kubernetes `emptyDir` volume).
-    if Path('/tmp/miniccc-mounts').is_dir():
-        base = '/tmp/miniccc-mounts'
+    if Path("/tmp/miniccc-mounts").is_dir():
+        base = "/tmp/miniccc-mounts"
 
     with tempfile.TemporaryDirectory(dir=base) as tmp:
         if isinstance(src, str):
             src = [src]
 
-        vm_sources = [os.path.join(tmp, s.strip('/')) for s in src]
+        vm_sources = [os.path.join(tmp, s.strip("/")) for s in src]
         dst_dir = os.path.dirname(dst)
 
         if not os.path.exists(dst_dir):
@@ -302,9 +308,8 @@ def mm_recv(mm: minimega.minimega, vm: str, src: Union[List[str], str], dst: str
 
                     if tries >= 5:
                         # finally block will still get called
-                        raise ValueError(f'{src} not found in VM {vm}')
-                    else:
-                        time.sleep(0.5)
+                        raise ValueError(f"{src} not found in VM {vm}")
+                    time.sleep(0.5)
 
                 if os.path.isdir(vm_src):
                     shutil.copytree(vm_src, dst, dirs_exist_ok=True)
@@ -318,7 +323,7 @@ def mm_recv(mm: minimega.minimega, vm: str, src: Union[List[str], str], dst: str
             time.sleep(1.0)
 
 
-def mm_get_cc_path(mm: minimega.minimega) -> Optional[Path]:
+def mm_get_cc_path(mm: minimega.minimega) -> Path | None:
     """
     Path: <MM_FILEPATH>/<EXPERIMENT-NAME>/miniccc_responses
     Example: /phenix/images/goes_scorch/miniccc_responses
@@ -344,7 +349,7 @@ def mm_exec_wait(
     poll_rate: float = 1.0,
     debug: bool = False,
 ) -> dict:
-    mm.cc_filter(f'name={vm}')
+    mm.cc_filter(f"name={vm}")
 
     if once:
         mm.cc_exec_once(cmd)
@@ -353,7 +358,7 @@ def mm_exec_wait(
 
     last_cmd = mm_last_command(mm)
     mm_wait_for_cmd(
-        mm=mm, cmd_id=last_cmd['id'], timeout=timeout, poll_rate=poll_rate, debug=debug
+        mm=mm, cmd_id=last_cmd["id"], timeout=timeout, poll_rate=poll_rate, debug=debug
     )
 
     waiting = True
@@ -362,7 +367,7 @@ def mm_exec_wait(
     while waiting:
         # we only expect a single response since scoped by VM
         try:
-            exit_resp = mm.cc_exitcode(last_cmd['id'], vm)[0]
+            exit_resp = mm.cc_exitcode(last_cmd["id"], vm)[0]
             waiting = False
             break
         except minimega.Error as ex:
@@ -370,24 +375,28 @@ def mm_exec_wait(
                 raise ex from None
 
         if timeout and counter > int(timeout / poll_rate):
-            raise RuntimeError(f"Timeout exceeded waiting for exit code in mm.mm_exec_wait (timeout={timeout}, counter={counter}, poll_rate={poll_rate})") from None
+            raise RuntimeError(
+                f"Timeout exceeded waiting for exit code in mm.mm_exec_wait (timeout={timeout}, counter={counter}, poll_rate={poll_rate})"
+            ) from None
 
         if debug:
-            print_msg(f"Waiting {poll_rate} seconds before checking exit code for ID '{last_cmd['id']}' (timeout={timeout}, counter={counter})")
+            print_msg(
+                f"Waiting {poll_rate} seconds before checking exit code for ID '{last_cmd['id']}' (timeout={timeout}, counter={counter})"
+            )
 
         time.sleep(poll_rate)
         counter += 1
 
     result = {
-        'id':       last_cmd['id'],
-        'cmd':      last_cmd['cmd'],
-        'exitcode': int(exit_resp['Response']),
-        'stderr':   None,
-        'stdout':   None,
+        "id": last_cmd["id"],
+        "cmd": last_cmd["cmd"],
+        "exitcode": int(exit_resp["Response"]),
+        "stderr": None,
+        "stdout": None,
     }
 
-    resps = mm.cc_responses(last_cmd['id'])
-    uuid  = mm_vm_uuid(mm, vm)
+    resps = mm.cc_responses(last_cmd["id"])
+    uuid = mm_vm_uuid(mm, vm)
 
     # example response from mm.cc_responses:
     # [{
@@ -400,13 +409,13 @@ def mm_exec_wait(
     # }]
 
     for row in resps:
-        if not row['Response']:
+        if not row["Response"]:
             continue
 
-        resp = row['Response']
+        resp = row["Response"]
 
         if uuid not in resp:
-            eprint(f"UUID '{uuid}' not in response: {repr(resp)}")
+            eprint(f"UUID '{uuid}' not in response: {resp!r}")
             continue
 
         if "/stderr:\n" in resp:
@@ -414,7 +423,7 @@ def mm_exec_wait(
         if "/stdout:\n" in resp:
             result["stdout"] = resp.partition("/stdout:\n")[2].strip()
         if "/stderr:\n" not in resp and "/stdout:\n" not in resp:
-            eprint(f"no stderr or stdout in response: {repr(resp)}")
+            eprint(f"no stderr or stdout in response: {resp!r}")
 
     return result
 
@@ -426,8 +435,11 @@ def mm_wait_for_cmd(
     poll_rate: float = 1.0,
     debug: bool = False,
 ) -> None:
-    last_test = lambda c: c[0] == cmd_id
-    done_test = lambda c: int(c[3]) > 0
+    def last_test(c):
+        return c[0] == cmd_id
+
+    def done_test(c):
+        return int(c[3]) > 0
 
     waiting = True
     counter = 0
@@ -438,7 +450,7 @@ def mm_wait_for_cmd(
         commands = mm.cc_commands()
 
         for host in commands:
-            last = list(filter(last_test, host['Tabular']))
+            last = list(filter(last_test, host["Tabular"]))
             done = list(filter(done_test, last))
 
             if len(done) > 0:
@@ -446,10 +458,14 @@ def mm_wait_for_cmd(
                 break
 
         if timeout and counter > int(timeout / poll_rate):
-            raise RuntimeError(f"Timeout exceeded in mm_wait_for_command (timeout={timeout}, counter={counter}, poll_rate={poll_rate})") from None
+            raise RuntimeError(
+                f"Timeout exceeded in mm_wait_for_command (timeout={timeout}, counter={counter}, poll_rate={poll_rate})"
+            ) from None
 
         if debug:
-            print_msg(f"Waiting {poll_rate} seconds before checking command for ID '{cmd_id}' in mm_wait_for_cmd (timeout={timeout}, counter={counter})")
+            print_msg(
+                f"Waiting {poll_rate} seconds before checking command for ID '{cmd_id}' in mm_wait_for_cmd (timeout={timeout}, counter={counter})"
+            )
 
         time.sleep(poll_rate)
         counter += 1
@@ -465,8 +481,11 @@ def mm_wait_for_prefix(
 ) -> None:
     # 'Header': ['id', 'prefix', 'command', 'responses', 'background', 'once', 'sent', 'received', 'connectivity', 'level', 'filter']
     # 'Tabular': [['1', 'testing', '[/usr/bin/iperf3 --version]', '15', 'false', 'true', '[]', '[]', '', '', 'os=linux && iperf=1']]
-    last_test = lambda c: c[1] == prefix
-    done_test = lambda c: int(c[3]) == num_responses
+    def last_test(c):
+        return c[1] == prefix
+
+    def done_test(c):
+        return int(c[3]) == num_responses
 
     waiting = True
     counter = 0
@@ -475,7 +494,7 @@ def mm_wait_for_prefix(
         commands = mm.cc_commands()
 
         for host in commands:
-            last = list(filter(last_test, host['Tabular']))
+            last = list(filter(last_test, host["Tabular"]))
             done = list(filter(done_test, last))
 
             if len(done) > 0:
@@ -483,19 +502,20 @@ def mm_wait_for_prefix(
                 break
 
         if timeout and counter > int(timeout / poll_rate):
-            raise RuntimeError(f"Timeout exceeded in mm_wait_for_prefix (timeout={timeout}, counter={counter}, poll_rate={poll_rate})") from None
+            raise RuntimeError(
+                f"Timeout exceeded in mm_wait_for_prefix (timeout={timeout}, counter={counter}, poll_rate={poll_rate})"
+            ) from None
 
         if debug:
-            print_msg(f"Waiting {poll_rate} seconds before checking command for prefix '{prefix}' in mm_wait_for_prefix (timeout={timeout}, counter={counter})")
+            print_msg(
+                f"Waiting {poll_rate} seconds before checking command for prefix '{prefix}' in mm_wait_for_prefix (timeout={timeout}, counter={counter})"
+            )
 
         time.sleep(poll_rate)
         counter += 1
 
 
-def mm_get_cc_responses(
-    mm: minimega.minimega,
-    id_or_prefix_or_all: str
-) -> List[dict]:
+def mm_get_cc_responses(mm: minimega.minimega, id_or_prefix_or_all: str) -> list[dict]:
     responses = mm.cc_responses(id_or_prefix_or_all)
     results = []
 
@@ -503,7 +523,9 @@ def mm_get_cc_responses(
         if not row["Response"]:
             continue
 
-        cmd_resps = re.findall(r'(\d)/(\w+-\w+-\w+-\w+-\w+)/(.*?)/', row["Response"], re.DOTALL)
+        cmd_resps = re.findall(
+            r"(\d)/(\w+-\w+-\w+-\w+-\w+)/(.*?)/", row["Response"], re.DOTALL
+        )
 
         for cmd_resp in cmd_resps:
             # ('1', '096b4042-9166-402c-895e-dd39fe0f83cd', 'stdout: ...')
@@ -521,13 +543,17 @@ def mm_get_cc_responses(
             if "stdout:\n" in output:
                 cmd_result["stdout"] = output.partition("stdout:\n")[2].strip()
             if "stderr:\n" not in output and "stdout:\n" not in output:
-                print_msg(f"WARNING: no stderr or stdout in response: {repr(output)}")
+                print_msg(f"WARNING: no stderr or stdout in response: {output!r}")
 
             try:
-                cmd_result["exitcode"] = int(mm.cc_exitcode(cmd_result["id"], cmd_result["uuid"])[0]["Response"])
+                cmd_result["exitcode"] = int(
+                    mm.cc_exitcode(cmd_result["id"], cmd_result["uuid"])[0]["Response"]
+                )
             except Exception:
                 time.sleep(1.0)
-                cmd_result["exitcode"] = int(mm.cc_exitcode(cmd_result["id"], cmd_result["uuid"])[0]["Response"])
+                cmd_result["exitcode"] = int(
+                    mm.cc_exitcode(cmd_result["id"], cmd_result["uuid"])[0]["Response"]
+                )
 
             results.append(cmd_result)
 
@@ -538,16 +564,16 @@ def mm_last_command(mm: minimega.minimega) -> dict:
     commands = mm.cc_commands()
 
     return {
-        'id':  commands[0]['Tabular'][-1][0],
-        'cmd': mm.cc_commands()[0]['Tabular'][-1][2][1:-1],
+        "id": commands[0]["Tabular"][-1][0],
+        "cmd": mm.cc_commands()[0]["Tabular"][-1][2][1:-1],
     }
 
 
-def mm_vm_uuid(mm: minimega.minimega, name: str) -> Optional[str]:
-    info = mm.vm_info(summary='summary')
+def mm_vm_uuid(mm: minimega.minimega, name: str) -> str | None:
+    info = mm.vm_info(summary="summary")
 
     for host in info:
-        for vm in host['Tabular']:
+        for vm in host["Tabular"]:
             if vm[1] == name:
                 return vm[4]
 
@@ -565,25 +591,23 @@ def mm_vm_info(mm: minimega.minimega) -> dict:
     responses = mm.vm_info()
 
     if len(responses) > 1:
-        raise ValueError(f"Got {len(responses)} responses from 'mm vm info', expected 1 response")
+        raise ValueError(
+            f"Got {len(responses)} responses from 'mm vm info', expected 1 response"
+        )
 
     # Headers: ['id', 'name', 'state', 'uptime', 'type', 'uuid', 'cc_active', 'pid', 'vlan', 'bridge', 'tap', 'mac', 'ip', 'ip6', 'qos', 'qinq', 'bond', 'memory', 'vcpus', 'disks', 'snapshot', 'initrd', 'kernel', 'cdrom', 'migrate', 'append', 'serial-ports', 'virtio-ports', 'vnc_port', 'usb-use-xhci', 'tpm-socket', 'filesystem', 'hostname', 'init', 'preinit', 'fifo', 'volume', 'console_port', 'tags']
 
     # Data keys, per item: ['UUID', 'VCPUs', 'Memory', 'Snapshot', 'Schedule', 'Colocate', 'Coschedule', 'Backchannel', 'Networks', 'Bonds', 'Tags', 'ID', 'Name', 'Namespace', 'Host', 'State', 'LaunchTime', 'Type', 'ActiveCC', 'Pid', 'QemuPath', 'KernelPath', 'InitrdPath', 'CdromPath', 'MigratePath', 'CPU', 'Sockets', 'Cores', 'Threads', 'Machine', 'SerialPorts', 'VirtioPorts', 'Vga', 'Append', 'Disks', 'UsbUseXHCI', 'TpmSocketPath', 'QemuAppend', 'QemuOverride', 'VNCPort']
 
-    results = {
+    return {
         # Results from "mm vm info", keyed by VM name
         "info": {
-            item[1]: dict(zip(responses[0]["Header"], item))
+            item[1]: dict(zip(responses[0]["Header"], item, strict=False))
             for item in responses[0]["Tabular"]
         },
         # Metadata about VMs, keyed by VM name
-        "data": {
-            data["Name"]: data for data in responses[0]["Data"]
-        },
+        "data": {data["Name"]: data for data in responses[0]["Data"]},
     }
-
-    return results
 
 
 def mm_kill_process(
@@ -601,7 +625,9 @@ def mm_kill_process(
         # -im: image name to be terminated (iperf3.exe)
         mm.cc_exec_once(f"taskkill -f -im {process}")
     else:
-        raise ValueError(f"unknown os_type '{os_type}' for mm_kill_process with filter '{cc_filter}'")
+        raise ValueError(
+            f"unknown os_type '{os_type}' for mm_kill_process with filter '{cc_filter}'"
+        )
 
 
 def mm_delete_file(
@@ -618,7 +644,9 @@ def mm_delete_file(
             if not filepath.endswith("*"):
                 filepath += "*"
             # TODO: glob remove relative to arbitrary directory
-            mm.cc_exec_once(f"bash -c '/usr/bin/find / -maxdepth 1 -wholename \"{filepath}\" -type f -print0 | /usr/bin/xargs -0 /bin/rm -f'")
+            mm.cc_exec_once(
+                f"bash -c '/usr/bin/find / -maxdepth 1 -wholename \"{filepath}\" -type f -print0 | /usr/bin/xargs -0 /bin/rm -f'"
+            )
         else:
             mm.cc_exec_once(f"rm -f {filepath}")
     # TODO: this assumes file to delete is on C drive
@@ -633,17 +661,19 @@ def mm_delete_file(
 
         mm.cc_exec_once(f"cmd /c del /q {filepath}")
     else:
-        raise ValueError(f"unknown os_type '{os_type}' for mm_delete_file with filter '{cc_filter}'")
+        raise ValueError(
+            f"unknown os_type '{os_type}' for mm_delete_file with filter '{cc_filter}'"
+        )
 
 
-def run_command(cmd: str, timeout: Optional[float] = None) -> str:
+def run_command(cmd: str, timeout: float | None = None) -> str:
     result = subprocess.check_output(cmd, shell=True, timeout=timeout)
     if isinstance(result, bytes):
         result = result.decode()
     return result
 
 
-def read_json(path: Union[str, Path]):
+def read_json(path: str | Path):
     if isinstance(path, str):
         path = Path(path).resolve()
 
@@ -652,10 +682,10 @@ def read_json(path: Union[str, Path]):
 
 
 def write_json(
-    path: Union[str, Path],
-    data: Union[dict, list],
-    indent: Optional[int] = 4,
-    sort: bool = False
+    path: str | Path,
+    data: dict | list,
+    indent: int | None = 4,
+    sort: bool = False,
 ) -> None:
     if isinstance(path, str):
         path = Path(path).resolve()
@@ -673,7 +703,7 @@ def sort_dict(obj: dict) -> dict:
     return dict(sorted(obj.items(), key=lambda x: str(x[0])))
 
 
-def copy_file(src_file: Union[str, Path], dest_dir: Union[str, Path]) -> Path:
+def copy_file(src_file: str | Path, dest_dir: str | Path) -> Path:
     """
     Copy file to the destination directory.
     """
@@ -700,9 +730,7 @@ def rglob_copy(pattern: str, src_dir: Path, dest_dir: Path):
 
 
 def trim_pcap(
-    pcap_path: Path,
-    start_time: datetime.datetime,
-    end_time: datetime.datetime
+    pcap_path: Path, start_time: datetime.datetime, end_time: datetime.datetime
 ) -> None:
     """
     Edits a PCAP file to only contain packets between start_time and end_time.
@@ -712,13 +740,17 @@ def trim_pcap(
     """
     src = pcap_path.resolve()
     if not end_time > start_time:
-        eprint(f"ERROR: end time '{end_time}' should be greater than start time '{start_time}' for pcap trim of {src}")
+        eprint(
+            f"ERROR: end time '{end_time}' should be greater than start time '{start_time}' for pcap trim of {src}"
+        )
         sys.exit(1)
 
     og_size = pcap_path.stat().st_size
     print_msg(f"Trimming PCAP {pcap_path.name} (size: {og_size} bytes)")
 
-    edited = src.with_name(f"{src.stem}_edited{src.suffix}")  # with_stem requires Python 3.9+
+    edited = src.with_name(
+        f"{src.stem}_edited{src.suffix}"
+    )  # with_stem requires Python 3.9+
     cap_type = src.suffix.lstrip(".")  # pcap or pcapng
 
     # https://www.wireshark.org/docs/wsug_html_chunked/AppToolseditcap.html
@@ -740,10 +772,12 @@ def trim_pcap(
     src.unlink()
     edited.rename(src)
 
-    print_msg(f"Trimmed size for {src.name}: {trimmed_size} bytes (reduced by {og_size - trimmed_size} bytes)")
+    print_msg(
+        f"Trimmed size for {src.name}: {trimmed_size} bytes (reduced by {og_size - trimmed_size} bytes)"
+    )
 
 
-def pcap_capinfos(pcap_path: Union[str, Path]) -> dict:
+def pcap_capinfos(pcap_path: str | Path) -> dict:
     """
     Extract metadata from PCAP file. This also has the side effect of verifying that the PCAP file is valid.
     This will work with both PCAP (.pcap) and PCAPng (.pcapng) files.
@@ -754,16 +788,18 @@ def pcap_capinfos(pcap_path: Union[str, Path]) -> dict:
 
     io_obj = StringIO(capinfo_output)
     reader = csv.DictReader(io_obj, delimiter="\t")  # tab-delimited
-    results = [row for row in reader]
+    results = list(reader)
     io_obj.close()
 
     if len(results) > 1:
-        raise ValueError("More than one result from capinfos run! (this should never happen)")
+        raise ValueError(
+            "More than one result from capinfos run! (this should never happen)"
+        )
 
     return results[0]
 
 
-def usec_to_sec(val: Union[int, float]) -> float:
+def usec_to_sec(val: int | float) -> float:
     """
     Convert microseconds (usec) to seconds (sec).
     seconds = (usec * 1e-6)
@@ -780,8 +816,8 @@ def eprint(msg: str, ui: bool = True) -> None:
     print(msg, file=sys.stderr)
 
     if ui:
-        tstamp = time.strftime('%H:%M:%S')
-        print(f'[{tstamp}] ERROR : {msg}', flush=True)
+        tstamp = time.strftime("%H:%M:%S")
+        print(f"[{tstamp}] ERROR : {msg}", flush=True)
 
     logger.error(msg)  # write error to phenix log file
 
@@ -793,8 +829,8 @@ def print_msg(msg: str, ts: bool = True) -> None:
     """
 
     if ts:
-        tstamp = time.strftime('%H:%M:%S')
-        print(f'[{tstamp}] {msg}', flush=True)
+        tstamp = time.strftime("%H:%M:%S")
+        print(f"[{tstamp}] {msg}", flush=True)
     else:
         print(msg, flush=True)
 
@@ -819,9 +855,7 @@ def get_dated_index(base_index: str) -> str:
 
 
 def get_indices_from_range(
-    base_index: str,
-    start: datetime.datetime,
-    stop: datetime.datetime
+    base_index: str, start: datetime.datetime, stop: datetime.datetime
 ) -> str:
     # TODO: handle multiple dates between range
     assert start.day <= stop.day

@@ -1,0 +1,4 @@
+[codespell]
+ignore-words-list = ot
+skip = **/sunspec/models/smdx/smdx_*.xml,
+       **/sunspec/models/smdx/CHANGELOG

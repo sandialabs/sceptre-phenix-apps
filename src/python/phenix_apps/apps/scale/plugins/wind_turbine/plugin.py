@@ -5,7 +5,7 @@ import os
 import shutil
 import sys
 import tarfile
-from typing import Any
+from typing import Any, ClassVar
 
 import lxml.etree as ET
 from box import Box
@@ -31,7 +31,9 @@ class WindTurbineConfig(BaseModel):
     node_template: dict[str, Any] = Field(default_factory=dict)
     container_template: dict[str, Any] = Field(default_factory=dict)
     templates: dict[str, Any] = Field(default_factory=dict)
-    ground_truth: dict[str, Any] = Field(default_factory=dict, alias="ground-truth-module")
+    ground_truth: dict[str, Any] = Field(
+        default_factory=dict, alias="ground-truth-module"
+    )
     helics: dict[str, Any] = Field(default_factory=dict)
     labels: dict[str, Any] = Field(default_factory=dict)
     ext_net: dict[str, Any] | None = None
@@ -72,7 +74,7 @@ class WindTurbine(ScalePlugin):
     """
 
     # Defines the components of a single wind turbine, their private IPs, and their order.
-    COMPONENTS = [
+    COMPONENTS: ClassVar[list[dict[str, str]]] = [
         {"name": "main-controller", "ip": "10.135.1.254/24"},
         {"name": "signal-converter", "ip": "10.135.1.21/24"},
         {"name": "yaw-controller", "ip": "10.135.1.11/24"},
@@ -91,7 +93,7 @@ class WindTurbine(ScalePlugin):
         """Resolve the base IP for the external network, ignoring app.py increments."""
         if self.config.ext_net.get("start_ip"):
             return ipaddress.IPv4Address(self.config.ext_net["start_ip"])
-        elif self.config.ext_net.get("network"):
+        if self.config.ext_net.get("network"):
             iface = ipaddress.IPv4Interface(self.config.ext_net["network"])
             # If the IP is the network address (e.g. 192.168.1.0/24), start at .1
             if iface.ip == iface.network.network_address:
@@ -136,7 +138,7 @@ class WindTurbine(ScalePlugin):
                     f"Could not resolve IP for HELICS broker on host '{hostname}'"
                 )
                 return addr
-            elif "address" in broker:
+            if "address" in broker:
                 return broker["address"]
         return None
 
@@ -582,7 +584,8 @@ class WindTurbine(ScalePlugin):
             Register("analog-read", "yaw.setpoint"),
             Register("analog-read", "turbine.mw-output"),
             Register("binary-read", "feathered"),
-        ] + self._get_anemometer_registers(anemo_tmpl)
+            *self._get_anemometer_registers(anemo_tmpl),
+        ]
         dnp.registers_to_xml(registers)
         config.append_to_root(dnp.root)
         module = ET.Element("module", {"name": "dnp3"})

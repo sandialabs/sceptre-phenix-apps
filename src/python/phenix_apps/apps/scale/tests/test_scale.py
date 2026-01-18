@@ -299,7 +299,9 @@ def test_get_gateway(mocker, mock_scale_app):
     # Case 3: VLAN name (tap not found)
     app.extract_app = MagicMock(return_value=None)
     assert app._get_gateway("MGMT") is None
-    mock_logger.error.assert_called_with("Tap app not found! Required for gateway resolution.")
+    mock_logger.error.assert_called_with(
+        "Tap app not found! Required for gateway resolution."
+    )
 
 
 def test_duplicate_plugin_registration_error():
@@ -313,6 +315,7 @@ def test_duplicate_plugin_registration_error():
         pass
 
     with pytest.raises(ValueError, match="is already registered"):
+
         @registry.register_plugin("dup_test", "1.0")
         class P2:
             pass
@@ -370,4 +373,7 @@ def test_missing_plugin_error(mocker, mock_scale_app):
 
     mock_exit.assert_called_with(1)
     mock_logger.error.assert_called()
-    assert "Failed to load scale plugin 'non_existent_plugin'" in mock_logger.error.call_args[0][0]
+    assert (
+        "Failed to load scale plugin 'non_existent_plugin'"
+        in mock_logger.error.call_args[0][0]
+    )
