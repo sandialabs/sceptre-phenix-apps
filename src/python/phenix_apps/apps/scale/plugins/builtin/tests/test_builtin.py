@@ -85,7 +85,9 @@ def test_builtin_v2_methods(mocker, mock_scale_app):
     plugin.pre_configure(mock_scale_app, profile)
 
     # Verify logging
-    mock_logger.info.assert_called_with("Using builtin plugin v2.0.0 for profile 'my-profile'")
+    mock_logger.info.assert_called_with(
+        "Using builtin plugin v2.0.0 for profile 'my-profile'"
+    )
 
     # Verify hostname override
     assert plugin.get_hostname(1) == "v2-test-1"

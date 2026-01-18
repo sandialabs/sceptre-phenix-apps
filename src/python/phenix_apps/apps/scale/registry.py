@@ -15,9 +15,11 @@ class PluginRegistry:
             if name not in self._plugins:
                 self._plugins[name] = {}
             if version in self._plugins[name]:
-                raise ValueError(f"Plugin '{name}' version '{version}' is already registered.")
+                raise ValueError(
+                    f"Plugin '{name}' version '{version}' is already registered."
+                )
             self._plugins[name][version] = cls
-            setattr(cls, "_phenix_deprecated", deprecated)
+            cls._phenix_deprecated = deprecated
             return cls
 
         return decorator
@@ -30,7 +32,9 @@ class PluginRegistry:
         if version == "latest":
             try:
                 # Sort semantically (e.g., 1.10.0 > 1.2.0)
-                version = sorted(versions.keys(), key=lambda v: [int(p) for p in v.split(".")])[-1]
+                version = sorted(
+                    versions.keys(), key=lambda v: [int(p) for p in v.split(".")]
+                )[-1]
             except ValueError:
                 version = sorted(versions.keys())[-1]
 

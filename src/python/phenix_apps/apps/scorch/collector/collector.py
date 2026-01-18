@@ -1,6 +1,6 @@
 import configparser
-import sys
 import shutil
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -9,6 +9,7 @@ import yaml
 from phenix_apps.apps.scorch import ComponentBase
 from phenix_apps.common import utils
 from phenix_apps.common.logger import logger
+
 from .csv_gen import gen_csv
 
 # TODO: make what's saved configurable (like the experiment)
@@ -19,7 +20,7 @@ from .csv_gen import gen_csv
 
 class Collector(ComponentBase):
     def __init__(self):
-        ComponentBase.__init__(self, 'collector')
+        ComponentBase.__init__(self, "collector")
 
         # results_dir: top-level directory in the final collection of files
         self.results_dir = Path(self.base_dir, "experiment_results")
@@ -30,8 +31,7 @@ class Collector(ComponentBase):
         # Determine what scorch components are enabled, and enable lookups
         # by component type (for cases when name and type differ).
         self.all_components = {
-            c.type: c
-            for c in self.extract_app("scorch").metadata.components
+            c.type: c for c in self.extract_app("scorch").metadata.components
         }
         self.run_config = self.extract_app("scorch").metadata.runs[self.run]
         self.enabled_components = {}
@@ -39,16 +39,21 @@ class Collector(ComponentBase):
         # TODO: this doesn't handle multiple instances of same component with different name
         # However, for the components being collected, there should only be one instance usually.
         for comp in self.all_components.values():
-            if (
-                any(comp.name in run_stage for run_stage in self.run_config.values() if isinstance(run_stage, list)) or
-                any(comp.name in loop_stage for loop_stage in self.run_config.get("loop", {}).values() if isinstance(loop_stage, list))
+            if any(
+                comp.name in run_stage
+                for run_stage in self.run_config.values()
+                if isinstance(run_stage, list)
+            ) or any(
+                comp.name in loop_stage
+                for loop_stage in self.run_config.get("loop", {}).values()
+                if isinstance(loop_stage, list)
             ):
                 self.enabled_components[comp.type] = comp
 
         self.execute_stage()
 
     def stop(self):
-        logger.info(f'Stopping user component: {self.name}')
+        logger.info(f"Stopping user component: {self.name}")
 
         record = {}
 
@@ -62,7 +67,9 @@ class Collector(ComponentBase):
         topo_data = utils.run_command(f"phenix config get topology/{sceptre_topo}")
         sc_data = utils.run_command(f"phenix config get scenario/{sceptre_scenario}")
         exp_data = utils.run_command(f"phenix config get experiment/{self.exp_name}")
-        assert topo_data and sc_data and exp_data
+        assert topo_data
+        assert sc_data
+        assert exp_data
 
         Path(self.meta_dir, "topology.yaml").write_text(topo_data)
         Path(self.meta_dir, "scenario.yaml").write_text(sc_data)
@@ -94,10 +101,14 @@ class Collector(ComponentBase):
                 shutil.copytree(iperf_src, iperf_dest)
                 # TODO: remove *.log files if they're empty (no output)?
             else:
-                self.eprint(f"WARNING: 'collect_iperf' is set but 'iperf' component isn't enabled in run/loop stages for run {self.run}")
+                self.eprint(
+                    f"WARNING: 'collect_iperf' is set but 'iperf' component isn't enabled in run/loop stages for run {self.run}"
+                )
 
         if not self.enabled_components.get("disruption"):
-            self.eprint("'disruption' component isn't enabled but is required for collector!")
+            self.eprint(
+                "'disruption' component isn't enabled but is required for collector!"
+            )
             sys.exit(1)
 
         # disruption: attack_results, scenario_results, scenario_*
@@ -115,14 +126,18 @@ class Collector(ComponentBase):
         start_time = datetime.fromisoformat(start_time_fmt)
         assert start_time.tzinfo.tzname(start_time) == "UTC"
         start_time_kibana = utils.kibana_format_time(start_time)
-        self.print(f"disruption start time: {start_time_fmt} (kibana format: '{start_time_kibana}')")
+        self.print(
+            f"disruption start time: {start_time_fmt} (kibana format: '{start_time_kibana}')"
+        )
 
         # disruption stop time
         actual_stop_time_fmt = Path(s_src, "disruption_stop_time.txt").read_text()
         actual_stop_time = datetime.fromisoformat(actual_stop_time_fmt)
         assert actual_stop_time.tzinfo.tzname(actual_stop_time) == "UTC"
         actual_stop_time_kibana = utils.kibana_format_time(actual_stop_time)
-        self.print(f"disruption stop time (actual): {actual_stop_time_fmt} (kibana format: '{actual_stop_time_kibana}')")
+        self.print(
+            f"disruption stop time (actual): {actual_stop_time_fmt} (kibana format: '{actual_stop_time_kibana}')"
+        )
 
         # clamp the stop time to be start_time + configured duration
         stop_time_modified = start_time + timedelta(seconds=configured_duration)  # type: datetime
@@ -130,20 +145,26 @@ class Collector(ComponentBase):
         assert stop_time_modified.tzinfo.tzname(actual_stop_time) == "UTC"
         stop_time_modified_fmt = stop_time_modified.isoformat()
         stop_time_modified_kibana = utils.kibana_format_time(stop_time_modified)
-        self.print(f"disruption stop time (modified): {stop_time_modified_fmt} (kibana format: '{stop_time_modified_kibana}')")
+        self.print(
+            f"disruption stop time (modified): {stop_time_modified_fmt} (kibana format: '{stop_time_modified_kibana}')"
+        )
 
         # duration of the disruption (stop - start)
         duration_actual = (actual_stop_time - start_time).total_seconds()
         self.print(f"disruption duration (actual)     : {duration_actual}")
         self.print(f"disruption duration (configured) : {configured_duration}")
         if duration_actual < configured_duration:
-            self.eprint(f"actual duration of {duration_actual:.2f} was less than the configured duration of {configured_duration}, something might have gone wrong...")
+            self.eprint(
+                f"actual duration of {duration_actual:.2f} was less than the configured duration of {configured_duration}, something might have gone wrong..."
+            )
             sys.exit(1)
 
         # Record (experiment_record.json)
         self.print("generating experiment record")
 
-        current_disruption = str(disruption_metadata.current_disruption)  # baseline, dos, physical
+        current_disruption = str(
+            disruption_metadata.current_disruption
+        )  # baseline, dos, physical
         permutation = int(disruption_metadata.permutation)
         record["experiment"] = {
             "disruption": current_disruption,
@@ -184,16 +205,20 @@ class Collector(ComponentBase):
 
         if current_disruption in ["dos", "cyber_physical"]:
             dos_config = disruption_metadata.dos
-            ares_name = Path(dos_config.get("results_path", "attacker_results.json")).name
+            ares_name = Path(
+                dos_config.get("results_path", "attacker_results.json")
+            ).name
             dos_att_results = utils.read_json(Path(s_src, ares_name))
 
             record["disruption"]["dos"] = {
                 "configuration": dict(dos_config),
                 "results": dos_att_results,
             }
-            record["disruption"]["dos"]["configuration"]["attacker"]["ip"] = self.extract_node_ip(
-                name=dos_config.attacker.hostname,
-                iface=dos_config.attacker.get("interface", "eth0")
+            record["disruption"]["dos"]["configuration"]["attacker"]["ip"] = (
+                self.extract_node_ip(
+                    name=dos_config.attacker.hostname,
+                    iface=dos_config.attacker.get("interface", "eth0"),
+                )
             )
 
         if current_disruption in ["physical", "cyber_physical"]:
@@ -229,7 +254,6 @@ class Collector(ComponentBase):
         self.print(f"Saving experiment record to {record_path}")
         utils.write_json(record_path, record)
 
-
         # TODO: update for providerdata/opalrt
         # === CSV file (experiment_results.csv) ===
         # Uses Elasticsearch configuration from the 'rtds' component metadata
@@ -237,7 +261,9 @@ class Collector(ComponentBase):
         # TODO: run count query to verify number of expected docs
         if self.metadata.get("generate_csv", False):
             if not self._check_component("rtds"):
-                self.eprint("'generate_csv' is true but 'rtds' component not enabled (CSV generation only works for RTDS)")
+                self.eprint(
+                    "'generate_csv' is true but 'rtds' component not enabled (CSV generation only works for RTDS)"
+                )
                 sys.exit(1)
 
             rtds_metadata = self.enabled_components["rtds"].metadata
@@ -249,7 +275,7 @@ class Collector(ComponentBase):
                 iperf_dir=iperf_dest,
             )
 
-        logger.info(f'Stopped user component: {self.name}')
+        logger.info(f"Stopped user component: {self.name}")
 
     def _collect_provider_data(self) -> dict:
         """
@@ -319,7 +345,9 @@ class Collector(ComponentBase):
                 data["pmus"][p["name"]] = p["label"]
             self.print(f"{len({data['pmus']})} PMUs")
         else:
-            self.print(f"WARNING: No PMUs defined for {data['simulator']} Provider, skipping adding PMU names to record...")
+            self.print(
+                f"WARNING: No PMUs defined for {data['simulator']} Provider, skipping adding PMU names to record..."
+            )
 
         if yaml_conf.get("gtnet_skt", {}).get("tags"):
             # [G1CB1, G2CB2, ...]
@@ -327,14 +355,18 @@ class Collector(ComponentBase):
                 data["gtnet_skt_tags"].append(gt["name"].split(".")[0])
             self.print(f"{len(data['gtnet_skt_tags'])} GTNET-SKT tags")
         elif data["simulator"].upper().strip() == "RTDS":
-            self.print("WARNING: No GTNET-SKT tags defined for RTDS Provider, skipping adding those tags to record...")
+            self.print(
+                "WARNING: No GTNET-SKT tags defined for RTDS Provider, skipping adding those tags to record..."
+            )
 
         if yaml_conf.get("modbus", {}).get("registers"):
             for mb in yaml_conf["modbus"]["registers"]:
                 data["modbus_registers"].append(mb["name"])
             self.print(f"{len(data['modbus_registers'])} Modbus registers")
         else:
-            self.print(f"WARNING: No Modbus registers defined for {data['simulator']} Provider, skipping adding register names to record...")
+            self.print(
+                f"WARNING: No Modbus registers defined for {data['simulator']} Provider, skipping adding register names to record..."
+            )
 
         return data
 
@@ -379,7 +411,7 @@ class Collector(ComponentBase):
         to store in the experiment record
         """
         if not self._check_component("pcap"):
-            return
+            return None
 
         pcap_src = self._comp_dir("pcap")
         pcap_dest = Path(self.results_dir, "pcaps")
@@ -419,9 +451,14 @@ class Collector(ComponentBase):
 
         # TODO: this won't work for things run in configure stage before loops start
         #   workaround this by determining where each component is configured.
-        pth = Path(self.files_dir, f"scorch/run-{self.run}/{component_name}/loop-{self.loop}-count-{self.count}")
+        pth = Path(
+            self.files_dir,
+            f"scorch/run-{self.run}/{component_name}/loop-{self.loop}-count-{self.count}",
+        )
         if not pth.is_dir():
-            self.eprint(f"Output directory doesn't exist for scorch component '{component_type}' (name={component_name}): {pth}")
+            self.eprint(
+                f"Output directory doesn't exist for scorch component '{component_type}' (name={component_name}): {pth}"
+            )
             sys.exit(1)
 
         return pth
@@ -429,7 +466,9 @@ class Collector(ComponentBase):
     def _check_component(self, component_type: str) -> bool:
         """Check if component is enabled for this run, and if not, log the fact."""
         if not self.enabled_components.get(component_type):
-            self.print(f"NOTE: skipping '{component_type}' collection as its not defined in scorch metadata or set in any run/loop stage for run {self.run}")
+            self.print(
+                f"NOTE: skipping '{component_type}' collection as its not defined in scorch metadata or set in any run/loop stage for run {self.run}"
+            )
             return False
         return True
 
@@ -438,5 +477,5 @@ def main():
     Collector()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

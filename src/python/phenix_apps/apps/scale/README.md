@@ -181,7 +181,7 @@ Plugins implement the `ScalePlugin` interface. The Scale app calls these methods
     *   **`update_template_config(cfg)`**: Allows the plugin to inject custom variables into the Minimega template context.
     *   **`get_template_name()`**: Returns the name of the Minimega template to use (default: `minimega.mako`).
 
-#### Overrideable Methods
+#### Overridable Methods
 
 | Method | Description | Required |
 | :--- | :--- | :--- |
