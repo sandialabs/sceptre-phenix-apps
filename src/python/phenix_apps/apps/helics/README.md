@@ -31,7 +31,7 @@ specifying a broker that a federate running in the annotated node will be
 connecting to, as well as how many federates will be connecting to it.
 
 Each `helics/federate` annotation is processed according to the following. The
-refereced `root broker` is specified in this app's metadata (see below).
+referenced `root broker` is specified in this app's metadata (see below).
 
 1. If federate broker matches root broker exactly, it will connect directly to
    root broker.

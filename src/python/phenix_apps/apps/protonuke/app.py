@@ -9,36 +9,38 @@ class Protonuke(AppBase):
 
         self.startup_dir: str = f"{self.exp_dir}/startup"
 
-
     def pre_start(self):
-        logger.info(f'Starting user application: {self.name}')
+        logger.info(f"Starting user application: {self.name}")
 
         nukes = self.extract_all_nodes()
 
         for vm in nukes:
-            path = f'{self.startup_dir}/{vm.hostname}-protonuke'
+            path = f"{self.startup_dir}/{vm.hostname}-protonuke"
 
-            if vm.topology.hardware.os_type.upper() == 'WINDOWS':
+            if vm.topology.hardware.os_type.upper() == "WINDOWS":
                 kwargs = {
-                    'src' : path,
-                    'dst' : '/phenix/startup/90-protonuke.ps1',
+                    "src": path,
+                    "dst": "/phenix/startup/90-protonuke.ps1",
                 }
 
-                templates = utils.abs_path(__file__, 'templates/')
+                templates = utils.abs_path(__file__, "templates/")
 
-                with open(path, 'w') as f:
+                with open(path, "w") as f:
                     utils.mako_serve_template(
-                        'protonuke.ps1.mako', templates, f, protonuke_args=vm.metadata.args
+                        "protonuke.ps1.mako",
+                        templates,
+                        f,
+                        protonuke_args=vm.metadata.args,
                     )
             else:
                 kwargs = {
-                    'src' : path,
-                    'dst' : '/etc/default/protonuke',
+                    "src": path,
+                    "dst": "/etc/default/protonuke",
                 }
 
-                with open(path, 'w') as f:
-                    f.write('PROTONUKE_ARGS = {}'.format(vm.metadata.args))
+                with open(path, "w") as f:
+                    f.write(f"PROTONUKE_ARGS = {vm.metadata.args}")
 
             self.add_inject(hostname=vm.hostname, inject=kwargs)
 
-        logger.info(f'Started user application: {self.name}')
+        logger.info(f"Started user application: {self.name}")

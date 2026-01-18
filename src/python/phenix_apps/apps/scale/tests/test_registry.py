@@ -1,3 +1,5 @@
+import re
+
 import pytest
 
 from phenix_apps.apps.scale.registry import PluginRegistry
@@ -50,5 +52,7 @@ def test_registry_errors():
         pass
 
     # Version not found
-    with pytest.raises(ValueError, match="Plugin 'exists' version '2.0.0' not found"):
+    with pytest.raises(
+        ValueError, match=re.escape("Plugin 'exists' version '2.0.0' not found")
+    ):
         registry.get_plugin("exists", "2.0.0")
