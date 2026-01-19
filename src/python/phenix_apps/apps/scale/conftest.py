@@ -27,11 +27,13 @@ def setup_test_env():
                 # the compliance test will catch it.
                 pass
 
+
 @pytest.fixture(autouse=True)
-def caplog_loguru_sink(caplog):
+def caplog_loguru_sink(caplog):  # noqa: ARG001, caplog used by pytest
     """
     Redirect loguru logs to the standard logging module so pytest's caplog can capture them.
     """
+
     class PropagateHandler(logging.Handler):
         def emit(self, record):
             logging.getLogger(record.name).handle(record)
@@ -68,7 +70,9 @@ def mock_scale_app(mocker, tmp_path):
     app.templates_dir = str(tmp_path / "templates")
     app.metadata = {}
     app.dryrun = True
-    app.experiment = Box({"spec": {"topology": {"nodes": []}, "scenario": {"apps": []}}})
+    app.experiment = Box(
+        {"spec": {"topology": {"nodes": []}, "scenario": {"apps": []}}}
+    )
 
     # Create directories so real file operations (if any) don't fail
     os.makedirs(app.app_dir, exist_ok=True)

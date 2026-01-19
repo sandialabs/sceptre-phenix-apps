@@ -52,7 +52,9 @@ class Scale(AppBase):
     def _discover_plugins(self) -> None:
         # Discover plugins via specific group
         try:
-            logger.debug("Discovering plugins via 'phenix.scale.plugins' entry points...")
+            logger.debug(
+                "Discovering plugins via 'phenix.scale.plugins' entry points..."
+            )
             eps = entry_points(group="phenix.scale.plugins")
             for ep in eps:
                 try:
@@ -75,7 +77,9 @@ class Scale(AppBase):
 
         try:
             instance = get_plugin(name, version)
-            logger.debug(f"Loaded plugin instance: {instance.__class__.__name__} (requested: {version})")
+            logger.debug(
+                f"Loaded plugin instance: {instance.__class__.__name__} (requested: {version})"
+            )
             return instance
         except ValueError as e:
             logger.error(
@@ -229,7 +233,7 @@ echo 'DONE!'
             hw["memory"] = node_tmpl["memory"]
         if "image" in node_tmpl:
             # Handle image location (hw['image'] vs hw['drives'])
-            if "drives" in hw and hw["drives"]:
+            if hw.get("drives"):
                 hw["drives"][0]["image"] = node_tmpl["image"]
             else:
                 # If image was set as string in hw
@@ -503,7 +507,9 @@ echo 'DONE!'
                 try:
                     getattr(self.experiment.status.vlans, gateway)
                 except (AttributeError, KeyError):
-                    logger.error(f"Gateway VLAN '{gateway}' not found in experiment status")
+                    logger.error(
+                        f"Gateway VLAN '{gateway}' not found in experiment status"
+                    )
                     return None
 
             tap_app = self.extract_app("tap")

@@ -1,34 +1,45 @@
-import phenix_apps.common.error as error
 import phenix_apps.apps.sceptre.configs.infrastructures as infra
+import phenix_apps.common.error as error
 
 
 def get_fdconfig_class(infrastructure: str) -> type:
     # no reason for this to be case-sensitive
     infrastructure = infrastructure.lower().strip()
 
-    if infrastructure == 'power-transmission':
+    if infrastructure == "power-transmission":
         base_class = infra.PowerTransmissionInfrastructure
-    elif infrastructure == 'power-distribution':
+    elif infrastructure == "power-distribution":
         base_class = infra.PowerDistributionInfrastructure
-    elif infrastructure == 'batch-process':
+    elif infrastructure == "batch-process":
         base_class = infra.BatchProcessInfrastructure
-    elif infrastructure == 'hvac':
+    elif infrastructure == "hvac":
         base_class = infra.HVACInfrastructure
-    elif infrastructure == 'fuel':
+    elif infrastructure == "fuel":
         base_class = infra.FuelInfrastructure
-    elif infrastructure == 'rtds':
+    elif infrastructure == "rtds":
         base_class = infra.RTDSInfrastructure
-    elif infrastructure == 'opalrt':
+    elif infrastructure == "opalrt":
         base_class = infra.OPALRTInfrastructure
-    elif infrastructure == 'waterway':
+    elif infrastructure == "waterway":
         base_class = infra.WaterwayInfrastructure
-    elif infrastructure == 'battery':
+    elif infrastructure == "battery":
         base_class = infra.BatteryInfrastructure
     else:
         raise error.AppError(f"Infrastructure: {infrastructure} not supported")
 
     class FieldDeviceConfig(base_class):
-        def __init__(self, provider, name: str, interfaces, devices_by_protocol, publish_endpoint, server_endpoint, device_subtype, reg_config, counter):
+        def __init__(
+            self,
+            provider,
+            name: str,
+            interfaces,
+            devices_by_protocol,
+            publish_endpoint,
+            server_endpoint,
+            device_subtype,
+            reg_config,
+            counter,
+        ):
             super().__init__()
             if name in reg_config.keys():
                 self.reg_config = reg_config[name]
@@ -44,21 +55,30 @@ def get_fdconfig_class(infrastructure: str) -> type:
             self.device_subtype = device_subtype
             self.counter = counter
 
-        def __generate_protocols(self, devices_by_protocol: dict, base_class: type) -> list:
+        def __generate_protocols(
+            self, devices_by_protocol: dict, base_class: type
+        ) -> list:
             protocols_list = []
             for protocol in devices_by_protocol.keys():
-                if 'serial' in protocol:
-                    protocols_list.append(SerialProtocol(
-                        protocol,
-                        devices_by_protocol[protocol],
-                        base_class,
-                        self.serial_dev.pop(0),
-                        self.reg_config
-                    ))
+                if "serial" in protocol:
+                    protocols_list.append(
+                        SerialProtocol(
+                            protocol,
+                            devices_by_protocol[protocol],
+                            base_class,
+                            self.serial_dev.pop(0),
+                            self.reg_config,
+                        )
+                    )
                 else:
-                    protocols_list.append(Protocol(
-                        protocol, devices_by_protocol[protocol], base_class, self.reg_config
-                    ))
+                    protocols_list.append(
+                        Protocol(
+                            protocol,
+                            devices_by_protocol[protocol],
+                            base_class,
+                            self.reg_config,
+                        )
+                    )
             infra.Register.reset_addresses()
             return protocols_list
 
@@ -68,20 +88,34 @@ def get_fdconfig_class(infrastructure: str) -> type:
 class Protocol:
     def __init__(self, protocol, devices, infrastructure_class, reg_config):
         self.protocol = protocol
-        self.devices = self.__generate_devices(devices, infrastructure_class, reg_config)
+        self.devices = self.__generate_devices(
+            devices, infrastructure_class, reg_config
+        )
 
     def __generate_devices(self, devices, infrastructure_class, reg_config) -> list:
         devices_list = []
         for device in devices:
             kwargs = {}
             for key in device.keys():
-                if key == 'type' or key == 'name':
+                if key == "type" or key == "name":
                     continue
                 kwargs[key] = device[key]
             if self.protocol in reg_config.keys():
-                devices_list.append(infrastructure_class.create_device(device['type'], device['name'], self.protocol,reg_config=reg_config[self.protocol], **kwargs))
+                devices_list.append(
+                    infrastructure_class.create_device(
+                        device["type"],
+                        device["name"],
+                        self.protocol,
+                        reg_config=reg_config[self.protocol],
+                        **kwargs,
+                    )
+                )
             else:
-                devices_list.append(infrastructure_class.create_device(device['type'], device['name'], self.protocol,[], **kwargs))
+                devices_list.append(
+                    infrastructure_class.create_device(
+                        device["type"], device["name"], self.protocol, [], **kwargs
+                    )
+                )
         return devices_list
 
 
@@ -103,22 +137,31 @@ class OpcConfig:
         self.channel_list = []
         for fd_config in fd_configs.values():
             for protocol in fd_config.protocols:
-                if protocol.protocol == 'bacnet':
-                    chan_name = 'ChannelBACnet'
+                if protocol.protocol == "bacnet":
+                    chan_name = "ChannelBACnet"
                 else:
-                    chan_name = (f'Channel{protocol.protocol.title().replace("-", "_")}'
-                                 f'{fd_config.name.title().replace("-","_")}')
+                    chan_name = (
+                        f"Channel{protocol.protocol.title().replace('-', '_')}"
+                        f"{fd_config.name.title().replace('-', '_')}"
+                    )
                 # search channel_list and return item if we find a matching channel
                 # name, otherwise None
-                channel = next((x for x in self.channel_list if x.name == chan_name), None)
+                channel = next(
+                    (x for x in self.channel_list if x.name == chan_name), None
+                )
                 pending_channel = False
                 if not channel:
                     pending_channel = True
-                    channel = OpcConfig.Channel(chan_name, protocol.protocol,
-                                                opc_ip, fd_config.ipaddr)
-                device = OpcConfig.Device(fd_config.name, protocol.protocol,
-                                          fd_config.ipaddr, fd_config.range,
-                                          fd_config.counter)
+                    channel = OpcConfig.Channel(
+                        chan_name, protocol.protocol, opc_ip, fd_config.ipaddr
+                    )
+                device = OpcConfig.Device(
+                    fd_config.name,
+                    protocol.protocol,
+                    fd_config.ipaddr,
+                    fd_config.range,
+                    fd_config.counter,
+                )
                 for fd_dev in protocol.devices:
                     for register in fd_dev.registers:
                         device.add_tag(register)
@@ -170,15 +213,18 @@ class HmiConfig:
                     if devtype not in self.devices.keys():
                         self.devices[devtype] = {}
                     if devname not in self.devices[devtype].keys():
-                        self.devices[devtype][devname] = HmiConfig.Device(devname, devtype,
-                                                                          protocol, fd, device)
+                        self.devices[devtype][devname] = HmiConfig.Device(
+                            devname, devtype, protocol, fd, device
+                        )
                     else:
                         self.devices[devtype][devname].add_monitor(protocol, fd, device)
 
     class Device:
-        def __init__(self, name: str, type: str, monitor_proto, monitor_fd, monitor_dev):
+        def __init__(
+            self, name: str, device_type: str, monitor_proto, monitor_fd, monitor_dev
+        ):
             self.name = name
-            self.type = type
+            self.type = device_type
             self.protos = [monitor_proto]
             self.fds = [monitor_fd]
             self.regs = monitor_dev.registers
@@ -187,19 +233,19 @@ class HmiConfig:
             self.protos.append(monitor_proto)
             self.fds.append(monitor_fd)
             self.regs.append(monitor_dev.registers)
-            if self.type == 'branch':
+            if self.type == "branch":
                 # order of member lists depends on branch name
                 # only works with at most 2 fds per branch
-                bus = ''
+                bus = ""
                 for protocol in self.fds[-1]:
                     for dev in protocol:
-                        if dev.type == 'bus':
+                        if dev.type == "bus":
                             bus = dev.name
                             break
                     if bus:
                         break
-                from_, to_ = self.name.split('_')[-1].split('-')
-                if f'bus-{to_}' != bus:
+                _from, to_ = self.name.split("_")[-1].split("-")
+                if f"bus-{to_}" != bus:
                     self.protos = list(reversed(self.protos))
                     self.fds = list(reversed(self.fds))
                     self.regs = list(reversed(self.regs))
@@ -207,14 +253,18 @@ class HmiConfig:
 
 class HistorianConfig:
     def __init__(
-        self, opc_config=None, opc_ip ="", replication_ips=[],
-        scadaConnectToHistorian=False, fields=[]
-        ):
+        self,
+        opc_config=None,
+        opc_ip="",
+        replication_ips=None,
+        scadaConnectToHistorian=False,
+        fields=None,
+    ):
         """Build a historian configuration object, used to build the historian
         config file from a mako template.
 
         All arguments are optional.  Any data not available in the configuration
-        object will be ommitted from the config file
+        object will be omitted from the config file
 
         Args:
             opc_config (configs.OpcConfig): The configuration object built for OPC
@@ -225,8 +275,12 @@ class HistorianConfig:
                                       will be added to a historians configuration from OPC.  If the list is empty
                                       all fields will be added.
         """
-        # Dictionary to hold the tags that will be retreived from OPC and stroed in the
+        # Dictionary to hold the tags that will be retrieved from OPC and stored in the
         # historian.  Key = TopicName, Value = List of associated tags (points)
+        if fields is None:
+            fields = []
+        if replication_ips is None:
+            replication_ips = []
         self.tags = {}
         self.opc_ip = opc_ip
         self.replication_ips = replication_ips
@@ -237,11 +291,13 @@ class HistorianConfig:
             for channel in opc_config.channel_list:
                 # Loop through each device (for tag in device.devices) and get tag name
                 for device in channel.devices:
-                    device_name = "Device" + device.fd_name.title().replace('-', '_')
+                    device_name = "Device" + device.fd_name.title().replace("-", "_")
                     tag_list = []
                     for register in device.tags:
                         if not fields or register.field in fields:
-                            tagname = f'{register.devname}_{register.regtype}_{register.field}'.replace('-', '_')
+                            tagname = f"{register.devname}_{register.regtype}_{register.field}".replace(
+                                "-", "_"
+                            )
                             tag_list.append(tagname)
                     if tag_list:
                         topic_name = channel.name + "_" + device_name

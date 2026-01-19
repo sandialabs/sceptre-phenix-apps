@@ -87,7 +87,7 @@ def run(csvBool, path, kafka_ips, topics, exp_name, wait_duration_seconds):
                         if writer is None:
                             writer = csv.DictWriter(
                                 file,
-                                fieldnames=["topic"] + sorted(all_keys),
+                                fieldnames=["topic", *sorted(all_keys)],
                                 extrasaction="ignore",
                             )
 
@@ -112,7 +112,7 @@ def run(csvBool, path, kafka_ips, topics, exp_name, wait_duration_seconds):
                             if writer is None:
                                 writer = csv.DictWriter(
                                     file,
-                                    fieldnames=["topic"] + sorted(all_keys),
+                                    fieldnames=["topic", *sorted(all_keys)],
                                     extrasaction="ignore",
                                 )
 
@@ -146,7 +146,7 @@ def run(csvBool, path, kafka_ips, topics, exp_name, wait_duration_seconds):
                                     if writer is None:
                                         writer = csv.DictWriter(
                                             file,
-                                            fieldnames=["topic"] + sorted(all_keys),
+                                            fieldnames=["topic", *sorted(all_keys)],
                                             extrasaction="ignore",
                                         )
 
