@@ -7,7 +7,7 @@ The `AppBase` class has been refactored to standardize application initializatio
 1.  **`AppBase.__init__`**: The base class constructor now handles argument parsing, reading `stdin`, and initializing core attributes like `self.experiment`, `self.stage`, and `self.dryrun`.
 2.  **`AppBase.main()`**: A new class method that serves as the standard entry point for all apps. It manages the entire lifecycle from argument parsing to final JSON output.
 
-## Step 1: Update the `__main__.py` Entry Point
+## Step 1: Update the app's Entry Point
 
 The app's entry point file becomes much simpler. You no longer need to handle `argparse` or instantiate the class manually.
 
@@ -16,7 +16,7 @@ The app's entry point file becomes much simpler. You no longer need to handle `a
 The old entry point typically looked like this, with manual argument parsing and app instantiation.
 
 ```python
-# old __main__.py
+# old <appname>.py
 import argparse
 import sys
 from .app import MyApp
@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
 ### After
 
-Update the file to call the new `AppBase.main()` class method, passing the app's registered name.
+Create a new file in the app's directory, `__main__.py`. Update the file to call the new `AppBase.main()` class method, passing the app's registered name.
 
 ```python
 # new __main__.py
@@ -52,14 +52,14 @@ if __name__ == "__main__":
 
 ## Step 2: Update the App's `__init__` Method
 
-The constructor for your app's main class needs to be updated to accept the new arguments and call the superclass constructor. You can remove all the boilerplate code that is now handled by `AppBase`.
+The constructor for the app's main class needs to be updated to accept the new arguments and call the superclass constructor. You can remove all the boilerplate code that is now handled by `AppBase`. Also, the app's file needs to be renamed from `<appname>.py` to `app.py`.
 
 ### Before
 
 The old constructor was responsible for reading `stdin`, parsing the experiment data, and setting up initial attributes.
 
 ```python
-# old app.py
+# old <appname>.py
 import sys
 from box import Box
 from phenix_apps.apps import AppBase
