@@ -101,7 +101,7 @@ class VMStats(ComponentBase):
             expanded = []
 
             for vm in vms:
-                expanded = utils.expand_shorthand(vm)
+                expanded.append(utils.expand_shorthand(vm))
 
             vms = [e for sub in expanded for e in sub]
         else:  # default to all linux VMs
