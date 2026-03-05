@@ -1,6 +1,5 @@
 import configparser
 import os.path
-import sys
 from time import sleep
 
 from phenix_apps.apps.scorch import ComponentBase
@@ -27,7 +26,7 @@ class ProviderData(ComponentBase):
 
         # Copy provider configs
         if self.metadata.get("export_config", True):
-            self.print(f"reading provider configs from '{host}'")
+            logger.info(f"reading provider configs from '{host}'")
             # get the ini config
             self.recv_file(vm=host, src="/etc/sceptre/config.ini")
             pconf = configparser.ConfigParser()
@@ -39,23 +38,22 @@ class ProviderData(ComponentBase):
             )
             self.recv_file(vm=host, src=config_path)
 
-        self.print("verifying NTP is ok")
+        logger.info("verifying NTP is ok")
         ntp_output = self.run_and_check_command(host, "ntpq -p")["stdout"]
         if ntp_output is None or ".INIT." in ntp_output:
-            self.eprint(
+            raise RuntimeError(
                 f"ntp on provider in INIT state, not synced. ntpq output: {ntp_output}"
             )
-            sys.exit(1)
 
         # Start provider
-        self.print("ensuring provider is started")
+        logger.info("ensuring provider is started")
         if not self.check_process_running(host, "pybennu-power-solver"):
-            self.print("Starting pybennu-power-solver")
+            logger.info("Starting pybennu-power-solver")
             cmd = "/usr/local/bin/pybennu-power-solver -d start"
             self.run_and_check_command(host, cmd)
 
             sleep_for = 8.0
-            self.print(
+            logger.info(
                 f"sleeping for {sleep_for} seconds to give provider time to start and reconnect to PMUs..."
             )
             sleep(sleep_for)
@@ -67,14 +65,13 @@ class ProviderData(ComponentBase):
 
         host = self.metadata.hostname  # type: str
 
-        self.print("checking if provider is running")
+        logger.info("checking if provider is running")
         if not self.check_process_running(host, "pybennu-power-solver"):
-            self.eprint("provider is not running!")
-            sys.exit(1)
+            raise RuntimeError("provider is not running!")
 
         # Verify CSV files
         if self.metadata.get("csv_files"):
-            self.print("checking if CSV files exist")
+            logger.info("checking if CSV files exist")
             csv_path = self.metadata.csv_files.get("path", "/root/provider_data")
             # TODO: check file sizes in output of ls to ensure they're being written to
             self.run_and_check_command(host, f"ls -lh {csv_path}")
@@ -82,28 +79,27 @@ class ProviderData(ComponentBase):
         # Verify elasticsearch
         logger.info(f"{self.name}: checking ES")
         if self.metadata.get("elasticsearch", {}).get("verify"):
-            self.print("Verifying data in Elasticsearch (elasticsearch.verify=true)")
+            logger.info("Verifying data in Elasticsearch (elasticsearch.verify=true)")
             index = utils.get_dated_index(self.metadata.elasticsearch.index)
 
             # ** ground truth data being collected **
-            self.print(
+            logger.info(
                 f"Verifying ground truth data is being collected in Elasticsearch (index={index})"
             )
             # sleep_for = 3.0
-            self.print("Getting index doc count")
+            logger.info("Getting index doc count")
             doc_count_1 = self.es.indices.stats(index=index)["indices"][index]["total"][
                 "docs"
             ]["count"]  # type: int
-            self.print(f"ES doc count is: {doc_count_1}")
+            logger.info(f"ES doc count is: {doc_count_1}")
 
             # For now, just make sure there are docs getting to ES
             # TODO figure out how to verify frequency is correct for generalized bennu provider
             if doc_count_1 < 100:
-                self.eprint("Elasticsearch does not appear to be running, exiting...")
                 logger.error(
                     f"{self.name}: Elasticsearch does not appear to be running, exiting..."
                 )
-                sys.exit(1)
+                raise RuntimeError("Elasticsearch does not appear to be running")
 
             # TODO: compare doc count after certain amount of time, use es.indices.stats()
 
@@ -117,7 +113,7 @@ class ProviderData(ComponentBase):
         # Copy CSV files
         if self.metadata.get("csv_files", {}).get("export"):
             src = self.metadata.csv_files.get("path", "/root/provider_data")
-            self.print(f"Saving CSV files from provider (src={src})")
+            logger.info(f"Saving CSV files from provider (src={src})")
             self.recv_file(host, src)
 
         # Copy provider log files
@@ -133,7 +129,7 @@ class ProviderData(ComponentBase):
         # TODO: doing copy here as well so it's available to collector, stupid loop numbers...
         # Copy provider configs
         if self.metadata.get("export_config", True):
-            self.print(f"reading provider configs from '{host}'")
+            logger.info(f"reading provider configs from '{host}'")
             # get the ini config
             self.recv_file(vm=host, src="/etc/sceptre/config.ini")
             pconf = configparser.ConfigParser()

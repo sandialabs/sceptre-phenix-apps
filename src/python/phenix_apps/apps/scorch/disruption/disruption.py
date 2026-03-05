@@ -1,4 +1,3 @@
-import sys
 import timeit
 from pathlib import Path
 from time import sleep
@@ -18,14 +17,14 @@ class Disruption(ComponentBase):
 
     def _kill_dos_processes(self):
         a_host = self.metadata.dos.attacker.hostname  # type: str
-        self.print(f"ensuring dos processes are killed on attacker (vm={a_host})")
+        logger.info(f"ensuring dos processes are killed on attacker (vm={a_host})")
         script_name = Path(self.metadata.dos.attacker.script_path).name
         utils.mm_kill_process(self.mm, f"name={a_host}", script_name)
         utils.mm_kill_process(self.mm, f"name={a_host}", "hping3")
 
     def _kill_phys_process(self):
         opc_host = self.metadata.physical.opc_hostname
-        self.print(
+        logger.info(
             f"killing python.exe process on {opc_host} (for physical disruption)"
         )
         utils.mm_kill_process(
@@ -73,21 +72,20 @@ class Disruption(ComponentBase):
             scn_timeout = run_duration - 1.0
 
         # Run physical disruption
-        self.print(
+        logger.info(
             f"Running disruption command on {opc_host}: {scn_cmd} (timeout={scn_timeout})"
         )
         scn_output = self.run_and_check_command(
             opc_host, scn_cmd, timeout=scn_timeout, debug=False
         )
         if not scn_output["stdout"]:
-            self.eprint(
+            raise RuntimeError(
                 f"Failed to run 'cyber_physical' disruption: no stdout from command (output={scn_output})"
             )
-            sys.exit(1)
 
         elapsed = timeit.default_timer() - timer_start
-        self.print(f"Finished running physical disruption in {elapsed:.2f} seconds")
-        self.print(
+        logger.info(f"Finished running physical disruption in {elapsed:.2f} seconds")
+        logger.info(
             f"=== Physical command output ===\n{scn_output['stdout']}\n=== End physical command output ==="
         )
 
@@ -97,7 +95,7 @@ class Disruption(ComponentBase):
         logger.info(f"Configuring user component: {self.name}")
 
         if self.metadata.current_disruption in ["dos", "cyber_physical"]:
-            self.print(
+            logger.info(
                 f"Running checks for '{self.metadata.current_disruption}' disruption"
             )
 
@@ -112,14 +110,14 @@ class Disruption(ComponentBase):
             # verify hping3 and dos script are installed
             # NOTE: cannot use bash builtins like "command -v" here
             if self.loop < 2 and self.count < 2:
-                self.print(f"Checking if hping3 is installed on '{a_host}'")
+                logger.info(f"Checking if hping3 is installed on '{a_host}'")
                 self.run_and_check_command(a_host, "hping3 --version")
 
                 script_path = self.metadata.dos.attacker.script_path
-                self.print(f"Checking if {script_path} is installed on '{a_host}'")
+                logger.info(f"Checking if {script_path} is installed on '{a_host}'")
                 self.run_and_check_command(a_host, f"{script_path} --help")
             else:
-                self.print(
+                logger.info(
                     f"skipping tool checks since loop {self.loop} < 2 and count {self.count} < 2"
                 )
 
@@ -128,7 +126,7 @@ class Disruption(ComponentBase):
             a_node = self.extract_node(a_host)
             for interface in a_node.network.interfaces:
                 if interface.name not in [a_iface, "MGMT", "mgmt"]:
-                    self.print(f"disabling interface {interface.name} on {a_host}")
+                    logger.info(f"disabling interface {interface.name} on {a_host}")
                     utils.mm_exec_wait(
                         self.mm,
                         a_host,
@@ -163,17 +161,17 @@ class Disruption(ComponentBase):
         # wait until we've reached the rounded up time
         sleep((rounded_start - base_start).total_seconds())
         start_fmt = rounded_start.isoformat()
-        self.print(f"disruption start time: {start_fmt}")
+        logger.info(f"disruption start time: {start_fmt}")
         Path(self.base_dir, "disruption_start_time.txt").write_text(start_fmt)
 
         run_duration = float(self.metadata.run_duration)
 
-        self.print(
+        logger.info(
             f"Running '{self.metadata.current_disruption}' disruption (loop={self.loop}, run_duration={run_duration})"
         )
 
         if self.metadata.current_disruption == "baseline":
-            self.print(f"baseline: sleeping for {run_duration} seconds...")
+            logger.info(f"baseline: sleeping for {run_duration} seconds...")
             sleep(run_duration)
 
         elif self.metadata.current_disruption == "dos":
@@ -192,26 +190,25 @@ class Disruption(ComponentBase):
             cmd = self._build_dos_cmd(start_delay, timeout)
 
             a_host = self.metadata.dos.attacker.hostname
-            self.print(f"Running DoS command on {a_host}: {cmd} (timeout={timeout})")
+            logger.info(f"Running DoS command on {a_host}: {cmd} (timeout={timeout})")
             timer_start = timeit.default_timer()
             output = self.run_and_check_command(
                 a_host, cmd, timeout=timeout, debug=False
             )
             if not output["stdout"]:
-                self.eprint(
+                raise RuntimeError(
                     f"Failed to run 'dos' disruption: no stdout from command (output={output})"
                 )
-                sys.exit(1)
 
             elapsed = timeit.default_timer() - timer_start
-            self.print(f"Finished running DoS command in {elapsed} seconds")
-            self.print(
+            logger.info(f"Finished running DoS command in {elapsed} seconds")
+            logger.info(
                 f"=== Command output ===\n{output['stdout']}\n=== End command output ==="
             )
 
             remaining = run_duration - elapsed
             if remaining > 0.1:
-                self.print(
+                logger.info(
                     f"{remaining:.2f} seconds remaining out of configured run_duration {run_duration}, sleeping for that many seconds..."
                 )
                 sleep(remaining)
@@ -221,7 +218,7 @@ class Disruption(ComponentBase):
             physical_start_delay = float(self.metadata.physical.start_delay)
 
             # start delay
-            self.print(f"sleeping for {physical_start_delay} seconds")
+            logger.info(f"sleeping for {physical_start_delay} seconds")
             sleep(physical_start_delay)
 
             # physical duration
@@ -230,7 +227,7 @@ class Disruption(ComponentBase):
             # sleep until experiment run_duration time is up, physical ended early
             remaining = run_duration - elapsed - physical_start_delay
             if remaining > 0.1:
-                self.print(
+                logger.info(
                     f"{remaining:.2f} seconds remaining out of configured run_duration {run_duration}, sleeping for that many seconds..."
                 )
                 sleep(remaining)
@@ -255,7 +252,7 @@ class Disruption(ComponentBase):
             # using config data dos_start_delay instead
 
             # run dos attack with start delay as a background process
-            self.print(
+            logger.info(
                 f"Kicking off DoS script in background with start delay of {dos_start_delay}"
             )
             dos_cmd = self._build_dos_cmd(dos_start_delay, dos_run_duration)
@@ -271,7 +268,7 @@ class Disruption(ComponentBase):
             # apply 60% load shedding to loads 5 and 6
 
             # physical start delay sleep
-            self.print(f"sleeping for {physical_start_delay} seconds")
+            logger.info(f"sleeping for {physical_start_delay} seconds")
             sleep(physical_start_delay)
 
             # run physical attack not as a background process
@@ -282,24 +279,24 @@ class Disruption(ComponentBase):
 
             # sleep until experiment run_duration time is up, physical or dos ended early
             if remaining_time > 0.1:
-                self.print(
+                logger.info(
                     f"{remaining_time:.2f} seconds remaining out of configured run_duration {run_duration}, sleeping for that many seconds..."
                 )
                 sleep(remaining_time)
         else:
             raise ValueError(f"Invalid disruption: {self.metadata.current_disruption}")
 
-        self.print(f"'{self.metadata.current_disruption}' disruption complete!")
+        logger.info(f"'{self.metadata.current_disruption}' disruption complete!")
 
         # record disruption stop time
         stop_time = utils.utc_now().isoformat()
-        self.print(f"disruption stop time: {stop_time}")
+        logger.info(f"disruption stop time: {stop_time}")
         Path(self.base_dir, "disruption_stop_time.txt").write_text(stop_time)
 
         if self.metadata.current_disruption in ["dos", "cyber_physical"]:
             self._kill_dos_processes()
 
-            self.print("saving attacker results")
+            logger.info("saving attacker results")
             self.recv_file(
                 vm=self.metadata.dos.attacker.hostname,
                 src=[
@@ -311,7 +308,7 @@ class Disruption(ComponentBase):
         if self.metadata.current_disruption in ["physical", "cyber_physical"]:
             self._kill_phys_process()
 
-            self.print("saving physical disruption results")
+            logger.info("saving physical disruption results")
             self.recv_file(
                 vm=self.metadata.physical.opc_hostname,
                 src=[
@@ -323,19 +320,18 @@ class Disruption(ComponentBase):
             )
 
             # verify disruption executed correctly
-            self.print("verifying disruption results")
+            logger.info("verifying disruption results")
             fname = Path(self.metadata.physical.results_path).name
             scn_path = Path(self.base_dir, fname)
-            self.print(f"disruption results path: {scn_path}")
+            logger.info(f"disruption results path: {scn_path}")
             results = utils.read_json(scn_path)
             assert results["scenario_duration"] > 1.0
-            self.print(f"{type(results['stages'])}")
+            logger.info(f"{type(results['stages'])}")
             for stage in results["stages"].values():
                 if stage.get("method", "") != "opc" and not stage["successful"]:
-                    self.eprint(
+                    raise RuntimeError(
                         f"failed disruption stage '{stage['name']}': {stage['status']}"
                     )
-                    sys.exit(1)
 
         self.mm.clear_cc_filter()
 
@@ -350,7 +346,7 @@ class Disruption(ComponentBase):
 
             # delete result file
             a_host = self.metadata.dos.attacker.hostname
-            self.print(f"deleting attacker results (vm={a_host})")
+            logger.info(f"deleting attacker results (vm={a_host})")
             self.mm.cc_filter(f"name={a_host}")
             self.mm.cc_exec_once(f"rm -f {self.metadata.dos.attacker.results_path}")
 
@@ -359,7 +355,7 @@ class Disruption(ComponentBase):
             a_node = self.extract_node(a_host)
             for interface in a_node.network.interfaces:
                 if interface.name not in [a_iface, "MGMT", "mgmt"]:
-                    self.print(f"bringing up interface {interface.name} on {a_host}")
+                    logger.info(f"bringing up interface {interface.name} on {a_host}")
                     self.mm.cc_exec_once(f"ip link set {interface.name} up")
 
             sleep(1.0)
@@ -369,7 +365,7 @@ class Disruption(ComponentBase):
             self._kill_phys_process()
 
             opc_host = self.metadata.physical.opc_hostname
-            self.print(f"deleting physical disruption results on {opc_host})")
+            logger.info(f"deleting physical disruption results on {opc_host})")
             utils.mm_delete_file(
                 self.mm,
                 f"name={opc_host}",

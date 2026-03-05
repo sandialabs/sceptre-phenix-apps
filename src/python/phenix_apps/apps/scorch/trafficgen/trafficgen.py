@@ -24,7 +24,7 @@ class TrafficGen(ComponentBase):
             hostname = target.get("hostname", "traffic-server")
             script = scripts["trafficServer"]
 
-            self.print(f"copying {os.path.basename(script)} to {hostname}")
+            logger.info(f"copying {os.path.basename(script)} to {hostname}")
 
             # Copies script to root directory of VM. For example, if script is
             # /phenix/topologies/trafficgen-test/scripts/traffic-server.py, then
@@ -37,11 +37,11 @@ class TrafficGen(ComponentBase):
                 hostname = background.get("hostname", "background-gen")
                 script = scripts["backgroundGen"]
 
-                self.print(f"copying {os.path.basename(script)} to {hostname}")
+                logger.info(f"copying {os.path.basename(script)} to {hostname}")
 
                 utils.mm_send(mm, hostname, script, os.path.basename(script))
             else:
-                self.print("no background client configured for target {hostname}")
+                logger.info("no background client configured for target {hostname}")
 
             malware = target.get("malwareClient", None)
 
@@ -49,11 +49,11 @@ class TrafficGen(ComponentBase):
                 hostname = malware.get("hostname", "malware-gen")
                 script = scripts["malwareGen"]
 
-                self.print(f"copying {os.path.basename(script)} to {hostname}")
+                logger.info(f"copying {os.path.basename(script)} to {hostname}")
 
                 utils.mm_send(mm, hostname, script, os.path.basename(script))
             else:
-                self.print("no malware client configured for target {hostname}")
+                logger.info("no malware client configured for target {hostname}")
 
         logger.info(f"Configured user component: {self.name}")
 
@@ -80,14 +80,14 @@ class TrafficGen(ComponentBase):
                 prob = background.get("probability", 0.01)
                 script = scripts["backgroundGen"]
 
-                self.print(
+                logger.info(
                     f"running {os.path.basename(target_script)} on {target_host}"
                 )
 
                 mm.cc_filter(f"name={target_host}")
                 mm.cc_background(f"python3 /{os.path.basename(target_script)}")
 
-                self.print(f"running {os.path.basename(script)} on {hostname}")
+                logger.info(f"running {os.path.basename(script)} on {hostname}")
 
                 mm.cc_filter(f"name={hostname}")
                 mm.cc_background(
@@ -95,7 +95,7 @@ class TrafficGen(ComponentBase):
                     f"--rate {rate} --duration {duration} --probability {prob}"
                 )
             else:
-                self.print("no background client configured for target {target_host}")
+                logger.info("no background client configured for target {target_host}")
 
             malware = target.get("malwareClient", None)
 
@@ -105,7 +105,7 @@ class TrafficGen(ComponentBase):
                 prob = background.get("probability", 1.25)
                 script = scripts["malwareGen"]
 
-                self.print(f"running {os.path.basename(script)} on {hostname}")
+                logger.info(f"running {os.path.basename(script)} on {hostname}")
 
                 mm.cc_filter(f"name={hostname}")
                 mm.cc_background(
@@ -113,9 +113,9 @@ class TrafficGen(ComponentBase):
                     f"--rate {rate} --duration {duration} --probability {prob}"
                 )
             else:
-                self.print("no malware client configured for target {target_host}")
+                logger.info("no malware client configured for target {target_host}")
 
-            self.print(
+            logger.info(
                 f"pausing for {int(duration) + 5}s while traffic is generated for {target_host}"
             )
 
@@ -141,19 +141,19 @@ class TrafficGen(ComponentBase):
                 hostname = background.get("hostname", "background-gen")
                 script = scripts["backgroundGen"]
 
-                self.print(
+                logger.info(
                     f"killing {os.path.basename(target_script)} on {target_host}"
                 )
 
                 mm.cc_filter(f"name={target_host}")
                 mm.cc_exec(f"pkill -f {os.path.basename(target_script)}")
 
-                self.print(f"killing {os.path.basename(script)} on {hostname}")
+                logger.info(f"killing {os.path.basename(script)} on {hostname}")
 
                 mm.cc_filter(f"name={hostname}")
                 mm.cc_exec(f"pkill -f {os.path.basename(script)}")
             else:
-                self.print("no background client configured for target {target_host}")
+                logger.info("no background client configured for target {target_host}")
 
             malware = target.get("malwareClient", None)
 
@@ -161,12 +161,12 @@ class TrafficGen(ComponentBase):
                 hostname = malware.get("hostname", "malware-gen")
                 script = scripts["malwareGen"]
 
-                self.print(f"killing {os.path.basename(script)} on {hostname}")
+                logger.info(f"killing {os.path.basename(script)} on {hostname}")
 
                 mm.cc_filter(f"name={hostname}")
                 mm.cc_exec(f"pkill -f {os.path.basename(script)}")
             else:
-                self.print("no malware client configured for target {target_host}")
+                logger.info("no malware client configured for target {target_host}")
 
         logger.info(f"Stopped user component: {self.name}")
 
@@ -188,19 +188,19 @@ class TrafficGen(ComponentBase):
                 hostname = background.get("hostname", "background-gen")
                 script = scripts["backgroundGen"]
 
-                self.print(
+                logger.info(
                     f"deleting /{os.path.basename(target_script)} on {target_host}"
                 )
 
                 mm.cc_filter(f"name={target_host}")
                 mm.cc_exec(f"rm /{os.path.basename(target_script)}")
 
-                self.print(f"deleting /{os.path.basename(script)} on {hostname}")
+                logger.info(f"deleting /{os.path.basename(script)} on {hostname}")
 
                 mm.cc_filter(f"name={hostname}")
                 mm.cc_exec(f"rm /{os.path.basename(script)}")
             else:
-                self.print("no background client configured for target {target_host}")
+                logger.info("no background client configured for target {target_host}")
 
             malware = target.get("malwareClient", None)
 
@@ -208,12 +208,12 @@ class TrafficGen(ComponentBase):
                 hostname = malware.get("hostname", "malware-gen")
                 script = scripts["malwareGen"]
 
-                self.print(f"deleting /{os.path.basename(script)} on {hostname}")
+                logger.info(f"deleting /{os.path.basename(script)} on {hostname}")
 
                 mm.cc_filter(f"name={hostname}")
                 mm.cc_exec(f"rm /{os.path.basename(script)}")
             else:
-                self.print("no malware client configured for target {target_host}")
+                logger.info("no malware client configured for target {target_host}")
 
         logger.info(f"Cleaned up user component: {self.name}")
 

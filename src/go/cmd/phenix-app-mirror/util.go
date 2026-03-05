@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	"phenix-apps/util"
 
 	"github.com/mitchellh/mapstructure"
+
+	"phenix-apps/util"
 )
 
 func extractMetadata(data map[string]any) (MirrorAppMetadataV1, error) {

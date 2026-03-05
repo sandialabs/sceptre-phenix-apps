@@ -25,21 +25,21 @@ class Ettercap(ComponentBase):
                 continue
 
             if not iface:
-                self.printf(f"missing interface name for VM {hostname}")
+                logger.error(f"missing interface name for VM {hostname}")
                 continue
 
             if not targets:
-                self.printf(f"missing targets for VM {hostname}")
+                logger.error(f"missing targets for VM {hostname}")
                 continue
 
-            self.print(f"ensuring interface {iface} is up in VM {hostname}")
+            logger.info(f"ensuring interface {iface} is up in VM {hostname}")
 
             cmd = f"ip link set {iface} up"
 
             mm.cc_filter(f"name={hostname}")
             mm.cc_exec(cmd)
 
-            self.print(
+            logger.info(
                 f"starting ettercap using {method} against {targets} in VM {hostname}"
             )
 
@@ -62,7 +62,7 @@ class Ettercap(ComponentBase):
             if not hostname:
                 continue
 
-            self.print(f"stopping ettercap in VM {hostname}")
+            logger.info(f"stopping ettercap in VM {hostname}")
 
             mm.cc_filter(f"name={hostname}")
             mm.cc_exec("pkill ettercap")

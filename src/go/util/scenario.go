@@ -1,6 +1,8 @@
 package util
 
 import (
+	"slices"
+
 	"phenix/types"
 	ifaces "phenix/types/interfaces"
 )
@@ -8,8 +10,8 @@ import (
 func ExtractVersion(md map[string]any) string {
 	val, ok := md["version"]
 	if ok {
-		version, ok := val.(string)
-		if ok {
+		version, typeOk := val.(string)
+		if typeOk {
 			return version
 		}
 	}
@@ -47,12 +49,8 @@ func ExtractNodesTopologyType(topo ifaces.TopologySpec, types ...string) []iface
 	var nodes []ifaces.NodeSpec
 
 	for _, node := range topo.Nodes() {
-		for _, typ := range types {
-			if node.Type() == typ {
-				nodes = append(nodes, node)
-
-				break
-			}
+		if slices.Contains(types, node.Type()) {
+			nodes = append(nodes, node)
 		}
 	}
 

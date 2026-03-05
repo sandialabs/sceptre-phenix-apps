@@ -1,5 +1,4 @@
 import json
-import sys
 import time
 
 from phenix_apps.apps.scorch import ComponentBase
@@ -37,7 +36,7 @@ class VMStats(ComponentBase):
 
         vms = self.__vm_list()
 
-        self.print("killing vmstat processes")
+        logger.info("killing vmstat processes")
         self.mm.cc_filter("vmstat=1 os=linux")
         self.mm.cc_exec_once("pkill vmstat")
         self.mm.clear_cc_filter()
@@ -45,21 +44,20 @@ class VMStats(ComponentBase):
         time.sleep(5.0)
 
         for i, vm in enumerate(vms):
-            self.print(f"transferring /vmstat.out from {vm} ({i + 1} of {len(vms)})")
+            logger.info(f"transferring /vmstat.out from {vm} ({i + 1} of {len(vms)})")
             try:
                 utils.mm_recv(self.mm, vm, "/vmstat.out", f"{self.base_dir}/{vm}.out")
             except ValueError as ex:
-                self.eprint(f"Failed to get vmstat.out from {vm}: {ex}")
-                sys.exit(1)
+                raise RuntimeError(f"Failed to get vmstat.out from {vm}: {ex}") from ex
 
-        self.print("deleting vmstat.out from VMs")
+        logger.info("deleting vmstat.out from VMs")
         self.mm.cc_filter("vmstat=1 os=linux")
         self.mm.cc_exec_once("rm /vmstat.out")
         self.mm.clear_cc_filter()
 
         stats = []
 
-        self.print("reading vmstat.out files")
+        logger.info("reading vmstat.out files")
         for vm in vms:
             with open(f"{self.base_dir}/{vm}.out") as f:
                 lines = f.readlines()
@@ -85,7 +83,7 @@ class VMStats(ComponentBase):
                     stats.append(stat)
 
         stats_path = f"{self.base_dir}/vm_stats.jsonl"
-        self.print(f"writing consolidated vmstats to {stats_path}")
+        logger.info(f"writing consolidated vmstats to {stats_path}")
         with open(stats_path, "a+") as f:
             for datum in stats:
                 json_record = json.dumps(datum)
@@ -112,7 +110,7 @@ class VMStats(ComponentBase):
                 if node.get("hardware", {}).get("os_type", "") in compatible_os:
                     vms.append(vm)
                 else:
-                    self.print(
+                    logger.info(
                         f"Skipping VM {vm} with incompatible os_type '{node.get('hardware', {}).get('os_type', '')}' (must be one of {compatible_os})"
                     )
 

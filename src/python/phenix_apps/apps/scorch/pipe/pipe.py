@@ -1,5 +1,3 @@
-import sys
-
 from phenix_apps.apps.scorch import ComponentBase
 from phenix_apps.common.logger import logger
 
@@ -23,34 +21,31 @@ class Pipe(ComponentBase):
         log = self.metadata.get("log", None)
 
         if not pipe:
-            self.eprint("pipe not specified but is required")
-            sys.exit(1)
+            raise ValueError("pipe not specified but is required")
 
         if via:
-            self.print(f"setting via '{via}' for pipe '{pipe}'")
+            logger.info(f"setting via '{via}' for pipe '{pipe}'")
             self.mm.pipe_via(pipe, via)
 
         if mode:
             if mode not in ["all", "round-robin", "random"]:
-                self.eprint(
+                raise ValueError(
                     f"mode invalid: {mode} - options are all|round-robin|random"
                 )
-                sys.exit(1)
-            self.print(f"setting mode '{mode}' for pipe '{pipe}'")
+            logger.info(f"setting mode '{mode}' for pipe '{pipe}'")
             self.mm.pipe_mode(pipe, mode)
 
         if log is not None:
             if log is True:
-                self.print(f"enabling logging for pipe '{pipe}'")
+                logger.info(f"enabling logging for pipe '{pipe}'")
             elif log is False:
-                self.print(f"disabling logging for pipe '{pipe}'")
+                logger.info(f"disabling logging for pipe '{pipe}'")
             else:
-                self.eprint(f"log setting invalid: {log} - options are true|false")
-                sys.exit(1)
+                raise ValueError(f"log setting invalid: {log} - options are true|false")
             self.mm.pipe_log(pipe, str(log).lower())
 
         if data:
-            self.print(f"writing data '{data}' to pipe '{pipe}'")
+            logger.info(f"writing data '{data}' to pipe '{pipe}'")
             self.mm.pipe(pipe, f"'{data}'")
 
         logger.info(f"Started user component: {self.name}")
@@ -61,10 +56,9 @@ class Pipe(ComponentBase):
         pipe = self.metadata.get("pipe", None)
 
         if not pipe:
-            self.eprint("pipe not specified but is required")
-            sys.exit(1)
+            raise ValueError("pipe not specified but is required")
 
-        self.print(f"clearing pipe '{pipe}'")
+        logger.info(f"clearing pipe '{pipe}'")
         self.mm.clear_pipe(pipe)
 
         logger.info(f"Cleaned up user component: {self.name}")

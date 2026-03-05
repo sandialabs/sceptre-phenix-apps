@@ -1,6 +1,5 @@
 import configparser
 import shutil
-import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -80,7 +79,7 @@ class Collector(ComponentBase):
 
         # miniccc logs
         if self.metadata.get("collect_miniccc", False):
-            self.print("collecting miniccc data")
+            logger.info("collecting miniccc data")
             mc_dir = Path(self.base_dir, "miniccc")
             vm_names = self.extract_node_names()
             for vm in vm_names:
@@ -97,24 +96,23 @@ class Collector(ComponentBase):
             if self._check_component("iperf"):
                 iperf_src = self._comp_dir("iperf")
                 iperf_dest = Path(self.results_dir, "iperf")
-                self.print("copying iperf data")
+                logger.info("copying iperf data")
                 shutil.copytree(iperf_src, iperf_dest)
                 # TODO: remove *.log files if they're empty (no output)?
             else:
-                self.eprint(
-                    f"WARNING: 'collect_iperf' is set but 'iperf' component isn't enabled in run/loop stages for run {self.run}"
+                logger.error(
+                    f"'collect_iperf' is set but 'iperf' component isn't enabled in run/loop stages for run {self.run}"
                 )
 
         if not self.enabled_components.get("disruption"):
-            self.eprint(
+            raise ValueError(
                 "'disruption' component isn't enabled but is required for collector!"
             )
-            sys.exit(1)
 
         # disruption: attack_results, scenario_results, scenario_*
         s_src = self._comp_dir("disruption")
         s_dest = Path(self.results_dir, "disruption")
-        self.print("copying disruption data")
+        logger.info("copying disruption data")
         shutil.copytree(s_src, s_dest)
 
         # Use duration for the configured disruption
@@ -126,7 +124,7 @@ class Collector(ComponentBase):
         start_time = datetime.fromisoformat(start_time_fmt)
         assert start_time.tzinfo.tzname(start_time) == "UTC"
         start_time_kibana = utils.kibana_format_time(start_time)
-        self.print(
+        logger.info(
             f"disruption start time: {start_time_fmt} (kibana format: '{start_time_kibana}')"
         )
 
@@ -135,7 +133,7 @@ class Collector(ComponentBase):
         actual_stop_time = datetime.fromisoformat(actual_stop_time_fmt)
         assert actual_stop_time.tzinfo.tzname(actual_stop_time) == "UTC"
         actual_stop_time_kibana = utils.kibana_format_time(actual_stop_time)
-        self.print(
+        logger.info(
             f"disruption stop time (actual): {actual_stop_time_fmt} (kibana format: '{actual_stop_time_kibana}')"
         )
 
@@ -145,22 +143,21 @@ class Collector(ComponentBase):
         assert stop_time_modified.tzinfo.tzname(actual_stop_time) == "UTC"
         stop_time_modified_fmt = stop_time_modified.isoformat()
         stop_time_modified_kibana = utils.kibana_format_time(stop_time_modified)
-        self.print(
+        logger.info(
             f"disruption stop time (modified): {stop_time_modified_fmt} (kibana format: '{stop_time_modified_kibana}')"
         )
 
         # duration of the disruption (stop - start)
         duration_actual = (actual_stop_time - start_time).total_seconds()
-        self.print(f"disruption duration (actual)     : {duration_actual}")
-        self.print(f"disruption duration (configured) : {configured_duration}")
+        logger.info(f"disruption duration (actual)     : {duration_actual}")
+        logger.info(f"disruption duration (configured) : {configured_duration}")
         if duration_actual < configured_duration:
-            self.eprint(
+            raise RuntimeError(
                 f"actual duration of {duration_actual:.2f} was less than the configured duration of {configured_duration}, something might have gone wrong..."
             )
-            sys.exit(1)
 
         # Record (experiment_record.json)
-        self.print("generating experiment record")
+        logger.info("generating experiment record")
 
         current_disruption = str(
             disruption_metadata.current_disruption
@@ -197,8 +194,7 @@ class Collector(ComponentBase):
         record["disruption"] = {}
 
         if current_disruption not in ["baseline", "dos", "physical", "cyber_physical"]:
-            self.eprint(f"bad disruption name: {current_disruption}")
-            sys.exit(1)
+            raise ValueError(f"bad disruption name: {current_disruption}")
 
         if current_disruption == "baseline":
             record["disruption"]["baseline"] = {}
@@ -251,7 +247,7 @@ class Collector(ComponentBase):
 
         # save record to file
         record_path = Path(self.results_dir, "experiment_record.json")
-        self.print(f"Saving experiment record to {record_path}")
+        logger.info(f"Saving experiment record to {record_path}")
         utils.write_json(record_path, record)
 
         # TODO: update for providerdata/opalrt
@@ -261,10 +257,9 @@ class Collector(ComponentBase):
         # TODO: run count query to verify number of expected docs
         if self.metadata.get("generate_csv", False):
             if not self._check_component("rtds"):
-                self.eprint(
+                raise ValueError(
                     "'generate_csv' is true but 'rtds' component not enabled (CSV generation only works for RTDS)"
                 )
-                sys.exit(1)
 
             rtds_metadata = self.enabled_components["rtds"].metadata
             gen_csv(
@@ -295,7 +290,7 @@ class Collector(ComponentBase):
         elif self._check_component("rtds"):
             prov_src = self._comp_dir("rtds")
         else:
-            self.eprint(
+            logger.error(
                 "WARNING: No provider data configured for experiment, "
                 "either 'providerdata' or 'rtds' component should be "
                 "configured, skipping..."
@@ -303,7 +298,7 @@ class Collector(ComponentBase):
             return {}
 
         dest = Path(self.results_dir, "provider_data")
-        self.print(f"copying provider data from '{prov_src}'")
+        logger.info(f"copying provider data from '{prov_src}'")
         utils.rglob_copy("*.csv", prov_src, dest)
         utils.rglob_copy("*.yaml", prov_src, self.meta_dir)
         utils.rglob_copy("*.txt", prov_src, self.meta_dir)
@@ -315,25 +310,22 @@ class Collector(ComponentBase):
         # Read Provider config
         ini_path = self.meta_dir / "config.ini"
         if not ini_path.is_file() and ini_path.read_text():
-            self.eprint("Non-existent or empty config.ini from provider")
-            sys.exit(1)
+            raise RuntimeError("Non-existent or empty config.ini from provider")
 
         pconf = configparser.ConfigParser()
         pconf.read(ini_path)
 
         # check if this is an updated config
         if not pconf.has_option("power-solver-service", "config-file"):
-            self.eprint(
+            raise RuntimeError(
                 "Old-style provider config detected (non-YAML). This is not "
                 "supported by this version of collector, use an older version."
             )
-            # exit error here because this shouldn't happen
-            sys.exit(1)
 
         data["simulator"] = pconf.get("power-solver-service", "solver-type")
 
         # parse new-style YAML-formatted config
-        self.print("Parsing YAML provider config")
+        logger.info("Parsing YAML provider config")
         config_file = Path(pconf.get("power-solver-service", "config-file")).name
         yaml_path = Path(self.meta_dir, config_file)
         with yaml_path.open() as yf:
@@ -343,9 +335,9 @@ class Collector(ComponentBase):
             # {PMU1: BUS7, ...}
             for p in yaml_conf["pmu"]["pmus"]:
                 data["pmus"][p["name"]] = p["label"]
-            self.print(f"{len({data['pmus']})} PMUs")
+            logger.info(f"{len({data['pmus']})} PMUs")
         else:
-            self.print(
+            logger.info(
                 f"WARNING: No PMUs defined for {data['simulator']} Provider, skipping adding PMU names to record..."
             )
 
@@ -353,18 +345,18 @@ class Collector(ComponentBase):
             # [G1CB1, G2CB2, ...]
             for gt in yaml_conf["gtnet_skt"]["tags"]:
                 data["gtnet_skt_tags"].append(gt["name"].split(".")[0])
-            self.print(f"{len(data['gtnet_skt_tags'])} GTNET-SKT tags")
+            logger.info(f"{len(data['gtnet_skt_tags'])} GTNET-SKT tags")
         elif data["simulator"].upper().strip() == "RTDS":
-            self.print(
+            logger.info(
                 "WARNING: No GTNET-SKT tags defined for RTDS Provider, skipping adding those tags to record..."
             )
 
         if yaml_conf.get("modbus", {}).get("registers"):
             for mb in yaml_conf["modbus"]["registers"]:
                 data["modbus_registers"].append(mb["name"])
-            self.print(f"{len(data['modbus_registers'])} Modbus registers")
+            logger.info(f"{len(data['modbus_registers'])} Modbus registers")
         else:
-            self.print(
+            logger.info(
                 f"WARNING: No Modbus registers defined for {data['simulator']} Provider, skipping adding register names to record..."
             )
 
@@ -378,7 +370,7 @@ class Collector(ComponentBase):
             return {}
 
         qos_file = self._comp_dir("qos") / "qos_values_applied.json"
-        self.print("copying qos data")
+        logger.info("copying qos data")
         utils.copy_file(qos_file, self.meta_dir)
 
         return utils.read_json(qos_file)
@@ -391,7 +383,7 @@ class Collector(ComponentBase):
             return
 
         vms_src = self._comp_dir("vmstats") / "vm_stats.jsonl"
-        self.print("copying vmstats data")
+        logger.info("copying vmstats data")
         utils.copy_file(vms_src, self.meta_dir)
 
     def _collect_hoststats(self) -> None:
@@ -402,7 +394,7 @@ class Collector(ComponentBase):
             return
 
         hs_src = self._comp_dir("hoststats") / "host_stats.jsonl"
-        self.print("copying hoststats data")
+        logger.info("copying hoststats data")
         utils.copy_file(hs_src, self.meta_dir)
 
     def _collect_pcap(self):
@@ -415,7 +407,7 @@ class Collector(ComponentBase):
 
         pcap_src = self._comp_dir("pcap")
         pcap_dest = Path(self.results_dir, "pcaps")
-        self.print("copying pcap data")
+        logger.info("copying pcap data")
         shutil.copytree(pcap_src, pcap_dest)
 
         # NOTE: pcap durations for several of the PCAPs may be shorter than the configured duration
@@ -433,12 +425,11 @@ class Collector(ComponentBase):
             )
 
             if (expected_cap_duration + 6.0) < dis_configured_duration:
-                self.eprint(
+                raise RuntimeError(
                     f"Capture duration {expected_cap_duration} seconds is "
                     f"more than 6.0 seconds less than configured disruption "
                     f"duration of {dis_configured_duration} seconds"
                 )
-                sys.exit(1)
 
         return pcap_metadata
 
@@ -456,17 +447,16 @@ class Collector(ComponentBase):
             f"scorch/run-{self.run}/{component_name}/loop-{self.loop}-count-{self.count}",
         )
         if not pth.is_dir():
-            self.eprint(
+            raise RuntimeError(
                 f"Output directory doesn't exist for scorch component '{component_type}' (name={component_name}): {pth}"
             )
-            sys.exit(1)
 
         return pth
 
     def _check_component(self, component_type: str) -> bool:
         """Check if component is enabled for this run, and if not, log the fact."""
         if not self.enabled_components.get(component_type):
-            self.print(
+            logger.info(
                 f"NOTE: skipping '{component_type}' collection as its not defined in scorch metadata or set in any run/loop stage for run {self.run}"
             )
             return False

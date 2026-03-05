@@ -1,7 +1,7 @@
-name: all
+name: codespell
 
 on:
-  pull_request:
+  push:
     branches: [ "**" ]
 
 jobs:

@@ -3,20 +3,20 @@
 package util
 
 import (
-	"math/rand"
+	"math/rand/v2"
 )
 
-var chars = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 func RandomString(n int) string {
 	var (
-		buf = make([]rune, n)
+		buf = make([]byte, n)
 		l   = len(chars)
 	)
 
 	for i := range buf {
 		//nolint:gosec // simple random string, not cryptographically relevant
-		buf[i] = chars[rand.Intn(l)]
+		buf[i] = chars[rand.IntN(l)]
 	}
 
 	return string(buf)

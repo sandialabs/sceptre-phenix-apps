@@ -65,7 +65,7 @@ def test_pre_configure_overrides(wind_turbine):
 
 
 def test_config_validation(wind_turbine):
-    """Test that invalid config raises ValueError."""
+    """Test that invalid config raises ValidationError."""
     plugin, mock_app = wind_turbine
     profile = {"name": "invalid-profile", "count": 0}
     with pytest.raises(ValidationError):
@@ -73,7 +73,7 @@ def test_config_validation(wind_turbine):
 
     # Test that external_network is required when count > 0
     profile_no_ext = {"name": "invalid-profile", "count": 1}
-    with pytest.raises(ValueError, match="external_network must be defined"):
+    with pytest.raises(ValidationError, match="external_network must be defined"):
         plugin.pre_configure(mock_app, profile_no_ext)
 
     # Test that external_network is required when count > 0 (empty container_template)
@@ -82,7 +82,7 @@ def test_config_validation(wind_turbine):
         "count": 1,
         "container_template": {},
     }
-    with pytest.raises(ValueError, match="external_network must be defined"):
+    with pytest.raises(ValidationError, match="external_network must be defined"):
         plugin.pre_configure(mock_app, profile_empty_tmpl)
 
 

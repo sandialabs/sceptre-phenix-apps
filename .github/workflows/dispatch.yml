@@ -15,4 +15,4 @@ jobs:
           token: ${{ secrets.REPO_DISPATCH_PAT }}
           repository: ${{ github.repository_owner }}/sceptre-phenix
           event-type: apps-update
-          client-payload: '{"repo": "${{ github.repository }}"}'
+          client-payload: '{"repo": "${{ github.repository }}", "ref": "${{ github.ref }}"}'

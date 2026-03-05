@@ -5,14 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"phenix/store"
-	"phenix/types"
-	"phenix/types/version"
 	"strconv"
 
 	"github.com/mitchellh/mapstructure"
 
+	"phenix/store"
+	"phenix/types"
 	ifaces "phenix/types/interfaces"
+	"phenix/types/version"
 )
 
 func IsDryRun() bool {
@@ -76,5 +76,5 @@ func DecodeExperiment(body []byte) (*types.Experiment, error) {
 		return nil, errors.New("invalid experiment status")
 	}
 
-	return &types.Experiment{Metadata: md, Spec: spec, Status: status}, nil
+	return &types.Experiment{Metadata: md, Spec: spec, Status: status, Hosts: nil}, nil
 }

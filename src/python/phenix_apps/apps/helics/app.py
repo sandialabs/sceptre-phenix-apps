@@ -1,5 +1,4 @@
 import os
-import sys
 
 from phenix_apps.apps import AppBase
 from phenix_apps.common import utils
@@ -20,8 +19,7 @@ class Helics(AppBase):
         root = broker_md.get("root", None)
 
         if not root:
-            logger.error("no root broker provided, but required")
-            sys.exit(1)
+            raise ValueError("no root broker provided, but required")
 
         if "|" in root:  # hostname|iface
             root_hostname, iface = root.split("|", 1)
@@ -29,8 +27,7 @@ class Helics(AppBase):
             root_ip = self.extract_node_interface_ip(root_hostname, iface)
 
             if not root_ip:
-                logger.error(f"root broker not found in topology: {root_hostname}")
-                sys.exit(1)
+                raise ValueError(f"root broker not found in topology: {root_hostname}")
         else:  # ip[:port]
             root_ip = root
 
@@ -40,8 +37,7 @@ class Helics(AppBase):
         root_hostname = self.extract_node_hostname_for_ip(root_ip)
 
         if not root_hostname:
-            logger.error(f"root broker not found in topology: {root}")
-            sys.exit(1)
+            raise ValueError(f"root broker not found in topology: {root}")
 
         if not self.is_booting(root_hostname):
             logger.error(f"root broker is marked do not boot: {root_hostname}")
@@ -91,8 +87,9 @@ class Helics(AppBase):
                     broker_ip = self.extract_node_interface_ip(broker_hostname, iface)
 
                     if not broker_ip:
-                        logger.error(f"broker not found in topology: {broker_hostname}")
-                        sys.exit(1)
+                        raise ValueError(
+                            f"broker not found in topology: {broker_hostname}"
+                        )
                 else:  # ip[:port]
                     broker_ip = broker
 
@@ -107,8 +104,7 @@ class Helics(AppBase):
                 hostname = self.extract_node_hostname_for_ip(broker_ip)
 
                 if not hostname:
-                    logger.error(f"node not found for broker at {broker}")
-                    sys.exit(1)
+                    raise ValueError(f"node not found for broker at {broker}")
 
                 if not self.is_booting(hostname):
                     logger.error(f"broker node is marked do not boot: {hostname}")

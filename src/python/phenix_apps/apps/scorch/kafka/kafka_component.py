@@ -86,7 +86,7 @@ class Kafka(ComponentBase):
             # prevents hang
             response.poll()
         except Exception as e:
-            self.eprint(f"Error running listener executable. See: {e}")
+            logger.error(f"Error running listener executable. See: {e}")
 
     def _create_pid_file(self, pid):
         # writes PID to unique .pid file under /tmp directory
@@ -94,7 +94,7 @@ class Kafka(ComponentBase):
             with open(self.pid_file, "w+") as f:
                 f.write(str(pid))
         except Exception as e:
-            self.eprint(
+            logger.error(
                 f"Could not create PID file. Listener process at PID {pid} "
                 f"will not terminate automatically when experiment ends. "
                 f"See: {e}"
@@ -109,7 +109,7 @@ class Kafka(ComponentBase):
             os.remove(self.pid_file)
             return pid
         except Exception as e:
-            self.eprint(
+            logger.error(
                 f"Error consuming PID file.Listener process at PID {pid} will not be terminated. See: {e}"
             )
             return pid
@@ -126,7 +126,7 @@ class Kafka(ComponentBase):
             os.kill(pid, 9)
             logger.info(f"Cleaned up user component: {self.name}")
         except Exception as e:
-            self.eprint(f"Error terminating listener at PID {pid}. See: {e}")
+            logger.error(f"Error terminating listener at PID {pid}. See: {e}")
 
 
 def main():

@@ -91,7 +91,7 @@ class HostStats(ComponentBase):
 
         host_info = self.mm.host()
 
-        self.print(f"getting host data for {len(vm_info)} hosts")
+        logger.info(f"getting host data for {len(vm_info)} hosts")
         try:
             for host in host_info:
                 host_dict = {}
@@ -115,7 +115,7 @@ class HostStats(ComponentBase):
             return []
 
         # print current data so users can see it in UI modal in real-time
-        self.print(resdata)
+        logger.info(resdata)
         return resdata
 
 

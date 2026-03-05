@@ -82,10 +82,9 @@ class Scale(AppBase):
             )
             return instance
         except ValueError as e:
-            logger.error(
-                f"Failed to load scale plugin '{name}': {e}. Available: {list(PLUGIN_REGISTRY.keys())}",
-            )
-            sys.exit(1)
+            raise ValueError(
+                f"Failed to load scale plugin '{name}': {e}. Available: {list(PLUGIN_REGISTRY.keys())}"
+            ) from e
 
     def get_profiles(self) -> list[dict[str, Any]]:
         if "profiles" in self.metadata:
@@ -278,8 +277,12 @@ echo 'DONE!'
         ]
         summary_rows = []
 
-        # Use stderr for progress to avoid interfering with stdout JSON output if any
-        with Progress(console=Console(stderr=True)) as progress:
+        # Only show progress bar in dryrun mode. In production, stderr is reserved for JSON logs.
+        progress_console = (
+            Console(stderr=True) if self.dryrun else Console(file=io.StringIO())
+        )
+
+        with Progress(console=progress_console) as progress:
             for profile in profiles:
                 plugin = self._get_plugin_instance(profile)
                 plugin.pre_post_start(self, profile)

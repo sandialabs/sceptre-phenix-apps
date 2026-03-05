@@ -9,6 +9,11 @@ import (
 	"text/template"
 )
 
+const (
+	dirPerms  = 0o750
+	filePerms = 0o644
+)
+
 func GenerateFromTemplate(name string, tmpl []byte, data any, w io.Writer) error {
 	t := template.Must(template.New(name).Parse(string(tmpl)))
 
@@ -23,13 +28,12 @@ func GenerateFromTemplate(name string, tmpl []byte, data any, w io.Writer) error
 func CreateFileFromTemplate(name string, tmpl []byte, data any, filename string) error {
 	dir := filepath.Dir(filename)
 
-	err := os.MkdirAll(dir, 0o755)
+	err := os.MkdirAll(dir, dirPerms)
 	if err != nil {
 		return fmt.Errorf("creating template path: %w", err)
 	}
 
-	//nolint:gosec //G304 creating file
-	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, filePerms)
 	if err != nil {
 		return fmt.Errorf("creating template file: %w", err)
 	}
@@ -56,7 +60,7 @@ func RestoreAsset(templates embed.FS, path, name string) error {
 		return fmt.Errorf("statting asset %q: %w", name, err)
 	}
 
-	err = os.MkdirAll(filepath.Dir(path), os.FileMode(0o755))
+	err = os.MkdirAll(filepath.Dir(path), os.FileMode(dirPerms))
 	if err != nil {
 		return fmt.Errorf("creating directory for %q: %w", path, err)
 	}

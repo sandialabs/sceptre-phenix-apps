@@ -362,18 +362,11 @@ def test_registry_deprecation_warning(caplog):
 
 
 def test_missing_plugin_error(mocker, mock_scale_app):
-    """Test that requesting a missing plugin causes the app to exit."""
-    mock_logger = mocker.patch("phenix_apps.apps.scale.app.logger")
-    mock_exit = mocker.patch("sys.exit")
-
+    """Test that requesting a missing plugin raises a ValueError."""
     app = mock_scale_app
     profile = {"name": "test", "plugin": "non_existent_plugin"}
 
-    app._get_plugin_instance(profile)
-
-    mock_exit.assert_called_with(1)
-    mock_logger.error.assert_called()
-    assert (
-        "Failed to load scale plugin 'non_existent_plugin'"
-        in mock_logger.error.call_args[0][0]
-    )
+    with pytest.raises(
+        ValueError, match="Failed to load scale plugin 'non_existent_plugin'"
+    ):
+        app._get_plugin_instance(profile)

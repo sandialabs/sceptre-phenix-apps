@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-03-04
+
+### Changed
+- **Logging**: Updated `AppBase` to enforce the new App Contract, emitting structured JSON logs to `stderr` for aggregation by the Core daemon.
+- **Error Handling**: `AppBase` now captures full tracebacks in a structured `traceback` field using `logger.exception` instead of printing raw text to stderr.
+- **Scale App**: Disabled `rich` progress bars on stderr during production runs to prevent JSON log corruption.
+- **Helics App**: Replaced `sys.exit(1)` with exceptions to ensure proper JSON error logging.
+- **Scorch App**: Replaced `sys.exit(1)` with exceptions to ensure JSON status files are written on failure.
+- **Scorch App**: Removed raw stdout/stderr printing. All logs now go to `stderr` as structured JSON.
+- **Scorch App**: Fixed internal log capturing for status files by using a custom log sink instead of monkey-patching `logger.log`.
+- **Build System**: Standardized Makefiles with consistent targets (`help`, `all`, `test`, `lint`, `format`, `clean`) and improved help output.
+- **Mirror App**: Refactored `main.go` to reduce complexity and improve testability.
+- **Mirror App**: Fixed linting errors and updated to use `log/slog` for structured logging.
+- **Go**: Updated Go version requirement to 1.24.
+
 ## [1.0.0]
 
 ### Added

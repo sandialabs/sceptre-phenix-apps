@@ -1,6 +1,5 @@
 import os
 import subprocess
-import sys
 import uuid
 
 from box import Box
@@ -27,21 +26,18 @@ class AtomicRedTeam(ComponentBase):
         mm = self.mm_init()
 
         if not goart or not os.path.exists(goart):
-            self.eprint("goart executable not found")
-            sys.exit(1)
+            raise RuntimeError("goart executable not found")
 
         if not technique:
-            self.eprint("no technique configured")
-            sys.exit(1)
+            raise ValueError("no technique configured")
 
         if test_name is None and test_index is None:
-            self.eprint("no technique test configured")
-            sys.exit(1)
+            raise ValueError("no technique test configured")
 
         vms = self.metadata.get("vms", None)
 
         for vm in vms:
-            self.print(f"copying {goart} to {vm.hostname}")
+            logger.info(f"copying {goart} to {vm.hostname}")
 
             utils.mm_send(mm, vm.hostname, goart, f"/tmp/{os.path.basename(goart)}")
 
@@ -59,8 +55,7 @@ class AtomicRedTeam(ComponentBase):
             elif test_name is not None:
                 args.extend(["-n", test_name])
             else:  # should never get here...
-                self.eprint("no technique test configured")
-                sys.exit(1)
+                raise ValueError("no technique test configured")
 
             inputs = vm.get("inputs", {})
             for name, value in inputs.items():
@@ -76,24 +71,23 @@ class AtomicRedTeam(ComponentBase):
 
             cmd = f"/tmp/{os.path.basename(goart)} {' '.join(args)}"
 
-            self.print(f"executing {cmd} in {vm.hostname}")
+            logger.info(f"executing {cmd} in {vm.hostname}")
 
             utils.mm_exec_wait(mm, vm.hostname, cmd)
 
-            self.print(f"getting results file {out_file} from {vm.hostname}")
+            logger.info(f"getting results file {out_file} from {vm.hostname}")
 
             results_file = os.path.join(self.base_dir, f"{vm.hostname}.json")
 
             try:
                 utils.mm_recv(mm, vm.hostname, out_file, results_file)
             except Exception as ex:
-                self.eprint(f"failed to get results file: {ex}")
-                sys.exit(1)
+                raise RuntimeError(f"failed to get results file: {ex}") from ex
 
             validator = self.metadata.get("validator", None)
 
             if validator:
-                self.print(f"validating results from {vm.hostname}")
+                logger.info(f"validating results from {vm.hostname}")
 
                 tempfile = f"/tmp/{uuid.uuid4()!s}.sh"
 
@@ -111,14 +105,14 @@ class AtomicRedTeam(ComponentBase):
                 if proc.returncode != 0:
                     stderr = proc.stderr.decode()
                     if stderr:
-                        self.eprint(f"results validation failed: {stderr}")
+                        logger.error(f"results validation failed: {stderr}")
                     else:
-                        self.eprint("results validation failed")
+                        logger.error("results validation failed")
 
                     if self.metadata.get("abortOnError", False):
-                        os.exit(1)
+                        raise RuntimeError("results validation failed")
                 else:
-                    self.print("results are valid")
+                    logger.info("results are valid")
 
                 os.remove(tempfile)
 

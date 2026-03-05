@@ -1,30 +1,29 @@
 name: go
 
 env:
-  GO_VERSION: 1.24.4
+  GO_VERSION: 1.24.0
 
 on:
-  pull_request:
-    branches: [ "**" ]
-    paths:
-      - 'src/go/**.go'
-      - 'src/go/go.mod'
-      - 'src/go/go.sum'
-      - '.github/workflows/go.yml'
+  push:
+    branches: ['**']
 
 jobs:
 
-  golangci-lint:
+  lint-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
-      - uses: golangci/golangci-lint-action@v9
-        with:
-          version: v2.7.2
-          working-directory: src/go
+          cache: true
+          cache-dependency-path: src/go/go.sum
+      - name: Install dependencies
+        working-directory: src/go
+        run: make install-dev
+      - name: Run lint checks
+        working-directory: src/go
+        run: make check
 
   test:
     runs-on: ubuntu-latest
@@ -33,6 +32,8 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: src/go/go.sum
       - name: Run Tests
         working-directory: src/go
-        run: go test ./...
+        run: make test

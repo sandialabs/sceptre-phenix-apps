@@ -14,71 +14,47 @@ from box import Box
 from elasticsearch import Elasticsearch
 
 from phenix_apps.common import utils
-from phenix_apps.common.logger import logger
+from phenix_apps.common.logger import logger, phenix_stderr_sink
 from phenix_apps.common.settings import PHENIX_DIR
 
 
 class ComponentBase:
+    """
+    Base class for Scorch components.
+
+    Developers must:
+    1. Use `phenix_apps.common.logger` for logging.
+    2. Raise exceptions (e.g. `ValueError`, `RuntimeError`) instead of calling `sys.exit()` for fatal errors.
+       This ensures that the `execute_stage` method can catch the error, write the JSON status file, and log the traceback.
+    """
+
     valid_stages = ("configure", "start", "stop", "cleanup")
 
     @classmethod
-    def check_stdin(klass) -> None:
+    def check_args(cls) -> None:
         """
-        Ensures that only one argument is passed in via the command line
-        This takes in the stage as the first argument ?
-        Need to make sure that if anything errors it takes it errors with a status code that is non-zero
+        Validates command line arguments.
+        Expects 5 arguments: <run_stage> <component_name> <run_id> <current_loop> <current_loop_count>
         """
 
         if len(sys.argv) != 6:
-            klass.eprint(
-                f"must pass exactly five arguments to scorch component: was passed {len(sys.argv) - 1}"
+            raise ValueError(
+                f"Invalid arguments passed to scorch component. "
+                f"Must pass exactly five arguments: was passed {len(sys.argv) - 1}. "
+                "Expects <run_stage> <component_name> <run_id> <current_loop> <current_loop_count> << <json_input>"
             )
-            klass.eprint(
-                "scorch component expects <run_stage> <component_name> <run_id> <current_loop> <current_loop_count> << <json_input>"
+
+        if sys.argv[1] not in cls.valid_stages:
+            raise ValueError(
+                f"{sys.argv[1]} is not a valid stage. Valid stages are: {cls.valid_stages}"
             )
-
-            sys.exit(1)
-
-        if sys.argv[1] not in klass.valid_stages:
-            klass.eprint(f"{sys.argv[1]} is not a valid stage")
-            klass.eprint(f"Valid stages are: {klass.valid_stages}")
-
-            sys.exit(1)
-
-    @staticmethod
-    def eprint(msg: str, ui: bool = True):
-        """
-        Prints errors to STDERR, and optionally flushed to STDOUT so it also
-        gets streamed to the phenix UI.
-        """
-
-        print(msg, file=sys.stderr)
-
-        if ui:
-            tstamp = time.strftime("%Y-%m-%dT%H:%M:%S")
-            print(f"[{tstamp}] ERROR : {msg}", flush=True)
-
-        logger.error(msg)  # write error to phenix log file
-
-    @staticmethod
-    def print(msg: str, ts: bool = True):
-        """
-        Prints msg to STDOUT, flushing it immediately so it gets streamed to the
-        phenix UI in a timely manner.
-        """
-
-        if ts:
-            tstamp = time.strftime("%Y-%m-%dT%H:%M:%S")
-            print(f"[{tstamp}] {msg}", flush=True)
-        else:
-            print(msg, flush=True)
 
     def __init__(self, typ: str) -> None:
         self.type: str = typ
 
         self.dryrun: bool = os.getenv("PHENIX_DRYRUN", "false") == "true"
 
-        self.check_stdin()
+        self.check_args()
 
         self.stage: str = sys.argv[
             1
@@ -102,10 +78,9 @@ class ComponentBase:
         try:
             self.experiment: Box = Box.from_json(self.raw_input)
         except Exception as ex:
-            self.eprint(
+            raise ValueError(
                 f"Failed to parse experiment JSON for scorch component '{self.name}': {ex}"
-            )
-            sys.exit(1)
+            ) from ex
 
         self.exp_name: str = self.experiment.spec.experimentName
         self.exp_dir: str = self.experiment.spec.baseDir
@@ -133,7 +108,15 @@ class ComponentBase:
 
     def execute_stage(self) -> None:
         """
-        Executes the stage passed in from the json blob and captures logger output, stdout, and stderr to info file
+        Executes the stage passed in from the json blob and captures logger output, stdout, and stderr to info file.
+
+        This method sets up:
+        1. System Logging: Configures the logger to output structured JSON to stderr for the parent process to consume.
+        2. Stdout/Stderr mirroring: Output is sent to the original streams (for UI/logging) AND captured in memory buffers.
+        3. Log Capturing: A sink is added to the logger to capture all log records into a memory buffer.
+           This ensures that logs (including those from libraries) are included in the final JSON status file.
+        4. Exception Handling: Wraps execution in a try/except block. If an exception occurs (including those raised
+           instead of sys.exit), it is logged with a traceback, and the JSON status file is written before re-raising.
         """
 
         stages_dict = {
@@ -143,7 +126,10 @@ class ComponentBase:
             "cleanup": self.cleanup,
         }
 
-        orig_logger_log = logger.log
+        # Configure logger to output JSON to stderr
+        logger.remove()
+        logger.add(phenix_stderr_sink)
+
         orig_stdout_stream = sys.stdout
         orig_stderr_stream = sys.stderr
         log_buffer = io.StringIO()
@@ -152,32 +138,35 @@ class ComponentBase:
         stdout_mirror = _MirrorAndBuffer(orig_stdout_stream, io.StringIO())
         stderr_mirror = _MirrorAndBuffer(orig_stderr_stream, io.StringIO())
 
-        # override phenix's logger to save to the buffer
-        # we use a lambda function because level and msg do not exist until the logger calls this function
-        logger.log = lambda level, msg: self.buffer_logger_log(
-            level, msg, log_buffer, orig_logger_log
-        )
+        # Add a sink to capture logs to the buffer for the status file
+        log_format = "[{time:YYYY-MM-DD HH:mm:ss.SSS}] {level} : {message}"
+        sink_id = logger.add(lambda msg: log_buffer.write(msg), format=log_format)
 
         start = time.time()
 
         # redirect stdout and stderr to mirror to our buffers
+        error_occurred = False
         try:
             with redirect_stdout(stdout_mirror), redirect_stderr(stderr_mirror):
                 out = stages_dict[self.stage]() or ""
         except Exception as ex:
+            error_occurred = True
+            logger.exception(
+                f"Error executing stage '{self.stage}' for component '{self.name}'"
+            )
             out = f"Error occurred: {ex}"
         finally:
             sys.stdout = orig_stdout_stream
             sys.stderr = orig_stderr_stream
-            logger.log = orig_logger_log
+            logger.remove(sink_id)
 
         end = time.time()
 
         start_dt = datetime.fromtimestamp(start, tz=UTC)
         end_dt = datetime.fromtimestamp(end, tz=UTC)
 
-        start_ts = start_dt.isoformat(timespec="milliseconds").replace("+00:00", "Z")
-        end_ts = end_dt.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        start_ts = start_dt.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        end_ts = end_dt.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
 
         # filenames can't have colons, so replace with dashes
         start_ts_filename = start_dt.strftime("%Y-%m-%dT%H-%M-%SZ")
@@ -204,14 +193,8 @@ class ComponentBase:
         with open(info_file, "w") as f:
             json.dump(content, f, indent=2)
 
-    # override phenix's logger buffer_logger_log to also save to our buffer
-    def buffer_logger_log(self, level, msg, log_buffer, orig_logger_log):
-        try:
-            tstamp = time.strftime("%Y-%m-%dT%H:%M:%S")
-            log_buffer.write(f"[{tstamp}] {level} : {msg}\n")
-        except Exception as ex:
-            print(f"Error writing to log buffer: {ex}")
-        orig_logger_log(level, msg)
+        if error_occurred:
+            raise RuntimeError(f"Error occurred during stage execution: {out}")
 
     def _format_stream(self, s):
         if not s:
@@ -356,19 +339,16 @@ class ComponentBase:
         """
         hostname = config.get("hostname")
         if not hostname:
-            self.eprint(f"no hostname provided for VM config {config}")
-            sys.exit(1)
+            raise ValueError(f"no hostname provided for VM config {config}")
 
         node = self.extract_node(hostname)
         if not node:
-            self.eprint(f'failed to find node "{hostname}" (config={config})')
-            sys.exit(1)
+            raise ValueError(f'failed to find node "{hostname}" (config={config})')
 
         if not node.network.interfaces:
-            self.eprint(
+            raise ValueError(
                 f"no interfaces defined for node {hostname}! (node={node}, config={config})"
             )
-            sys.exit(1)
 
         # Default to interface 0
         interface = config.get("interface", 0)
@@ -401,15 +381,15 @@ class ComponentBase:
             utils.mm_recv(self.mm, vm, src, dst)
             self.print(f"file '{src}' received from VM {vm} to {dst}")
         except Exception as ex:
-            self.eprint(f"error receiving file '{src}' from VM {vm}: {ex}")
-            sys.exit(1)
+            raise RuntimeError(
+                f"error receiving file '{src}' from VM {vm}: {ex}"
+            ) from ex
 
     def ensure_vm_running(self, vm: str) -> None:
         self.print(f"Checking if VM is running (VM hostname: {vm})")
         vm_info = utils.mm_info_for_vm(self.mm, vm)
         if not vm_info or vm_info["state"].lower() != "running":
-            self.eprint(f"VM isn't running (vm name: {vm})")
-            sys.exit(1)
+            raise RuntimeError(f"VM isn't running (vm name: {vm})")
 
     def run_and_check_command(
         self,
@@ -432,10 +412,9 @@ class ComponentBase:
         )
 
         if resp["exitcode"] != 0:
-            self.eprint(
+            raise RuntimeError(
                 f"failed to run '{cmd}'\nexitcode: {resp['exitcode']}\nstdout: {resp['stdout']}\nstderr: {resp['stderr']}"
             )
-            sys.exit(1)
 
         return resp
 
@@ -474,7 +453,11 @@ class ComponentBase:
 
 class _MirrorAndBuffer:
     """
-    Overwrites a stream to mirror output to the original stream and a buffer
+    Overwrites a stream to mirror output to the original stream and a buffer.
+
+    This allows Scorch to capture everything written to stdout/stderr (for the
+    JSON status file) while ensuring it still reaches the actual stdout/stderr
+    streams so it can be picked up by the Phenix logging system.
     """
 
     def __init__(self, orig_stream, buffer):

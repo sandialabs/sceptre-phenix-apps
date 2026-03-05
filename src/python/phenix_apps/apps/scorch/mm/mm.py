@@ -1,11 +1,11 @@
 import os
 import subprocess
-import sys
 import time
 from datetime import datetime
 
 from phenix_apps.apps.scorch import ComponentBase
 from phenix_apps.common import utils
+from phenix_apps.common.logger import logger
 
 
 class MM(ComponentBase):
@@ -38,14 +38,12 @@ class MM(ComponentBase):
                 cap = cmd.get("capture", None)
 
                 if not cap:
-                    self.eprint("no bridge capture details provided")
-                    sys.exit(1)
+                    raise ValueError("no bridge capture details provided")
 
                 bridge = cap.get("bridge", None)
 
                 if not bridge:
-                    self.eprint("bridge to capture traffic on not provided")
-                    sys.exit(1)
+                    raise ValueError("bridge to capture traffic on not provided")
 
                 now = datetime.utcnow()
                 filename = os.path.basename(
@@ -66,17 +64,16 @@ class MM(ComponentBase):
                     mm.capture_pcap_snaplen(snaplen)
 
                 try:
-                    self.print(f"starting pcap capture for bridge {bridge}")
+                    logger.info(f"starting pcap capture for bridge {bridge}")
                     mm.mesh_send("all", f"shell mkdir -p {self.base_dir}")
                     mm.capture_pcap_bridge(
                         bridge, os.path.join(self.base_dir, filename)
                     )
-                    self.print(f"started pcap capture for bridge {bridge}")
+                    logger.info(f"started pcap capture for bridge {bridge}")
                 except Exception as ex:
-                    self.eprint(
+                    raise RuntimeError(
                         f"unable to start pcap capture for bridge {bridge}: {ex}"
-                    )
-                    sys.exit(1)
+                    ) from ex
                 finally:
                     mm.capture_pcap_filter(None)
                     mm.capture_pcap_snaplen(None)
@@ -84,23 +81,21 @@ class MM(ComponentBase):
                 cap = cmd.get("capture", None)
 
                 if not cap:
-                    self.eprint("no bridge capture details provided")
-                    sys.exit(1)
+                    raise ValueError("no bridge capture details provided")
 
                 bridge = cap.get("bridge", None)
 
                 if not bridge:
-                    self.eprint("bridge to stop capture traffic on not provided")
-                    sys.exit(1)
+                    raise ValueError("bridge to stop capture traffic on not provided")
                 try:
-                    self.print(f"stopping pcap capture on bridge {bridge}")
+                    logger.info(f"stopping pcap capture on bridge {bridge}")
                     mm.capture_pcap_delete_bridge(bridge)
-                    self.print(f"stopped pcap capture on bridge {bridge}")
+                    logger.info(f"stopped pcap capture on bridge {bridge}")
 
                     mm.file_get(os.path.relpath(self.base_dir, self.root_dir))
 
                     if cap.get("convert", False):
-                        self.print(
+                        logger.info(
                             "Waiting for transfer of pcap files to head node to complete."
                         )
 
@@ -117,14 +112,16 @@ class MM(ComponentBase):
                             if done:
                                 break
 
-                        self.print("Transfer of pcap files to head node has completed.")
+                        logger.info(
+                            "Transfer of pcap files to head node has completed."
+                        )
 
                         # convert pcap files
                         for file in os.listdir(self.base_dir):
                             if file.endswith(".pcap") and not os.path.exists(
                                 f"{file}.jsonl"
                             ):
-                                self.print(
+                                logger.info(
                                     f"starting PCAP --> JSON conversion of {file}"
                                 )
 
@@ -136,14 +133,15 @@ class MM(ComponentBase):
                                     shell=True,
                                 )
 
-                                self.print(
+                                logger.info(
                                     f"PCAP --> JSON conversion of {file} complete"
                                 )
                 except Exception as ex:
-                    self.eprint(f"unable to stop pcap capture on bridge {bridge}: {ex}")
-                    sys.exit(1)
+                    raise RuntimeError(
+                        f"unable to stop pcap capture on bridge {bridge}: {ex}"
+                    ) from ex
             else:
-                self.eprint(f"Unknown command type '{cmd.type}'")
+                raise ValueError(f"Unknown command type '{cmd.type}'")
 
         vms = self.metadata.get("vms", [])
 
@@ -153,98 +151,95 @@ class MM(ComponentBase):
             for cmd in commands:
                 if cmd.type == "start":
                     try:
-                        self.print(f"starting VM {vm.hostname}")
+                        logger.info(f"starting VM {vm.hostname}")
                         mm.vm_start(vm.hostname)
-                        self.print(f"started VM {vm.hostname}")
+                        logger.info(f"started VM {vm.hostname}")
                     except Exception as ex:
-                        self.eprint(f"unable to start vm {vm.hostname}: {ex}")
-                        sys.exit(1)
+                        raise RuntimeError(
+                            f"unable to start vm {vm.hostname}: {ex}"
+                        ) from ex
                 elif cmd.type == "stop":
                     try:
-                        self.print(f"stopping VM {vm.hostname}")
+                        logger.info(f"stopping VM {vm.hostname}")
                         mm.vm_stop(vm.hostname)
-                        self.print(f"stopped VM {vm.hostname}")
+                        logger.info(f"stopped VM {vm.hostname}")
                     except Exception as ex:
-                        self.eprint(f"unable to stop vm {vm.hostname}: {ex}")
-                        sys.exit(1)
+                        raise RuntimeError(
+                            f"unable to stop vm {vm.hostname}: {ex}"
+                        ) from ex
                 elif cmd.type == "connect":
                     conn = cmd.get(cmd.type, None)
 
                     if not conn:
-                        self.eprint(f"no connect details provided for vm {vm.hostname}")
-                        sys.exit(1)
+                        raise ValueError(
+                            f"no connect details provided for vm {vm.hostname}"
+                        )
 
                     iface = conn.get("interface", None)
 
                     if iface is None:
-                        self.eprint(
+                        raise ValueError(
                             f"interface to connect not provided for vm {vm.hostname}"
                         )
-                        sys.exit(1)
 
                     vlan = conn.get("vlan", None)
 
                     if not vlan:
-                        self.eprint(
+                        raise ValueError(
                             f"VLAN to connect interface {iface} to not provided for vm {vm.hostname}"
                         )
-                        sys.exit(1)
 
                     bridge = conn.get("bridge", None)
 
                     try:
-                        self.print(
+                        logger.info(
                             f"connecting interface {iface} on {vm.hostname} to VLAN {vlan}"
                         )
                         mm.vm_net_connect(vm.hostname, iface, vlan, bridge)
-                        self.print(
+                        logger.info(
                             f"connected interface {iface} on {vm.hostname} to VLAN {vlan}"
                         )
                     except Exception as ex:
-                        self.eprint(
+                        raise RuntimeError(
                             f"unable to connect interface {iface} on {vm.hostname} to VLAN {vlan}: {ex}"
-                        )
-                        sys.exit(1)
+                        ) from ex
                 elif cmd.type == "disconnect":
                     conn = cmd.get(cmd.type, None)
 
                     if not conn:
-                        self.eprint(
+                        raise ValueError(
                             f"no disconnect details provided for vm {vm.hostname}"
                         )
-                        sys.exit(1)
 
                     iface = conn.get("interface", None)
 
                     if iface is None:
-                        self.eprint(
+                        raise ValueError(
                             f"interface to disconnect not provided for vm {vm.hostname}"
                         )
-                        sys.exit(1)
 
                     try:
-                        self.print(f"disconnecting interface {iface} on {vm.hostname}")
+                        logger.info(f"disconnecting interface {iface} on {vm.hostname}")
                         mm.vm_net_disconnect(vm.hostname, iface)
-                        self.print(f"disconnected interface {iface} on {vm.hostname}")
+                        logger.info(f"disconnected interface {iface} on {vm.hostname}")
                     except Exception as ex:
-                        self.eprint(
+                        raise RuntimeError(
                             f"unable to disconnect interface {iface} on {vm.hostname}: {ex}"
-                        )
-                        sys.exit(1)
+                        ) from ex
                 elif cmd.type == "start_capture":
                     cap = cmd.get("capture", None)
 
                     if not cap:
-                        self.eprint(f"no capture details provided for vm {vm.hostname}")
-                        sys.exit(1)
+                        raise ValueError(
+                            f"no capture details provided for vm {vm.hostname}"
+                        )
 
                     iface = cap.get("interface", None)
 
                     if iface is None:
-                        self.eprint(
+                        raise ValueError(
                             f"interface to capture traffic on not provided for vm {vm.hostname}"
                         )
-                        sys.exit(1)
 
                     now = utils.utc_now()
                     filename = os.path.basename(
@@ -268,21 +263,20 @@ class MM(ComponentBase):
                         mm.capture_pcap_snaplen(snaplen)
 
                     try:
-                        self.print(
+                        logger.info(
                             f"starting pcap capture for interface {iface} on {vm.hostname}"
                         )
                         mm.mesh_send("all", f"shell mkdir -p {self.base_dir}")
                         mm.capture_pcap_vm(
                             vm.hostname, iface, os.path.join(self.base_dir, filename)
                         )
-                        self.print(
+                        logger.info(
                             f"started pcap capture for interface {iface} on {vm.hostname}"
                         )
                     except Exception as ex:
-                        self.eprint(
+                        raise RuntimeError(
                             f"unable to start pcap capture for interface {iface} on {vm.hostname}: {ex}"
-                        )
-                        sys.exit(1)
+                        ) from ex
                     finally:
                         mm.capture_pcap_filter(None)
                         mm.capture_pcap_snaplen(None)
@@ -290,14 +284,14 @@ class MM(ComponentBase):
                     cap = cmd.get("capture", None)
 
                     try:
-                        self.print(f"stopping pcap capture(s) on VM {vm.hostname}")
+                        logger.info(f"stopping pcap capture(s) on VM {vm.hostname}")
                         mm.capture_pcap_delete_vm(vm.hostname)
-                        self.print(f"stopped pcap capture(s) on VM {vm.hostname}")
+                        logger.info(f"stopped pcap capture(s) on VM {vm.hostname}")
 
                         mm.file_get(os.path.relpath(self.base_dir, self.root_dir))
 
                         if cap and cap.get("convert", False):
-                            self.print(
+                            logger.info(
                                 "Waiting for pcap transfers to head node to complete."
                             )
 
@@ -319,7 +313,7 @@ class MM(ComponentBase):
                                 if file.endswith(".pcap") and not os.path.exists(
                                     f"{file}.jsonl"
                                 ):
-                                    self.print(
+                                    logger.info(
                                         f"starting PCAP --> JSON conversion of {file}"
                                     )
 
@@ -331,16 +325,15 @@ class MM(ComponentBase):
                                         shell=True,
                                     )
 
-                                    self.print(
+                                    logger.info(
                                         f"PCAP --> JSON conversion of {file} complete"
                                     )
                     except Exception as ex:
-                        self.eprint(
+                        raise RuntimeError(
                             f"unable to stop pcap capture(s) on vm {vm.hostname}: {ex}"
-                        )
-                        sys.exit(1)
+                        ) from ex
                 else:
-                    self.eprint(
+                    raise ValueError(
                         f"Unknown command type for VM '{vm.hostname}': {cmd.type}"
                     )
 

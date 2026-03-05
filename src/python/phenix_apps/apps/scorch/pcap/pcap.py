@@ -1,5 +1,4 @@
 import shutil
-import sys
 from pathlib import Path
 
 from phenix_apps.apps.scorch import ComponentBase
@@ -34,21 +33,20 @@ class PCAP(ComponentBase):
     def _check_commands_available(self):
         for command in ["tshark", "capinfos", "editcap", "mergecap"]:
             if not shutil.which(command):
-                self.eprint(
+                raise RuntimeError(
                     f"'{command}' is unavailable on this host, which is required for PCAP processing"
                 )
-                sys.exit(1)
 
     def start(self):
         logger.info(f"Starting user component: {self.name}")
 
-        self.print("clearing capture on minimega")
+        logger.info("clearing capture on minimega")
         self.mm.clear_capture("pcap")
 
         # Berkeley Packet Filter (BPF) syntax: https://biot.com/capstats/bpf.html
         bpf_filter = self.metadata.get("filter")
         if bpf_filter:
-            self.print(f"applying pcap BPF filter: '{bpf_filter}'")
+            logger.info(f"applying pcap BPF filter: '{bpf_filter}'")
             self.mm.capture_pcap_filter(
                 f"'{bpf_filter}'"
             )  # single quotes are needed here
@@ -59,14 +57,12 @@ class PCAP(ComponentBase):
             try:
                 snaplen = int(str(snaplen).strip())
             except Exception:
-                self.eprint("snaplen must be a integer")
-                sys.exit(1)
+                raise ValueError("snaplen must be a integer") from None
 
             if not snaplen >= 0:
-                self.eprint("snaplen must be a positive number")
-                sys.exit(1)
+                raise ValueError("snaplen must be a positive number")
 
-            self.print(f"applying pcap snaplen: {snaplen}")
+            logger.info(f"applying pcap snaplen: {snaplen}")
             self.mm.capture_pcap_snaplen(snaplen)
 
         # TODO: bridge (note: this is implemented in mm.py component)
@@ -74,12 +70,12 @@ class PCAP(ComponentBase):
         # self.mm.mesh_send('all', f'shell mkdir -p {self.base_dir}')
         # self.mm.capture_pcap_bridge("phenix", str(bridge_path))
 
-        self.print(f"starting capture for {len(self.metadata.vms)} VMs")
+        logger.info(f"starting capture for {len(self.metadata.vms)} VMs")
         for i, vm in enumerate(self.metadata.vms):
             hostname, interface = self.get_host_and_iface(vm)
             filepath = Path(self.base_dir, f"{hostname}-{interface}.pcap")
 
-            self.print(
+            logger.info(
                 f"starting capture on '{hostname}' interface '{interface}' to '{filepath}' ({i + 1} of {len(self.metadata.vms)})"
             )
             self.mm.capture_pcap_vm(hostname, interface, str(filepath))
@@ -91,11 +87,11 @@ class PCAP(ComponentBase):
 
         pcap_paths = []
 
-        self.print(f"stopping captures for {len(self.metadata.vms)} VMs")
+        logger.info(f"stopping captures for {len(self.metadata.vms)} VMs")
         for i, vm in enumerate(self.metadata.vms):
             hostname, interface = self.get_host_and_iface(vm)
 
-            self.print(
+            logger.info(
                 f"stopping PCAP capture on interface {interface} for VM {hostname} ({i + 1} of {len(self.metadata.vms)})"
             )
             self.mm.capture_pcap_delete_vm(hostname)
@@ -103,37 +99,34 @@ class PCAP(ComponentBase):
             pcap_path = Path(self.base_dir, f"{hostname}-{interface}.pcap")
             pcap_paths.append(pcap_path)
 
-        self.print("clearing capture on minimega")
+        logger.info("clearing capture on minimega")
         self.mm.clear_capture("pcap")
 
-        self.print(f"verifying {len(pcap_paths)} PCAP files")
+        logger.info(f"verifying {len(pcap_paths)} PCAP files")
         pcap_metadata = {}
         for pcap_path in pcap_paths:
             if not pcap_path.is_file():
-                self.eprint(f"PCAP file doesn't exist: {pcap_path}")
-                sys.exit(1)
+                raise RuntimeError(f"PCAP file doesn't exist: {pcap_path}")
 
             try:
                 pcap_info = utils.pcap_capinfos(pcap_path)
             except Exception as ex:
-                self.eprint(
+                raise RuntimeError(
                     f"failed to run capinfos to verify on PCAP file {pcap_path}: {ex}"
-                )
-                sys.exit(1)
+                ) from ex
 
             # verify pcap files are valid by checking their metadata with capinfos
             if not pcap_info or "pcap" not in pcap_info["File type"]:
-                self.eprint(
+                raise RuntimeError(
                     f"failed validation of PCAP metadata for file {pcap_path}\nraw info: {pcap_info}"
                 )
-                sys.exit(1)
 
             pcap_metadata[pcap_path.name] = pcap_info
 
         # merge pcap files together into a single consolidated PCAP
         # the pcaps that were merged will be moved into "raw" sub-directory
         if self.metadata.get("create_merged_pcap", False):
-            self.print(
+            logger.info(
                 f"merging {len(pcap_paths)} PCAP files into a single file (create_merged_pcap=true)"
             )
 
@@ -152,7 +145,7 @@ class PCAP(ComponentBase):
             pcap_paths.append(merged_path)
 
             if self.metadata.get("dedupe", True):
-                self.print(
+                logger.info(
                     f"'dedupe' is true, removing duplicates from '{merged_path.name}'"
                 )
 
@@ -168,7 +161,7 @@ class PCAP(ComponentBase):
                         break
 
                 if dos_targets:
-                    self.print("Performing special processing for TCP packet flood")
+                    logger.info("Performing special processing for TCP packet flood")
                     non_target_paths = [
                         p
                         for p in pcap_paths
@@ -182,14 +175,14 @@ class PCAP(ComponentBase):
                     ]
 
                     # merge all hosts EXCEPT hosts targeted by DOS into merged.pcap, dedupe
-                    self.print(
+                    logger.info(
                         f"Special processing: merging non-target PCAPs: {[p.name for p in non_target_paths]}"
                     )
                     merged_path = self._merge_pcaps(non_target_paths)
                     self._dedupe_pcap(merged_path)
 
                     # split each target's PCAP into two, first part has the DOS packets, second one has everything else
-                    self.print(
+                    logger.info(
                         f"Special processing: splitting DOS packets from non-DOS packets for targets: {[p.name for p in target_paths]}"
                     )
                     non_dos = []
@@ -212,7 +205,7 @@ class PCAP(ComponentBase):
                         non_dos.append(nd_path)
 
                     # merge the "everything else" pcaps from targets into merged.pcap, dedupe again
-                    self.print(
+                    logger.info(
                         "Special processing: merging non-attack packets into merged.pcap and deduping"
                     )
                     # GAH, need to make sure pcap is merged into self
@@ -220,22 +213,22 @@ class PCAP(ComponentBase):
                     self._dedupe_pcap(merged_path)
 
                     # merge the "dos packets" pcaps from targets into merged.pcap, DON'T dedupe this time
-                    self.print(
+                    logger.info(
                         "Special processing: final merge of fragmented attack packets into merged.pcap"
                     )
                     merged_path = self._merge_pcaps([merged_path, *fragmented])
 
                     # delete the fragmented PCAPs (those with DOS packets)
-                    self.print(
+                    logger.info(
                         "Special processing: deleting fragmented PCAPs (those with DOS packets)"
                     )
                     for wd_path in fragmented:
                         wd_path.unlink()
-                    self.print("Finished special processing for TCP packet flood")
+                    logger.info("Finished special processing for TCP packet flood")
                 else:
                     self._dedupe_pcap(merged_path)
             else:
-                self.print(
+                logger.info(
                     f"NOT removing duplicates from '{merged_path.name}' (dedupe=false)"
                 )
 
@@ -243,12 +236,12 @@ class PCAP(ComponentBase):
 
         # Save metadata to JSON file
         m_path = Path(self.base_dir, "pcap_metadata.json")
-        self.print(f"saving pcap metadata to {m_path}")
+        logger.info(f"saving pcap metadata to {m_path}")
         utils.write_json(m_path, pcap_metadata)
 
         # Process PCAPs to JSON, once all captures have been stopped
         if self.metadata.get("convertToJSON", False):
-            self.print(
+            logger.info(
                 f"PCAP --> JSON conversion enabled, converting {len(pcap_paths)} files"
             )
 
@@ -257,12 +250,12 @@ class PCAP(ComponentBase):
                 json_path = pcap_path.with_suffix(
                     ".jsonl"
                 )  # .pcap.jsonl could break filters for "*.pcap*"
-                self.print(
+                logger.info(
                     f"running PCAP --> JSON conversion (source={pcap_path.name}, dest={json_path.name})"
                 )
                 utils.run_command(f"tshark -r {pcap_path} -T ek > {json_path}")
         else:
-            self.print("PCAP --> JSON conversion disabled")
+            logger.info("PCAP --> JSON conversion disabled")
 
         logger.info(f"Stopped user component: {self.name}")
 
@@ -282,8 +275,9 @@ class PCAP(ComponentBase):
         utils.run_command(mergecap_cmd, timeout=60.0)  # this shouldn't take long
 
         if not merged_path.is_file():
-            self.eprint(f"PCAP merge failed, output file '{merged_path}' doesn't exist")
-            sys.exit(1)
+            raise RuntimeError(
+                f"PCAP merge failed, output file '{merged_path}' doesn't exist"
+            )
 
         # rename "temp_merged.pcap" to "merged.pcap"
         if overwriting:
@@ -296,8 +290,9 @@ class PCAP(ComponentBase):
         utils.run_command(f"editcap -d {pcap_path} {dd_path}", timeout=60.0)
 
         if not dd_path.is_file():
-            self.eprint(f"PCAP dedupe failed, output file '{dd_path}' doesn't exist")
-            sys.exit(1)
+            raise RuntimeError(
+                f"PCAP dedupe failed, output file '{dd_path}' doesn't exist"
+            )
 
         dd_path.replace(pcap_path)  # overwrite merged.pcap with deduped.pcap
 

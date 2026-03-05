@@ -91,7 +91,13 @@ class AppBase:
             "cleanup": self.cleanup,
         }
 
-        stages_dict[self.stage]()
+        try:
+            stages_dict[self.stage]()
+        except Exception:
+            logger.exception(
+                f"Error executing stage '{self.stage}' for app '{self.name}'"
+            )
+            sys.exit(1)
 
     def finalize(self) -> None:
         pass

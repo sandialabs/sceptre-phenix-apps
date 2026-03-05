@@ -1,4 +1,3 @@
-import sys
 from collections import defaultdict
 from pathlib import Path
 
@@ -21,7 +20,7 @@ class QoS(ComponentBase):
 
         values_applied = defaultdict(dict)
         vms = self.metadata.vms
-        self.print(f"applying qos to {len(vms)} VMs")
+        logger.info(f"applying qos to {len(vms)} VMs")
 
         for i, vm in enumerate(vms):
             hostname, interface = self.get_host_and_iface(vm)
@@ -34,17 +33,15 @@ class QoS(ComponentBase):
 
             # at least one must be specified
             if delay is None and loss is None and rate is None:
-                self.eprint(
+                raise ValueError(
                     f"must specify one of loss, delay, or rate in config for node {hostname} (node config={vm})"
                 )
-                sys.exit(1)
 
             # rate cannot be combined with loss or delay
             if rate is not None and (loss is not None or delay is not None):
-                self.eprint(
+                raise ValueError(
                     f"cannot use rate limit at the same time as loss or delay for node {hostname} (node config={vm})"
                 )
-                sys.exit(1)
 
             # apply loss
             if loss is not None:
@@ -52,25 +49,24 @@ class QoS(ComponentBase):
                 # TODO: manual specification of what variable loss is multiplied by
                 if vm.get("variable_loss") is not None:
                     loss = float(vm.variable_loss) * self.count  # type: float
-                    self.print(
+                    logger.info(
                         f"variable_loss is set, {vm.variable_loss} * {self.count} => {loss} loss for run iteration {self.count} for interface {interface} on node {hostname}"
                     )
 
-                self.print(
+                logger.info(
                     f"adding loss of {loss} to interface {interface} on node {hostname} ({i + 1} of {len(vms)})"
                 )
                 if loss < 0.0 or loss > 99.9:
-                    self.eprint(
+                    raise ValueError(
                         f"loss of {loss} for {hostname} is not between 0.0 - 99.9 (note: 100% loss is not possible with minimega)"
                     )
-                    sys.exit(1)
                 self.mm.qos_add_loss(hostname, interface, loss)
                 values_applied[hostname]["loss"] = loss
 
             # apply delay
             if delay is not None:
                 delay = delay.strip().lower()  # duration of delay
-                self.print(
+                logger.info(
                     f"adding delay of {delay} to interface {interface} on node {hostname} ({i + 1} of {len(vms)})"
                 )
                 self.mm.qos_add_delay(hostname, interface, delay)
@@ -81,19 +77,18 @@ class QoS(ComponentBase):
                 bw, unit = rate.strip().lower().split(" ")
 
                 if unit not in ["kbit", "mbit", "gbit"]:
-                    self.eprint(
+                    raise ValueError(
                         f"rate limit unit must be one of kbit, mbit, or gbit, not {unit} for node {hostname} (node config={vm})"
                     )
-                    sys.exit(1)
 
-                self.print(
+                logger.info(
                     f"adding rate limit of {bw} {unit} to interface {interface} on node {hostname} ({i + 1} of {len(vms)})"
                 )
                 self.mm.qos_add_rate(hostname, interface, bw, unit)
                 values_applied[hostname]["rate"] = f"{bw} {unit}"
 
         qos_path = Path(self.base_dir, "qos_values_applied.json")
-        self.print(f"saving qos values applied to {qos_path}")
+        logger.info(f"saving qos values applied to {qos_path}")
         utils.write_json(qos_path, values_applied)
 
         logger.info(f"Started user component: {self.name}")
@@ -102,10 +97,10 @@ class QoS(ComponentBase):
         logger.info(f"Stopping user component: {self.name}")
 
         vms = self.metadata.vms  # type: list
-        self.print(f"clearing qos from {len(vms)} VMs")
+        logger.info(f"clearing qos from {len(vms)} VMs")
         for i, vm in enumerate(vms):
             hostname, interface = self.get_host_and_iface(vm)
-            self.print(
+            logger.info(
                 f"clearing qos for interface {interface} on node {hostname} ({i + 1} of {len(vms)})"
             )
             self.mm.clear_qos(hostname, interface)

@@ -5,6 +5,7 @@ import (
 	"strings"
 )
 
+//nolint:gochecknoglobals // Exported configuration variable
 var HostnameSuffixes = []string{"-minimega", "-phenix"}
 
 func TrimHostnameSuffixes(str string) string {

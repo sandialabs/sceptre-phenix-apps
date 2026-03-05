@@ -1,11 +1,11 @@
 package util
 
+import "slices"
+
 func StringSliceContains(haystack []string, needles ...string) bool {
 	for _, val := range haystack {
-		for _, needle := range needles {
-			if val == needle {
-				return true
-			}
+		if slices.Contains(needles, val) {
+			return true
 		}
 	}
 

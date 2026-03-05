@@ -1,6 +1,5 @@
 import json
 import os
-import sys
 import time
 from xml.etree import ElementTree as ET
 
@@ -22,11 +21,11 @@ class OPCExport(ComponentBase):
         # this will copy all files from opcexport into C:/opcexport/
         # Faster and simpler than copying individual files
         # The few unnecessary .py files that get copied don't matter
-        self.print(f"Copying opcexport files to '/opcexport' folder on host '{host}'")
+        logger.info(f"Copying opcexport files to '/opcexport' folder on host '{host}'")
         utils.mm_send(self.mm, host, utils.abs_path(__file__), "/opcexport")
 
         # get opc config file
-        self.print("Looking for OPC XML config file")
+        logger.info("Looking for OPC XML config file")
         opc_config_file = f"{self.exp_dir}/sceptre/{host}/opc.xml"
         try:
             asset_dir = next(
@@ -36,12 +35,12 @@ class OPCExport(ComponentBase):
             )["assetDir"]
             override_file = f"{asset_dir}/injects/override/{host}_opc.xml"
             if os.path.exists(override_file):
-                self.print(
+                logger.info(
                     f"Using override for OPC variables file from {override_file}"
                 )
                 opc_config_file = override_file
         except KeyError:
-            self.print(
+            logger.info(
                 "WARNING: 'assetDir' not defined for sceptre app or sceptre app not present, skipping the check for a OPC override file"
             )
 
@@ -53,18 +52,18 @@ class OPCExport(ComponentBase):
         if not os.path.exists(e_dir):
             os.mkdir(e_dir)
         opc_variables_file = os.path.join(e_dir, "opc_variables.json")
-        self.print(f"Creating opc_variables file: {opc_variables_file}")
+        logger.info(f"Creating opc_variables file: {opc_variables_file}")
 
         # write variables to json
         with open(opc_variables_file, "w") as f:
             json.dump(opc_json, f)
 
         # Use miniccc to inject opc variables file
-        self.print(f"Copying opc_variables.json to host '{host}'")
+        logger.info(f"Copying opc_variables.json to host '{host}'")
         utils.mm_send(self.mm, host, opc_variables_file, "opcexport/opc_variables.json")
 
         # install stuff
-        self.print("Running install script install-python-opc.ps1")
+        logger.info("Running install script install-python-opc.ps1")
         utils.mm_exec_wait(
             self.mm, host, "powershell.exe -File C:/opcexport/install-python-opc.ps1"
         )
@@ -72,7 +71,7 @@ class OPCExport(ComponentBase):
         # This is a bit of a dirty hack to auto-add the route out of the tap
         elastic_ip = self.metadata.get("elastic_ip", "172.16.0.254")
         if elastic_ip != "172.16.0.254":
-            self.print("configuring route")
+            logger.info("configuring route")
 
             tap_ip = ""
             if self.extract_app("tap"):
@@ -81,14 +80,14 @@ class OPCExport(ComponentBase):
             elif self.extract_app("mgmt_tap"):
                 tap_ip = "172.16.111.1"
             else:
-                self.eprint(
+                logger.error(
                     "no tap app defined and a non-default elastic IP, your mileage may vary"
                 )
 
             # determine target network, assume /24 subnet
             target_subnet = ".".join(elastic_ip.split(".")[:-1]) + ".0"
             if tap_ip:  # only configure if one of the tap apps was found
-                self.print(f"Adding route to {target_subnet} via {tap_ip}")
+                logger.info(f"Adding route to {target_subnet} via {tap_ip}")
                 utils.mm_exec_wait(
                     self.mm,
                     host,
@@ -98,7 +97,7 @@ class OPCExport(ComponentBase):
         # verify elasticsearch server is pingable
         # Unfortunately, Test-Connection on Windows 7 isn't very capable and
         # can't be used to check TCP ports, just ICMP pings.
-        self.print(f"checking if elastic server is reachable at {elastic_ip}")
+        logger.info(f"checking if elastic server is reachable at {elastic_ip}")
         self.run_and_check_command(
             host,
             f'''powershell.exe -Command "Test-Connection -ComputerName {elastic_ip} -Count 1 -Quiet"''',
@@ -121,7 +120,7 @@ class OPCExport(ComponentBase):
 
         # start dirty elastic
         # open in new powershell window so that it will run in background and scorch can return
-        self.print(
+        logger.info(
             f"Starting scada_to_elastic.py (host={host}, elastic_ip={elastic_ip}, elastic_port={elastic_port})"
         )
 
@@ -136,20 +135,19 @@ class OPCExport(ComponentBase):
         # Verify process is still running and didn't error out
         # Hopefully, there are no other python processes running
         # 10 seconds should be enough for OPC and Elastic to time out
-        self.print("Waiting 10 seconds then checking if python.exe is still running")
+        logger.info("Waiting 10 seconds then checking if python.exe is still running")
         time.sleep(10.0)
         running = False
         for _ in range(3):
-            self.print("Checking if python is running...")
+            logger.info("Checking if python is running...")
             if self.check_process_running(host, "python.exe", os_type="windows"):
-                self.print("Python is running!")
+                logger.info("Python is running!")
                 running = True
                 break
             time.sleep(5.0)
 
         if not running:
-            self.eprint("scada_to_elastic.py is not running!")
-            sys.exit(1)
+            raise RuntimeError("scada_to_elastic.py is not running!")
 
         logger.info(f"Started user component: {self.name}")
 
@@ -160,15 +158,15 @@ class OPCExport(ComponentBase):
 
         # Stop dirty elastic
         # TODO: find a better way to do this that doesn't kill all pythons
-        self.print(f"Killing all 'python.exe' processes (host={host})")
+        logger.info(f"Killing all 'python.exe' processes (host={host})")
         utils.mm_kill_process(
             self.mm, cc_filter=f"name={host}", process="python.exe", os_type="windows"
         )
 
         # save log file
-        self.print("Collecting log file for scada_to_elastic.py")
+        logger.info("Collecting log file for scada_to_elastic.py")
         self.recv_file(host, "/opcexport/scada_to_elastic.log")
-        self.print("Deleting log file")
+        logger.info("Deleting log file")
         utils.mm_delete_file(self.mm, f"name={host}", "/opcexport/scada_to_elastic.log")
 
         # TODO: validate that data made it into Elasticsearch
@@ -183,7 +181,7 @@ class OPCExport(ComponentBase):
         elastic_port = self.metadata.get("elastic_port", "9200")
 
         # delete data from elastic
-        self.print(
+        logger.info(
             f"Running delete_scada_to_elastic.py (host={host}, elastic_ip={elastic_ip}, elastic_port={elastic_port})"
         )
         utils.mm_exec_wait(
@@ -195,7 +193,7 @@ class OPCExport(ComponentBase):
         logger.info(f"Cleaned up user component: {self.name}")
 
     def create_opc_variables(self, opc_config_file: str) -> dict:
-        self.print(f"Generating OPC variables from: {opc_config_file}")
+        logger.info(f"Generating OPC variables from: {opc_config_file}")
         opc_json = {}
 
         # TODO: support for other OPC servers

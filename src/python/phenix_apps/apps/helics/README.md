@@ -1,5 +1,9 @@
 # HELICS App
 
+**Language:** Python
+
+## 📖 Overview
+
 This phēnix app, named `helics`, aids in the generation of HELICS broker start
 scripts and injects them into the appropriate nodes in an experiment. It does
 this by looking for experiment topology nodes with a `helics/federate`
@@ -46,8 +50,9 @@ referenced `root broker` is specified in this app's metadata (see below).
 4. Each unique broker `ip:port` identified in the annotations that does not
    match the root broker warrants its own sub broker.
 
-Below is an example of all the options available in the `helics` app, with
-documentation for each.
+## ⚙️ Spec / Configuration
+
+The application is configured via the `scenario.yaml` metadata.
 
 > NOTE: The `broker.root` metadata must be provided by the user, and the
 > topology node referenced by `broker.root` must already exist in the topology.
@@ -73,3 +78,12 @@ spec:
                              # Root broker will log to helics-root-broker.log
                              # in this directory. Sub brokers will log to
                              # helics-sub-broker.log in this directory.
+```
+
+### Configuration Options
+
+| Key | Type | Required | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `broker.root` | String | Yes | - | Endpoint details for root broker (`hostname\|iface` or IP). |
+| `broker.log-level` | String | No | `summary` | HELICS broker log level. |
+| `broker.log-dir` | String | No | `/var/log` | Directory for broker logs. |
