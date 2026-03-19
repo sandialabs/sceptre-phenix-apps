@@ -240,7 +240,7 @@ class ComponentBase:
     def es(self) -> Elasticsearch:
         """Connect to Elasticsearch and return the initialized object."""
         if not self._es:
-            self.print(
+            logger.info(
                 f"Connecting to Elasticsearch: {self.metadata.elasticsearch.server}"
             )
             self._es = utils.connect_elastic(self.metadata.elasticsearch.server)
@@ -285,8 +285,7 @@ class ComponentBase:
         for app in self.experiment.spec.scenario.apps:
             if app.name == name:
                 return app
-        self.eprint(f"failed to find app '{name}'")
-        return None
+        raise ValueError(f"failed to find app '{name}'")
 
     def extract_node(
         self, hostname: str, wildcard: bool = False
@@ -375,18 +374,18 @@ class ComponentBase:
         elif not dst and isinstance(src, list):
             dst = self.base_dir
 
-        self.print(f"copying file from {vm} (src={src}, dst={dst})")
+        logger.info(f"copying file from {vm} (src={src}, dst={dst})")
 
         try:
             utils.mm_recv(self.mm, vm, src, dst)
-            self.print(f"file '{src}' received from VM {vm} to {dst}")
+            logger.info(f"file '{src}' received from VM {vm} to {dst}")
         except Exception as ex:
             raise RuntimeError(
                 f"error receiving file '{src}' from VM {vm}: {ex}"
             ) from ex
 
     def ensure_vm_running(self, vm: str) -> None:
-        self.print(f"Checking if VM is running (VM hostname: {vm})")
+        logger.info(f"Checking if VM is running (VM hostname: {vm})")
         vm_info = utils.mm_info_for_vm(self.mm, vm)
         if not vm_info or vm_info["state"].lower() != "running":
             raise RuntimeError(f"VM isn't running (vm name: {vm})")
@@ -435,7 +434,7 @@ class ComponentBase:
 
         if process.lower() in ps_list.lower():
             return True
-        self.eprint(f"process '{process}' is not running on '{vm}'")
+        logger.info(f"process '{process}' is not running on '{vm}'")
         return False
 
     def configure(self) -> None:
