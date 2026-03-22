@@ -771,17 +771,14 @@ func cleanup(log *slog.Logger, exp *types.Experiment, dryrun bool) error {
 }
 
 func deleteTap(log *slog.Logger, name, exp string, cluster map[string][]string) error {
-	var errs error
+	var errs *multierror.Error
 
 	for host := range cluster {
 		errs = multierror.Append(errs, deleteTapFromHost(log, name, exp, host))
 	}
 
-	if errs != nil {
-		return fmt.Errorf("error deleting tap: %w", errs)
-	}
-
-	return nil
+	//nolint:wrapcheck // multierror already wraps errors
+	return errs.ErrorOrNil()
 }
 
 func deleteTapFromHost(log *slog.Logger, name, exp, host string) error {
@@ -801,23 +798,20 @@ func deleteTapFromHost(log *slog.Logger, name, exp, host string) error {
 }
 
 func deleteMirror(log *slog.Logger, mirror, bridge string, cluster map[string][]string) error {
-	var errs error
+	var errs *multierror.Error
 
 	for host := range cluster {
 		errs = multierror.Append(errs, deleteMirrorFromHost(log, mirror, bridge, host))
 	}
 
-	if errs != nil {
-		return fmt.Errorf("error deleting mirror: %w", errs)
-	}
-
-	return nil
+	//nolint:wrapcheck // multierror already wraps errors
+	return errs.ErrorOrNil()
 }
 
 func deleteMirrorFromHost(log *slog.Logger, mirror, bridge, host string) error {
 	log.Info("deleting mirror", "mirror", mirror, "bridge", bridge, "host", host)
 
-	var errs error
+	var errs *multierror.Error
 
 	cmd := fmt.Sprintf(
 		`ovs-vsctl -- --id=@m get mirror %s -- remove bridge %s mirrors @m`,
@@ -854,11 +848,8 @@ func deleteMirrorFromHost(log *slog.Logger, mirror, bridge, host string) error {
 		)
 	}
 
-	if errs != nil {
-		return fmt.Errorf("error deleting mirror from host: %w", errs)
-	}
-
-	return nil
+	//nolint:wrapcheck // multierror already wraps errors
+	return errs.ErrorOrNil()
 }
 
 func mirrorNet(log *slog.Logger, md *MirrorAppMetadataV1) (netaddr.IPPrefix, error) {
