@@ -14,7 +14,7 @@ help:
 	@echo "Development:"
 	@echo "  all         - Run all tools (format, lint, and test)"
 	@echo "  check       - Run linters without fixing (for CI)"
-	@echo "  coverage       - Run unit tests with coverage"
+	@echo "  coverage    - Run unit tests with coverage"
 	@echo "  format      - Format code (golangci-lint)"
 	@echo "  lint        - Lint code and fix issues (golangci-lint)"
 	@echo "  lint-clean  - Clean lint cache (golangci-lint)"
@@ -46,7 +46,7 @@ install:
 
 install-dev:
 	$(call check-command,curl)
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(GOBIN) v2.10.1
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(GOBIN) v2.11.3
 
 format:
 	$(call check-command,$(GOLANGCI_LINT))

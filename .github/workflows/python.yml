@@ -4,12 +4,15 @@ env:
   PYTHON_VERSION: "3.12"
 
 on:
-  push:
-    branches: ['**']
+  pull_request:
+    branches: [ "**" ]
+    paths:
+      - 'src/python/**.py'
+      - '.github/workflows/python.yml'
 
 jobs:
 
-  lint-check:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
