@@ -126,10 +126,6 @@ class ComponentBase:
             "cleanup": self.cleanup,
         }
 
-        # Configure logger to output JSON to stderr
-        logger.remove()
-        logger.add(phenix_stderr_sink)
-
         orig_stdout_stream = sys.stdout
         orig_stderr_stream = sys.stderr
         log_buffer = io.StringIO()
@@ -138,8 +134,15 @@ class ComponentBase:
         stdout_mirror = _MirrorAndBuffer(orig_stdout_stream, io.StringIO())
         stderr_mirror = _MirrorAndBuffer(orig_stderr_stream, io.StringIO())
 
-        # Add a sink to capture logs to the buffer for the status file
         log_format = "[{time:YYYY-MM-DD HH:mm:ss.SSS}] {level} : {message}"
+
+        # Configure logger to output JSON to stderr while also mirroring log lines
+        # to stdout so the scorch modal continues to receive component progress.
+        logger.remove()
+        logger.add(phenix_stderr_sink)
+        ui_sink_id = logger.add(stdout_mirror, format=log_format)
+
+        # Add a sink to capture logs to the buffer for the status file
         sink_id = logger.add(lambda msg: log_buffer.write(msg), format=log_format)
 
         start = time.time()
@@ -158,6 +161,7 @@ class ComponentBase:
         finally:
             sys.stdout = orig_stdout_stream
             sys.stderr = orig_stderr_stream
+            logger.remove(ui_sink_id)
             logger.remove(sink_id)
 
         end = time.time()
@@ -173,7 +177,7 @@ class ComponentBase:
 
         info_file = os.path.join(
             self.base_dir,
-            f"{self.exp_name}-scorch-run-{self.run}-{self.name}-loop-{self.loop}-count-{self.count}-{self.stage}-{start_ts_filename}.json",
+            f"{self.stage}-{start_ts_filename}.json",
         )
 
         content = {
