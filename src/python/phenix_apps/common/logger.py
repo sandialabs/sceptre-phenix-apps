@@ -6,9 +6,27 @@ from loguru import logger
 
 import phenix_apps.common.settings as settings
 
+PHENIX_JSON_LOG_CHUNK_SIZE = 16 * 1024
 
-def _format_phenix_json_log(message) -> str:
-    """Formats a loguru message record into a flat JSON string for phenix.
+
+def _iter_log_chunks(text: str):
+    """Yield line- and size-bounded chunks for transport-safe logging."""
+
+    if text == "":
+        yield ""
+        return
+
+    for line in text.splitlines():
+        if line == "":
+            yield ""
+            continue
+
+        for start in range(0, len(line), PHENIX_JSON_LOG_CHUNK_SIZE):
+            yield line[start : start + PHENIX_JSON_LOG_CHUNK_SIZE]
+
+
+def _iter_phenix_json_log_lines(message):
+    """Yield newline-delimited JSON log lines for a loguru message.
 
     This helper function builds the JSON log entry by extracting relevant
     fields from the loguru record, adding traceback information for exceptions,
@@ -17,31 +35,85 @@ def _format_phenix_json_log(message) -> str:
     Args:
         message: The loguru message object.
 
-    Returns:
-        A JSON-serialized string representing the log entry, with a trailing newline.
+    Yields:
+        Individual JSON log lines, each terminated with a newline.
     """
 
     record = message.record
 
     # Core expects 'level' and 'msg' at the top level.
-    log_entry = {
+    base_entry = {
         "level": record["level"].name,
-        "msg": record["message"],
         "proc_time": record["time"].strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
         "file": record["file"].name,
         "line": record["line"],
     }
 
-    if record["exception"]:
-        exc = record["exception"]
-        log_entry["traceback"] = "".join(traceback.format_exception(*exc))
-
     # Add any extra contextual kwargs passed to the logger (e.g. logger.bind(type="SCORCH").info("..."))
     if record["extra"]:
-        log_entry.update(record["extra"])
+        base_entry.update(record["extra"])
 
-    # Ensure we write a single line JSON string with a trailing newline
-    return json.dumps(log_entry) + "\n"
+    traceback_text = ""
+    if record["exception"]:
+        exc = record["exception"]
+        traceback_text = "".join(traceback.format_exception(*exc))
+
+    message_chunks = list(_iter_log_chunks(record["message"]))
+    traceback_chunks = list(_iter_log_chunks(traceback_text)) if traceback_text else []
+
+    if len(message_chunks) == 1 and len(traceback_chunks) <= 1:
+        log_entry = dict(base_entry)
+        log_entry["msg"] = message_chunks[0]
+        if traceback_chunks:
+            log_entry["traceback"] = traceback_chunks[0]
+        yield json.dumps(log_entry) + "\n"
+        return
+
+    total_parts = len(message_chunks) + len(traceback_chunks)
+
+    for part_num, chunk in enumerate(message_chunks, start=1):
+        log_entry = dict(base_entry)
+        log_entry["msg"] = chunk
+        log_entry["part"] = part_num
+        log_entry["parts"] = total_parts
+        yield json.dumps(log_entry) + "\n"
+
+    for part_num, chunk in enumerate(traceback_chunks, start=len(message_chunks) + 1):
+        log_entry = dict(base_entry)
+        log_entry["msg"] = chunk
+        log_entry["part"] = part_num
+        log_entry["parts"] = total_parts
+        log_entry["chunk_type"] = "traceback"
+        yield json.dumps(log_entry) + "\n"
+
+
+def _format_phenix_json_log(message) -> str:
+    """Formats a loguru message record into one or more flat JSON strings.
+
+    This preserves the existing helper contract for callers and tests that need
+    the full serialized payload as a single string.
+
+    Args:
+        message: The loguru message object.
+
+    Returns:
+        One or more newline-delimited JSON strings representing the log entry.
+    """
+
+    return "".join(_iter_phenix_json_log_lines(message))
+
+
+def _write_phenix_json_log(stream, message) -> None:
+    """Write each JSON frame as an individual flushed stream write.
+
+    The Phenix core log reader is line-oriented. Emitting one frame at a time
+    avoids bundling multiple JSON objects into a single stream write when a
+    message is chunked across lines or size boundaries.
+    """
+
+    for log_line in _iter_phenix_json_log_lines(message):
+        stream.write(log_line)
+        stream.flush()
 
 
 class PhenixFileSink:
@@ -63,9 +135,7 @@ class PhenixFileSink:
         self._file = open(path, "a", encoding="utf-8")
 
     def __call__(self, message):
-        log_str = _format_phenix_json_log(message)
-        self._file.write(log_str)
-        self._file.flush()
+        _write_phenix_json_log(self._file, message)
 
 
 def phenix_stderr_sink(message):
@@ -80,8 +150,7 @@ def phenix_stderr_sink(message):
     Args:
         message: The loguru message object.
     """
-    log_str = _format_phenix_json_log(message)
-    sys.stderr.write(log_str)
+    _write_phenix_json_log(sys.stderr, message)
 
 
 def configure_logging(force_console: bool = False) -> None:
