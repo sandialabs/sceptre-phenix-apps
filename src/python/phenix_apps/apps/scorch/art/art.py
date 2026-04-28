@@ -1,6 +1,7 @@
 import os
 import subprocess
 import uuid
+import time
 
 from box import Box
 
@@ -8,8 +9,8 @@ from phenix_apps.apps.scorch import ComponentBase
 from phenix_apps.common import utils
 from phenix_apps.common.logger import logger
 
+#This can be changed to reflect your directory structure on hosts
 GOART_BASE = "/phenix/art"
-
 
 class AtomicRedTeam(ComponentBase):
     def __init__(self):
@@ -24,10 +25,10 @@ class AtomicRedTeam(ComponentBase):
         if os_type == "windows":
             return "C:/phenix/art/goart.exe"
         return f"{GOART_BASE}/goart"
-
+        
     def _tmp_path(self, os_type, filename):
         if os_type == "windows":
-            return f"C:/Windows/Temp/{filename}"
+            return f"/phenix/art/{filename}"
         return f"/tmp/{filename}"
 
     def _check_binary(self, mm, hostname, goart_path, os_type):
@@ -35,7 +36,6 @@ class AtomicRedTeam(ComponentBase):
             shell_cmd = f'cmd /c "if not exist {goart_path} exit 1"'
         else:
             shell_cmd = f"test -x {goart_path}"
-
         try:
             utils.mm_exec_wait(mm, hostname, shell_cmd)
         except Exception:
@@ -98,7 +98,7 @@ class AtomicRedTeam(ComponentBase):
 
             logger.info(f"executing: {cmd}")
             utils.mm_exec_wait(mm, hostname, cmd)
-
+            time.sleep(5)
             logger.info(f"retrieving results: {out_file}")
             results_file = os.path.join(self.base_dir, f"{hostname}.json")
 
