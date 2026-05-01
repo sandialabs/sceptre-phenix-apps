@@ -85,7 +85,16 @@ sunspec_register = ''
         % endfor
     % endfor
 % endfor
-        </tags>
+if internal_tags:
+    % for tag, value in internal_tags.items():
+
+            <internal-tag>
+                <name>${tag}</name>
+                <value>${value}</value>
+            </internal-tag>
+    % endfor
+% endif
+	</tags>
 
     <comms>
 ################################# CLIENT ########################################
