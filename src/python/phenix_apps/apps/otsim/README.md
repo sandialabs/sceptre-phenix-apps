@@ -183,6 +183,48 @@ spec:
                 tag: foo.bar
                 value: 0
 ```
+
+## HELICS Vector Subscriptions
+
+Some HELICS federates publish multi-element values as a single `vector` topic
+rather than one scalar topic per element. The most common case is power-system
+3-phase measurements, where a single `voltage_magnitude` topic carries a
+3-element `[a, b, c]` vector instead of three separate `Va-mag`/`Vb-mag`/`Vc-mag`
+scalar topics.
+
+A variable in an infrastructure mapping is declared as a vector by adding an
+`elements` list:
+
+```yaml
+infrastructures:
+  my-3-phase:
+    regulator:
+      voltage_magnitude:
+        type: analog-read
+        elements: [a, b, c]     # presence of `elements` makes this a vector
+        modbus:
+          scaling: 2
+      setpt:
+        type: analog-read-write # no `elements` -- still a scalar
+        modbus:
+          scaling: 2
+```
+
+The generator emits one HELICS `<subscription>` per logical vector variable
+with `<type>vector</type>` and `<elements>a,b,c</elements>` children, and
+expands the variable into N modbus/dnp3 registers — one per element — with
+tags suffixed by element label (e.g. `regfasea.voltage_magnitude.a`,
+`.voltage_magnitude.b`, `.voltage_magnitude.c`). The OT-sim I/O module
+splits the incoming vector at runtime and publishes each element on the
+message bus as its own scalar `Point`, so downstream protocol modules,
+logic programs, and Node-RED flows reference the per-element tags as
+ordinary scalars. Read-write vectors (`type: analog-read-write` with
+`elements`) emit a vector `<publication>` (or per-element `<endpoint>`
+write-back tags when an endpoint is configured). The `elements` field is
+only valid on `analog-read` / `analog-read-write` variables — using it
+on a binary type raises an error.
+
+
 # Node-RED
 [Node-RED](https://www.node-red.dev/) is a coding software that is
 used for creating flows of data between systems.

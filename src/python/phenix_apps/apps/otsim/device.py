@@ -170,10 +170,24 @@ class FieldDeviceServer(Device):
                     if isinstance(var_type, str):
                         var_type = {"type": var_type}
 
-                    reg = Register(
-                        var_type["type"], f"{name}.{var}", var_type.get("dnp3", {})
-                    )
-                    self.registers["dnp3"].append(reg)
+                    elements = var_type.get("elements")
+                    proto_md = var_type.get("dnp3", {})
+
+                    # Vector variables expand into one Register per element so each
+                    # phase is individually addressable downstream. The OT-sim io
+                    # module splits the vector into matching `.{label}` scalar tags
+                    # at runtime.
+                    if elements:
+                        for e in elements:
+                            self.registers["dnp3"].append(
+                                Register(
+                                    var_type["type"], f"{name}.{var}.{e}", proto_md
+                                )
+                            )
+                    else:
+                        self.registers["dnp3"].append(
+                            Register(var_type["type"], f"{name}.{var}", proto_md)
+                        )
 
         if "modbus" in self.md:
             if "modbus" not in self.registers:
@@ -204,10 +218,20 @@ class FieldDeviceServer(Device):
                     if isinstance(var_type, str):
                         var_type = {"type": var_type}
 
-                    reg = Register(
-                        var_type["type"], f"{name}.{var}", var_type.get("modbus", {})
-                    )
-                    self.registers["modbus"].append(reg)
+                    elements = var_type.get("elements")
+                    proto_md = var_type.get("modbus", {})
+
+                    if elements:
+                        for e in elements:
+                            self.registers["modbus"].append(
+                                Register(
+                                    var_type["type"], f"{name}.{var}.{e}", proto_md
+                                )
+                            )
+                    else:
+                        self.registers["modbus"].append(
+                            Register(var_type["type"], f"{name}.{var}", proto_md)
+                        )
 
         self.processed = True
 
