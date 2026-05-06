@@ -1,7 +1,7 @@
 import os
 import subprocess
-import uuid
 import time
+import uuid
 
 from box import Box
 
@@ -9,8 +9,10 @@ from phenix_apps.apps.scorch import ComponentBase
 from phenix_apps.common import utils
 from phenix_apps.common.logger import logger
 
-#This can be changed to reflect your directory structure on hosts
+# This can be changed here to reflect your directory structure on hosts as a default.
+# This is overwritten if a value is provided via goartPath
 GOART_BASE = "/phenix/art"
+
 
 class AtomicRedTeam(ComponentBase):
     def __init__(self):
@@ -25,7 +27,7 @@ class AtomicRedTeam(ComponentBase):
         if os_type == "windows":
             return "C:/phenix/art/goart.exe"
         return f"{GOART_BASE}/goart"
-        
+
     def _tmp_path(self, os_type, filename):
         if os_type == "windows":
             return f"/phenix/art/{filename}"
@@ -107,7 +109,9 @@ class AtomicRedTeam(ComponentBase):
                 logger.info(f"results_file path: {results_file}")
                 logger.info(f"results_file exists: {os.path.exists(results_file)}")
             except Exception as ex:
-                raise RuntimeError(f"failed to get results file from {hostname}: {ex}") from ex
+                raise RuntimeError(
+                    f"failed to get results file from {hostname}: {ex}"
+                ) from ex
 
             validator = self.metadata.get("validator", None)
             if validator:
@@ -129,7 +133,11 @@ class AtomicRedTeam(ComponentBase):
 
                 if proc.returncode != 0:
                     stderr = proc.stderr.decode()
-                    logger.error(f"results validation failed: {stderr}" if stderr else "results validation failed")
+                    logger.error(
+                        f"results validation failed: {stderr}"
+                        if stderr
+                        else "results validation failed"
+                    )
                     if abort_on_error:
                         raise RuntimeError("results validation failed")
                 else:
