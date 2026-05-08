@@ -5,7 +5,10 @@ Unit tests for the Scale builtin plugin.
 import pytest
 from pydantic import ValidationError
 
+from phenix_apps.apps.scale.app import Scale
 from phenix_apps.apps.scale.plugins.builtin import BuiltinConfig, BuiltinV1, BuiltinV2
+
+pytestmark = pytest.mark.app_class(cls=Scale, name="scale")
 
 
 def test_builtin_config_validation():
@@ -26,19 +29,19 @@ def test_builtin_config_validation():
         config.count = 0
 
 
-def test_builtin_container_calculation(mock_scale_app):
+def test_builtin_container_calculation(mock_app):
     """Test node count calculation based on container settings."""
     # Case 1: Just count
     data = {"count": 5}
     plugin = BuiltinV1()
-    plugin.pre_configure(mock_scale_app, data)
+    plugin.pre_configure(mock_app, data)
     assert plugin.get_node_count() == 5
     assert plugin.get_container_count(1) == 0
 
     # Case 2: Containers and containers_per_node (exact fit)
     # 100 containers, 10 per node -> 10 nodes
     data = {"containers": 100, "containers_per_node": 10}
-    plugin.pre_configure(mock_scale_app, data)
+    plugin.pre_configure(mock_app, data)
     assert plugin.get_node_count() == 10
     assert plugin.get_container_count(1) == 10
     assert plugin.get_container_count(10) == 10
@@ -46,17 +49,17 @@ def test_builtin_container_calculation(mock_scale_app):
     # Case 3: Containers and containers_per_node (remainder)
     # 105 containers, 10 per node -> 11 nodes (10 full, 1 partial)
     data = {"containers": 105, "containers_per_node": 10}
-    plugin.pre_configure(mock_scale_app, data)
+    plugin.pre_configure(mock_app, data)
     assert plugin.get_node_count() == 11
     assert plugin.get_container_count(1) == 10
     assert plugin.get_container_count(11) == 5
 
 
-def test_builtin_v1_methods(mock_scale_app):
+def test_builtin_v1_methods(mock_app):
     """Test BuiltinV1 specific methods."""
     plugin = BuiltinV1()
     profile = {"count": 1, "hostname_prefix": "test"}
-    plugin.pre_configure(mock_scale_app, profile)
+    plugin.pre_configure(mock_app, profile)
 
     # get_hostname
     assert plugin.get_hostname(1) == "test-1"
@@ -68,13 +71,13 @@ def test_builtin_v1_methods(mock_scale_app):
     assert spec["general"]["vm_type"] == "kvm"
 
     # on_node_configured (noop)
-    plugin.on_node_configured(mock_scale_app, 1, "test-1")
+    plugin.on_node_configured(mock_app, 1, "test-1")
 
     # get_additional_startup_commands (empty)
     assert plugin.get_additional_startup_commands(1, "test-1") == ""
 
 
-def test_builtin_v2_methods(mocker, mock_scale_app):
+def test_builtin_v2_methods(mocker, mock_app):
     """Test BuiltinV2 specific methods."""
     # Mock logger to verify call
     mock_logger = mocker.patch("phenix_apps.apps.scale.plugins.builtin.plugin.logger")
@@ -82,7 +85,7 @@ def test_builtin_v2_methods(mocker, mock_scale_app):
     plugin = BuiltinV2()
     profile = {"count": 1, "hostname_prefix": "test", "name": "my-profile"}
 
-    plugin.pre_configure(mock_scale_app, profile)
+    plugin.pre_configure(mock_app, profile)
 
     # Verify logging
     mock_logger.info.assert_called_with(
