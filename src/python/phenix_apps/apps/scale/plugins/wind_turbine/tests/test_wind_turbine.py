@@ -3,13 +3,16 @@ from unittest.mock import MagicMock
 import pytest
 from pydantic import ValidationError
 
+from phenix_apps.apps.scale.app import Scale
 from phenix_apps.apps.scale.plugins.wind_turbine import WindTurbine, WindTurbineConfig
+
+pytestmark = pytest.mark.app_class(cls=Scale, name="scale")
 
 
 @pytest.fixture
-def wind_turbine(mock_scale_app):
+def wind_turbine(mock_app):
     plugin = WindTurbine()
-    return plugin, mock_scale_app
+    return plugin, mock_app
 
 
 def test_pre_configure_defaults(wind_turbine):

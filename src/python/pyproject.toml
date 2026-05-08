@@ -75,6 +75,9 @@ phenix-scorch-component-ssh = "phenix_apps.apps.scorch.ssh.ssh:main"
 builtin = "phenix_apps.apps.scale.plugins.builtin:BuiltinV1"
 wind_turbine = "phenix_apps.apps.scale.plugins.wind_turbine:WindTurbine"
 
+[project.entry-points.pytest11]
+phenix_apps_testing = "phenix_apps.testing.plugin"
+
 [project.urls]
 # Use PyPI-standard names here: https://docs.pypi.org/project_metadata/
 "Homepage" = "https://github.com/sandialabs/sceptre-phenix-apps/"

@@ -8,8 +8,11 @@ from unittest.mock import MagicMock
 import pytest
 from box import Box
 
+from phenix_apps.apps.scale.app import Scale
 from phenix_apps.apps.scale.interface import ScalePlugin
 from phenix_apps.apps.scale.registry import PLUGIN_REGISTRY
+
+pytestmark = pytest.mark.app_class(cls=Scale, name="scale")
 
 
 def test_plugins_compliance():
@@ -35,11 +38,11 @@ def test_plugins_compliance():
         )
 
 
-def test_plugin_loading_builtin(mocker, mock_scale_app):
+def test_plugin_loading_builtin(mocker, mock_app):
     """Test that the builtin plugin is loaded by default."""
     mock_get_plugin = mocker.patch("phenix_apps.apps.scale.app.get_plugin")
 
-    scale_app = mock_scale_app
+    scale_app = mock_app
 
     mock_plugin_instance = MagicMock()
     mock_get_plugin.return_value = mock_plugin_instance
@@ -51,7 +54,7 @@ def test_plugin_loading_builtin(mocker, mock_scale_app):
     assert plugin == mock_plugin_instance
 
 
-def test_post_start_logic(mocker, mock_scale_app, mock_minimega):
+def test_post_start_logic(mocker, mock_app, mock_minimega, tmp_path):
     """Test post_start logic with mocked minimega and file operations."""
     mocker.patch("phenix_apps.apps.scale.app.logger")
     mocker.patch("phenix_apps.apps.scale.app.Progress")
@@ -59,7 +62,8 @@ def test_post_start_logic(mocker, mock_scale_app, mock_minimega):
 
     mock_mm_conn = mock_minimega
 
-    app = mock_scale_app
+    app = mock_app
+    app.files_dir = str(tmp_path / "images")
     app.metadata = {"name": "default", "plugin": "builtin", "count": 2}
     app.dryrun = False
     app._get_profiles = MagicMock(return_value=[app.metadata])
@@ -85,11 +89,11 @@ def test_post_start_logic(mocker, mock_scale_app, mock_minimega):
     mock_mm_conn.cc_send.assert_any_call(f"{app.files_dir}/node-1.mm")
 
 
-def test_discover_plugins(mocker, mock_scale_app):
+def test_discover_plugins(mocker, mock_app):
     """Test that _discover_plugins method correctly loads entry points."""
     mocker.patch("phenix_apps.apps.scale.app.logger")
 
-    app = mock_scale_app
+    app = mock_app
 
     # Mock entry point
     mock_ep = MagicMock()
@@ -104,9 +108,10 @@ def test_discover_plugins(mocker, mock_scale_app):
     mock_ep.load.assert_called_once()
 
 
-def test_configure_adds_nodes_to_topology(mocker, mock_scale_app):
+@pytest.mark.app_class(cls=Scale, name="scale", real_methods=["add_node"])
+def test_configure_adds_nodes_to_topology(mocker, mock_app):
     """Test that configure method adds nodes to the experiment topology."""
-    app = mock_scale_app
+    app = mock_app
 
     # Reset experiment for this test
     app.experiment = Box(
@@ -146,9 +151,9 @@ def test_configure_adds_nodes_to_topology(mocker, mock_scale_app):
     assert app.experiment.spec.topology.nodes[1].general.hostname == "node-2"
 
 
-def test_startup_script_generation(mocker, mock_scale_app):
+def test_startup_script_generation(mocker, mock_app):
     """Test that startup script is generated with correct content."""
-    app = mock_scale_app
+    app = mock_app
     app.add_inject = MagicMock()
 
     mock_plugin = MagicMock()
@@ -211,9 +216,9 @@ echo 'DONE!'
     handle.write.assert_called_with(expected_content_multiline)
 
 
-def test_apply_node_defaults(mocker, mock_scale_app):
+def test_apply_node_defaults(mocker, mock_app):
     """Test _apply_node_defaults logic."""
-    app = mock_scale_app
+    app = mock_app
 
     # Case 1: Global defaults
     spec = {}
@@ -245,11 +250,11 @@ def test_apply_node_defaults(mocker, mock_scale_app):
     assert spec["network"]["interfaces"][0]["name"] == "eth0"
 
 
-def test_process_networks(mocker, mock_scale_app):
+def test_process_networks(mocker, mock_app):
     """Test _process_networks logic."""
     mock_logger = mocker.patch("phenix_apps.apps.scale.app.logger")
 
-    app = mock_scale_app
+    app = mock_app
     app.dryrun = False
     app.experiment = Box({"status": {"vlans": {"MGMT": 100}}})
 
@@ -279,11 +284,11 @@ def test_process_networks(mocker, mock_scale_app):
     assert str(nets[0]["addr"]) == "10.0.0.1"
 
 
-def test_get_gateway(mocker, mock_scale_app):
+def test_get_gateway(mocker, mock_app):
     """Test _get_gateway logic."""
     mock_logger = mocker.patch("phenix_apps.apps.scale.app.logger")
 
-    app = mock_scale_app
+    app = mock_app
     app.dryrun = False
     app.experiment = Box({"status": {"vlans": {"MGMT": 100}}})
 
@@ -361,9 +366,9 @@ def test_registry_deprecation_warning(caplog):
     assert "Plugin 'dep_test' version '1.0.0' is deprecated" in caplog.text
 
 
-def test_missing_plugin_error(mocker, mock_scale_app):
+def test_missing_plugin_error(mocker, mock_app):
     """Test that requesting a missing plugin raises a ValueError."""
-    app = mock_scale_app
+    app = mock_app
     profile = {"name": "test", "plugin": "non_existent_plugin"}
 
     with pytest.raises(
