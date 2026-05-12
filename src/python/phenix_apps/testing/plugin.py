@@ -14,6 +14,7 @@ The ``cls`` argument MUST be passed as a keyword. Passing a class positionally
 makes pytest's mark machinery treat it as the decoration target.
 """
 
+import inspect
 import os
 
 import pytest
@@ -22,29 +23,20 @@ from box import Box
 from phenix_apps.apps import AppBase
 from phenix_apps.common import settings
 
+# Ignore methods that shouldn't be mocked
+_IGNORE_METHODS = {"main", "execute_stage", "finalize"} | {
+    stage.replace("-", "_") for stage in AppBase.valid_stages
+}
+
 # Methods on AppBase replaced with MagicMock on the instance so tests can
 # assert calls without invoking real logic. Source of truth:
 # phenix_apps/apps/__init__.py.
-_APPBASE_METHODS = (
-    "extract_app",
-    "extract_node",
-    "extract_node_interface_ip",
-    "extract_node_hostname_for_ip",
-    "extract_topology_nodes_by_attribute",
-    "extract_annotated_topology_nodes",
-    "extract_labelled_topology_nodes",
-    "extract_app_node",
-    "extract_all_nodes",
-    "extract_nodes_type",
-    "extract_nodes_label",
-    "add_node",
-    "add_inject",
-    "add_annotation",
-    "add_label",
-    "get_annotation",
-    "is_booting",
-    "is_fully_scheduled",
-    "render",
+_APPBASE_METHODS = tuple(
+    method
+    for method, value in vars(AppBase).items()
+    if not method.startswith("_")
+    and method not in _IGNORE_METHODS
+    and (inspect.isfunction(value) or inspect.ismethod(value))
 )
 
 # Patched at class level so subclass overrides that call super().method(...)
