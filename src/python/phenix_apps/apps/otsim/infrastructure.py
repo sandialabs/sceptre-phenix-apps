@@ -283,7 +283,9 @@ class Infrastructure:
                 # We don't care about scaling in the I/O module, so if the variable
                 # type is a dictionary convert it to a string (using its `type` entry)
                 # so the rest of the code can assume it's just a string.
+                phases = None
                 if isinstance(var_type, dict):
+                    phases = var_type.get("phases")
                     var_type = var_type["type"]
 
                 sub = ET.Element("subscription")
@@ -297,7 +299,10 @@ class Infrastructure:
                 typ = ET.SubElement(sub, "type")
 
                 if var_type in ["analog-read", "analog-read-write"]:
-                    typ.text = "double"
+                    if phases:
+                        typ.text = "vector"
+                    else:
+                        typ.text = "double"
                 else:
                     typ.text = "boolean"
 
