@@ -73,11 +73,8 @@ class Caldera(ComponentBase):
                 )
 
             mm.cc_filter(f"name={server}")
-            mm.cc_send(cmd_src)
-
-            # wait for file to be sent via cc
-            last_cmd = utils.mm_last_command(mm)
-            utils.mm_wait_for_cmd(mm, last_cmd["id"])
+            cmd_id = utils.mm_command_id(mm.cc_send(cmd_src))
+            utils.mm_wait_for_cmd(mm, cmd_id)
 
             os.remove(cmd_src)
 
@@ -115,11 +112,8 @@ class Caldera(ComponentBase):
                 )
 
             mm.cc_filter(f"name={server}")
-            mm.cc_send(cmd_src)
-
-            # wait for file to be sent via cc
-            last_cmd = utils.mm_last_command(mm)
-            utils.mm_wait_for_cmd(mm, last_cmd["id"])
+            cmd_id = utils.mm_command_id(mm.cc_send(cmd_src))
+            utils.mm_wait_for_cmd(mm, cmd_id)
 
             os.remove(cmd_src)
 
@@ -157,11 +151,8 @@ class Caldera(ComponentBase):
                 )
 
             mm.cc_filter(f"name={server}")
-            mm.cc_send(cmd_src)
-
-            # wait for file to be sent via cc
-            last_cmd = utils.mm_last_command(mm)
-            utils.mm_wait_for_cmd(mm, last_cmd["id"])
+            cmd_id = utils.mm_command_id(mm.cc_send(cmd_src))
+            utils.mm_wait_for_cmd(mm, cmd_id)
 
             os.remove(cmd_src)
 
@@ -193,11 +184,8 @@ class Caldera(ComponentBase):
             utils.mako_serve_template("new_operation.mako", templates, f, op=op)
 
         mm.cc_filter(f"name={server}")
-        mm.cc_send(cmd_src)
-
-        # wait for file to be sent via cc
-        last_cmd = utils.mm_last_command(mm)
-        utils.mm_wait_for_cmd(mm, last_cmd["id"])
+        cmd_id = utils.mm_command_id(mm.cc_send(cmd_src))
+        utils.mm_wait_for_cmd(mm, cmd_id)
 
         os.remove(cmd_src)
 
@@ -221,11 +209,8 @@ class Caldera(ComponentBase):
                 )
 
             mm.cc_filter(f"name={server}")
-            mm.cc_send(cmd_src)
-
-            # wait for file to be sent via cc
-            last_cmd = utils.mm_last_command(mm)
-            utils.mm_wait_for_cmd(mm, last_cmd["id"])
+            cmd_id = utils.mm_command_id(mm.cc_send(cmd_src))
+            utils.mm_wait_for_cmd(mm, cmd_id)
 
             os.remove(cmd_src)
 
@@ -252,11 +237,8 @@ class Caldera(ComponentBase):
             )
 
         mm.cc_filter(f"name={server}")
-        mm.cc_send(cmd_src)
-
-        # wait for file to be sent via cc
-        last_cmd = utils.mm_last_command(mm)
-        utils.mm_wait_for_cmd(mm, last_cmd["id"])
+        cmd_id = utils.mm_command_id(mm.cc_send(cmd_src))
+        utils.mm_wait_for_cmd(mm, cmd_id)
 
         os.remove(cmd_src)
 

@@ -340,6 +340,133 @@ def mm_get_cc_path(mm: minimega.minimega) -> Path | None:
     return cc_path
 
 
+# On a multi-host deployment, cc commands fan out to remote hosts over meshage.
+# Several conditions are transient, where a VM's miniccc client is briefly
+# unresolvable by name/uuid even though its command already completed.
+# These must be polled through, not treated as hard errors
+
+# seconds between polls
+CC_POLL_RATE = 1.0
+# bounded window to ride out a transient error after command has completed
+CC_EXITCODE_GRACE = 10.0
+
+# Mesh blips worth re-polling
+_MM_TRANSIENT = (
+    "no client",
+    "broken pipe",
+    "connection refused",
+    "connection reset",
+    "use of closed",
+    "i/o timeout",
+    "meshage",
+    "timeout",
+    "eof",
+)
+
+# Genuine errors that will never clear on retry
+_MM_PERMANENT = (
+    "vm not found",
+    "vm not running",
+    "cannot mesh send yourself",
+    "invalid command",
+    "no such handler",
+    "expected",  # minicli syntax errors ("expected ...")
+)
+
+
+def is_transient_mm_error(exc: Exception) -> bool:
+    """Report whether a minimega error is transient and worth re-polling"""
+    s = str(exc).lower()
+
+    if any(p in s for p in _MM_PERMANENT):
+        return False
+
+    return any(t in s for t in _MM_TRANSIENT)
+
+
+def mm_cc_all_hosts(mm: minimega.minimega, method, *args) -> list:
+    """Call an mm cc_* method and return ALL per-host response rows, without
+    raising on an individual host's error.
+
+    On a multi-host deployments, cc_exitcode / cc_responses fan out across the
+    namespace: the host running the VM returns the data while sibling hosts
+    report "no client <vm>" / "no responses for <id>". With raise_errors=True
+    (the binding default) _get_response raises on the FIRST host error and
+    discards the valid row, so we temporarily disable it and let the caller scan
+    every row.
+    """
+    saved = mm._raise_errors
+    mm._raise_errors = False
+
+    try:
+        return method(*args)
+    finally:
+        mm._raise_errors = saved
+
+
+def mm_cc_exitcode_wait(
+    mm: minimega.minimega,
+    cmd_id: str,
+    client: str,
+    grace: float = CC_EXITCODE_GRACE,
+    poll_rate: float = CC_POLL_RATE,
+) -> dict:
+    """Wait for and return the cc exit-code response row for an already-completed
+    command, tolerating multi-host fan-out.
+
+    cc_exitcode fans out across the namespace; only the host running the VM has
+    the code, while sibling hosts report "no client <vm>". Scan every host row
+    and return the one carrying the code, ignoring sibling errors (a sibling that
+    doesn't run the VM never will, so retrying its error is pointless). ``grace``
+    is the bounded window to ride out the brief gap between the command's
+    response becoming visible and the exit code being recorded; it raises
+    RuntimeError if no host reports the code within it.
+    """
+    deadline = time.monotonic() + grace
+
+    while True:
+        try:
+            rows = mm_cc_all_hosts(mm, mm.cc_exitcode, cmd_id, client)
+        except minimega.Error as ex:
+            # Transport/namespace-level failure (not a per-host data error).
+            if not is_transient_mm_error(ex):
+                raise
+
+            rows = []
+
+        for row in rows:
+            if not row.get("Error") and row.get("Response") not in (None, ""):
+                return row
+
+        if time.monotonic() >= deadline:
+            raise RuntimeError(
+                f"timed out after {grace}s waiting for exit code of command "
+                f"{cmd_id} on {client}"
+            )
+
+        logger.warning(
+            f"exit code for {client} (cmd {cmd_id}) not yet reported by any host; "
+            f"retrying"
+        )
+        time.sleep(poll_rate)
+
+
+def mm_command_id(resp: list) -> str:
+    """Return the id of the command just created by cc_exec / cc_exec_once /
+    cc_send. minimega returns the new id in the response's ``Data`` field (see
+    Namespace.NewCommand), so read it from the call that created the command
+    rather than re-querying ``cc commands`` and guessing the last row -- the
+    latter is racy when another component issues into the same namespace queue.
+
+    The id is stringified to match the string id in ``cc commands`` tabular
+    output (compared in mm_wait_for_cmd)."""
+    for row in resp:
+        if row.get("Data") is not None:
+            return str(row["Data"])
+
+    raise RuntimeError(f"no command id in cc response: {resp!r}")
+
+
 def mm_exec_wait(
     mm: minimega.minimega,
     vm: str,
@@ -351,52 +478,37 @@ def mm_exec_wait(
 ) -> dict:
     mm.cc_filter(f"name={vm}")
 
-    if once:
-        mm.cc_exec_once(cmd)
-    else:
-        mm.cc_exec(cmd)
+    # Capture the new command's id directly from the cc_exec response rather than
+    # re-querying cc commands afterward.
+    resp = mm.cc_exec_once(cmd) if once else mm.cc_exec(cmd)
+    cmd_id = mm_command_id(resp)
 
-    last_cmd = mm_last_command(mm)
     mm_wait_for_cmd(
-        mm=mm, cmd_id=last_cmd["id"], timeout=timeout, poll_rate=poll_rate, debug=debug
+        mm=mm, cmd_id=cmd_id, timeout=timeout, poll_rate=poll_rate, debug=debug
     )
 
-    waiting = True
-    counter = 0
-
-    while waiting:
-        # we only expect a single response since scoped by VM
-        try:
-            exit_resp = mm.cc_exitcode(last_cmd["id"], vm)[0]
-            waiting = False
-            break
-        except minimega.Error as ex:
-            if not timeout:
-                raise ex from None
-
-        if timeout and counter > int(timeout / poll_rate):
-            raise RuntimeError(
-                f"Timeout exceeded waiting for exit code in mm.mm_exec_wait (timeout={timeout}, counter={counter}, poll_rate={poll_rate})"
-            ) from None
-
-        if debug:
-            print_msg(
-                f"Waiting {poll_rate} seconds before checking exit code for ID '{last_cmd['id']}' (timeout={timeout}, counter={counter})"
-            )
-
-        time.sleep(poll_rate)
-        counter += 1
+    # The command has completed (mm_wait_for_cmd saw a response). Fetch the exit
+    # code by UUID; mm_cc_exitcode_wait scans all hosts and ignores the sibling
+    # "no client" rows that the multi-host fan-out returns. Fall back to the VM
+    # name if the UUID lookup comes back empty.
+    uuid = mm_vm_uuid(mm, vm)
+    grace = timeout if timeout else CC_EXITCODE_GRACE
+    exit_resp = mm_cc_exitcode_wait(
+        mm, cmd_id, uuid or vm, grace=grace, poll_rate=poll_rate
+    )
 
     result = {
-        "id": last_cmd["id"],
-        "cmd": last_cmd["cmd"],
+        "id": cmd_id,
+        "cmd": cmd,
         "exitcode": int(exit_resp["Response"]),
         "stderr": None,
         "stdout": None,
     }
 
-    resps = mm.cc_responses(last_cmd["id"])
-    uuid = mm_vm_uuid(mm, vm)
+    # Read across all hosts: only the VM's host has the response; siblings report
+    # "no responses" and would otherwise raise. The loop below already skips rows
+    # with an empty Response.
+    resps = mm_cc_all_hosts(mm, mm.cc_responses, cmd_id)
 
     # example response from mm.cc_responses:
     # [{
@@ -428,6 +540,20 @@ def mm_exec_wait(
     return result
 
 
+def _mm_cc_commands_or_retry(mm: minimega.minimega) -> list | None:
+    """Return ``mm.cc_commands()`` output, or None if a transient multi-host mesh
+    error occurred (the caller should keep polling). Re-raises permanent errors."""
+    try:
+        return mm.cc_commands()
+    except minimega.Error as ex:
+        if not is_transient_mm_error(ex):
+            raise
+
+        logger.warning(f"transient error polling cc commands; retrying: {ex}")
+
+        return None
+
+
 def mm_wait_for_cmd(
     mm: minimega.minimega,
     cmd_id: str,
@@ -447,9 +573,9 @@ def mm_wait_for_cmd(
     while waiting:
         # >>> mm.cc_commands()
         # [{'Host': 'harmonie', 'Response': '', 'Header': ['id', 'prefix', 'command', 'responses', 'background', 'once', 'sent', 'received', 'connectivity', 'level', 'filter'], 'Tabular': [['1', 'testing', '[/usr/bin/iperf3 --version]', '15', 'false', 'true', '[]', '[]', '', '', 'os=linux && iperf=1']], 'Error': '', 'Data': None}]
-        commands = mm.cc_commands()
+        commands = _mm_cc_commands_or_retry(mm)
 
-        for host in commands:
+        for host in commands or []:
             last = list(filter(last_test, host["Tabular"]))
             done = list(filter(done_test, last))
 
@@ -491,9 +617,9 @@ def mm_wait_for_prefix(
     counter = 0
 
     while waiting:
-        commands = mm.cc_commands()
+        commands = _mm_cc_commands_or_retry(mm)
 
-        for host in commands:
+        for host in commands or []:
             last = list(filter(last_test, host["Tabular"]))
             done = list(filter(done_test, last))
 
@@ -516,7 +642,9 @@ def mm_wait_for_prefix(
 
 
 def mm_get_cc_responses(mm: minimega.minimega, id_or_prefix_or_all: str) -> list[dict]:
-    responses = mm.cc_responses(id_or_prefix_or_all)
+    # Read across all hosts so a sibling's "no responses" error doesn't abort the
+    # call; the loop below skips rows with an empty Response.
+    responses = mm_cc_all_hosts(mm, mm.cc_responses, id_or_prefix_or_all)
     results = []
 
     for row in responses:
@@ -545,15 +673,10 @@ def mm_get_cc_responses(mm: minimega.minimega, id_or_prefix_or_all: str) -> list
             if "stderr:\n" not in output and "stdout:\n" not in output:
                 print_msg(f"WARNING: no stderr or stdout in response: {output!r}")
 
-            try:
-                cmd_result["exitcode"] = int(
-                    mm.cc_exitcode(cmd_result["id"], cmd_result["uuid"])[0]["Response"]
-                )
-            except Exception:
-                time.sleep(1.0)
-                cmd_result["exitcode"] = int(
-                    mm.cc_exitcode(cmd_result["id"], cmd_result["uuid"])[0]["Response"]
-                )
+            # Fetch the exit code by UUID, polling through transient multi-host
+            # "no client" blips rather than a single blind retry.
+            exit_resp = mm_cc_exitcode_wait(mm, cmd_result["id"], cmd_result["uuid"])
+            cmd_result["exitcode"] = int(exit_resp["Response"])
 
             results.append(cmd_result)
 
@@ -561,6 +684,16 @@ def mm_get_cc_responses(mm: minimega.minimega, id_or_prefix_or_all: str) -> list
 
 
 def mm_last_command(mm: minimega.minimega) -> dict:
+    """DEPRECATED -- do not use in new code.
+
+    This infers "the command I just issued" as the last row of `cc commands`,
+    which is racy: the cc-command queue is shared across every component in the
+    namespace, so a concurrent (e.g. background) component can append a row
+    between your cc_exec/cc_send and this call. Prefer reading the id directly
+    from the cc call that created it: ``mm_command_id(mm.cc_send(...))`` /
+    ``mm_command_id(mm.cc_exec_once(...))``. Retained only for backwards
+    compatibility with out-of-tree callers.
+    """
     commands = mm.cc_commands()
 
     return {
