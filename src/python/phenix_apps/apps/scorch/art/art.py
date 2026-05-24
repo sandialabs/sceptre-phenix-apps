@@ -40,11 +40,11 @@ class AtomicRedTeam(ComponentBase):
             shell_cmd = f"test -x {goart_path}"
         try:
             utils.mm_exec_wait(mm, hostname, shell_cmd)
-        except Exception:
+        except Exception as ex:
             raise RuntimeError(
                 f"goart not found or not executable at {goart_path} on {hostname}. "
                 f"Ensure it is injected via topology."
-            )
+            ) from ex
 
     def start(self):
         logger.info(f"Starting user component: {self.name}")
