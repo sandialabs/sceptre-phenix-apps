@@ -252,11 +252,8 @@ class CC(ComponentBase):
             f.write(cmd)
 
         self.mm.cc_filter(f"name={hostname}")
-        self.mm.cc_send(cmd_src)
-
-        # wait for file to be sent via cc
-        last_cmd = utils.mm_last_command(self.mm)
-        utils.mm_wait_for_cmd(self.mm, last_cmd["id"])
+        cmd_id = utils.mm_command_id(self.mm.cc_send(cmd_src))
+        utils.mm_wait_for_cmd(self.mm, cmd_id)
         self.mm.clear_cc_filter()
 
         os.remove(cmd_src)
