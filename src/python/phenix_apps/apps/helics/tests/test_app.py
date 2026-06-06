@@ -94,3 +94,18 @@ def test_two_sub_broker_endpoints_on_one_host(tmp_path):
     assert script.count("helics_broker") == 2
     assert "--local_interface 10.0.0.2:24001" in script
     assert "--subbrokers 2 " in (tmp_path / "root-broker.sh").read_text()
+
+
+@pytest.mark.parametrize(
+    ("brokers", "subbrokers"),
+    [([], None), (["10.0.0.2"], "--subbrokers 1 ")],
+    ids=["flat", "hierarchical"],
+)
+def test_root_broker_always_serves_the_web_api(tmp_path, brokers, subbrokers):
+    sub_broker_app(tmp_path, brokers).pre_start()
+
+    script = (tmp_path / "root-broker.sh").read_text()
+    assert '--web --http_server_args="--http_port=8080 --external"' in script
+    assert ("--subbrokers" in script) == bool(subbrokers)
+    if subbrokers:
+        assert subbrokers in script
