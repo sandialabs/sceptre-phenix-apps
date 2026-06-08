@@ -208,6 +208,10 @@ echo 'DONE!'
         if "network" not in spec:
             spec["network"] = {"interfaces": []}
 
+        # Apply node_template delay if present
+        if "delay" in node_tmpl:
+            spec["delay"] = node_tmpl["delay"]
+
         # Apply node_template network override if present
         if "network" in node_tmpl:
             spec["network"] = node_tmpl["network"]
