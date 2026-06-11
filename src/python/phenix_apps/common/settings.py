@@ -14,3 +14,6 @@ PHENIX_TEMP_DIR = os.getenv("PHENIX_TEMP_DIR", "/tmp/phenix")
 
 # Base minimega filepath
 MM_FILEPATH = os.getenv("MM_FILEPATH", "/phenix/images")
+
+# Base minimega filepath
+MM_SOCKET_PATH = os.getenv("MM_SOCKET_PATH", "/tmp/minimega/minimega")
