@@ -7,6 +7,7 @@ import os.path
 import random
 import re
 import shutil
+import socket
 import stat
 import subprocess
 import sys
@@ -741,6 +742,183 @@ def mm_vm_info(mm: minimega.minimega) -> dict:
         # Metadata about VMs, keyed by VM name
         "data": {data["Name"]: data for data in responses[0]["Data"]},
     }
+
+
+def mm_compute_cmd(mm: minimega.minimega, **kwargs) -> list[dict]:
+    """Send command to compute nodes using minimega API.
+
+    Args:
+        mm: minimega connection object
+        **kwargs: Arbitrary keyword arguments including:
+            experiment: Experiment name/namespace
+            computes: Comma-separated list of compute nodes or 'all'
+            command: Command to execute
+            command_type: Type of command (default: 'shell')
+            ignore_error: Whether to ignore errors (default: False)
+
+    Returns:
+        List of response dictionaries from minimega
+
+    Raises:
+        ValueError: If required parameters are missing
+        RuntimeError: If command fails and ignore_error is False
+    """
+    # Validate required parameters
+    required_params = ["experiment", "computes", "command"]
+    for param in required_params:
+        if param not in kwargs:
+            raise ValueError(f"Missing required parameter: {param}")
+
+    experiment = kwargs["experiment"]
+    computes = kwargs.get("computes", "all")  # 'all' or comma-separated list
+    computes_list = computes.split(",")
+    command = kwargs["command"]
+    command_type = kwargs.get("command_type", "shell")
+    ignore_error = kwargs.get("ignore_error", False)
+
+    # Save current namespace and switch to experiment namespace
+    original_namespace = mm._namespace
+    mm.namespace(experiment)
+
+    results = []
+
+    try:
+        hostname = socket.gethostname().split("-")[0]
+        if len(computes_list) == 1 and hostname in computes_list[0]:
+            cmd = f"namespace {experiment} {command_type} {command}"
+        else:
+            cmd = (
+                f"namespace {experiment} mesh send {computes} {command_type} {command}"
+            )
+        logger.debug(cmd)
+        _socket_cmd(cmd, ignore_error=ignore_error)
+
+    except Exception as e:
+        if not ignore_error:
+            raise RuntimeError(f"Command failed: {e}") from e
+        logger.warning(f"Command failed (ignored): {e}")
+    finally:
+        # Restore original namespace
+        if original_namespace:
+            mm.namespace(original_namespace)
+
+    return results
+
+
+def _socket_path():
+    """Get path to minimega domain socket.
+
+    Returns:
+        str: Path to the domain socket.
+    """
+    return "/tmp/minimega/minimega"
+
+
+def _socket_cmd(cmd, ignore_error=False):
+    """Send command to minimega socket and get a response.
+
+    Args:
+        cmd (string): Command to run.
+
+    Returns:
+        list: List of JSON data elements in the minimega response.
+    """
+    client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    client.connect(_socket_path())
+    socketfile = client.makefile("rb")
+
+    msg = json.dumps({"Command": f"{cmd}"})
+    if len(msg) != client.send(msg.encode("utf-8")):
+        logger.error("_socket_cmd(): Failed to write message to minimega")
+        client.close()
+        sys.exit(1)
+    response = _get_response(socketfile)
+    if response["Resp"] and response["Resp"][0]["Error"] and not ignore_error:
+        err = response["Resp"][0]["Error"]
+        logger.error(f"_socket_cmd(): Command: '{cmd}' -- Response: '{err}'")
+        client.close()
+        sys.exit(1)
+    client.close()
+    return response["Resp"]
+
+
+def _get_response(socketfile):
+    """
+    _get_response reads a single response from minimega
+    """
+    line = socketfile.readline().decode("utf-8")
+    response = json.loads(line)
+    if not response:
+        logger.error("_socket_cmd(): Expected response, socket closed")
+        sys.exit(1)
+    return response
+
+
+def mm_host_info(mm: minimega.minimega) -> list[dict]:
+    """Get host information using minimega API.
+
+    This function provides compatibility with the internal phenix.services.minimega
+    API by adapting the minimega Python package.
+
+    Args:
+        mm: minimega connection object
+
+    Returns:
+        List of dictionaries containing host information, each with at least:
+        - 'name': Host name
+        - Other host metadata from minimega
+
+    Raises:
+        RuntimeError: If unable to get host information
+    """
+    try:
+        # Get host information from minimega
+        host_data = mm.host()
+        hosts = []
+        for host_item in host_data:
+            if not host_item.get("Tabular"):
+                continue
+
+            header = host_item["Header"]
+
+            for row in host_item["Tabular"]:
+                host_info = dict(zip(header, row, strict=False))
+
+                # Convert data types as needed (similar to internal implementation)
+                for key, value in host_info.items():
+                    if key in ["tx", "rx"] and isinstance(value, str):
+                        try:
+                            host_info[key] = float(value)
+                        except ValueError:
+                            pass
+                    elif key == "load" and isinstance(value, str):
+                        try:
+                            host_info[key] = [float(val) for val in value.split()]
+                        except ValueError:
+                            pass
+                    elif (
+                        key not in ["name", "uptime"]
+                        and isinstance(value, str)
+                        and value.isdigit()
+                    ):
+                        try:
+                            host_info[key] = int(value)
+                        except ValueError:
+                            pass
+
+                # Fix uptime format using existing utility
+                if "uptime" in host_info:
+                    host_info["uptime"] = hms_to_timedelta(host_info["uptime"])
+
+                # Add hostname
+                host_info["name"] = host_item["Host"]
+
+                hosts.append(host_info)
+
+        return hosts
+
+    except Exception as e:
+        raise RuntimeError(f"Failed to get host information: {e}") from e
 
 
 def mm_kill_process(
