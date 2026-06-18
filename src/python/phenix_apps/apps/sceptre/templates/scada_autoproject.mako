@@ -95,6 +95,7 @@ $select_win | Send-Keys "{Enter}"
 Start-Sleep 1
 $select_win | Send-Keys "{Enter}"
 Start-Sleep 1
+$select_win | Send-Keys "{Enter}"
 
 # Select "Download to Devices" button using menus
 $select_win = Select-Window -Active
