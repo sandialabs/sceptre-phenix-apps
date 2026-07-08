@@ -139,11 +139,11 @@ def get_direction(regtype):
                     ${scada_tags[i]}
                 </text>
             % else:
-                <g id="CompGenericSet1"
+                <g id="CompGenericSet${i}"
                    inkscape:componentSize="178.57143;630.0;0.0;0.0"
-                   inkscape:componentData="{&quot;attr&quot;:&quot;Comp&quot;,&quot;name&quot;:&quot;Display&quot;,&quot;desc&quot;:&quot;Digital display&quot;,&quot;author&quot;:&quot;mySCADA Team&quot;,&quot;uniqueID&quot;:&quot;generic-set-1&quot;,&quot;MasterID&quot;:&quot;000000001&quot;,&quot;list&quot;:[{&quot;variableName&quot;:&quot;color1&quot;,&quot;name&quot;:&quot;Base color&quot;,&quot;desc&quot;:&quot;Set color&quot;,&quot;value&quot;:&quot;#0099CC&quot;,&quot;type&quot;:4},{&quot;variableName&quot;:&quot;color3&quot;,&quot;name&quot;:&quot;Stroke color&quot;,&quot;desc&quot;:&quot;Set color&quot;,&quot;value&quot;:&quot;#0099CC&quot;,&quot;type&quot;:4},{&quot;variableName&quot;:&quot;txt&quot;,&quot;name&quot;:&quot;Text&quot;,&quot;desc&quot;:&quot;Edit text&quot;,&quot;value&quot;:&quot;Set&quot;,&quot;type&quot;:1},{&quot;variableName&quot;:&quot;size&quot;,&quot;name&quot;:&quot;Text size&quot;,&quot;desc&quot;:&quot;Set size&quot;,&quot;value&quot;:&quot;12&quot;,&quot;type&quot;:2},{&quot;variableName&quot;:&quot;color2&quot;,&quot;name&quot;:&quot;Text color&quot;,&quot;desc&quot;:&quot;Set color&quot;,&quot;value&quot;:&quot;#FFFFFF&quot;,&quot;type&quot;:4},{&quot;variableName&quot;:&quot;glow&quot;,&quot;name&quot;:&quot;Glow&quot;,&quot;desc&quot;:&quot;Set glow&quot;,&quot;value&quot;:&quot;0&quot;,&quot;type&quot;:5}]}"
-                   inkscape:label="{&quot;attr&quot;:&quot;setlist&quot;,&quot;listClick&quot;:[{&quot;attr&quot;:&quot;set&quot;,&quot;tag&quot;:&quot;2:${scada_tags[1]}@OPC&quot;,&quot;alias&quot;:&quot;2:${scada_tags[1]}&quot;,&quot;plcName&quot;:&quot;&quot;,&quot;prompt&quot;:&quot;&quot;,&quot;src&quot;:&quot;toggle&quot;,&quot;type&quot;:&quot;&quot;,&quot;memory&quot;:&quot;NO&quot;,&quot;logging&quot;:&quot;NO&quot;,&quot;loggingText&quot;:&quot;&quot;,&quot;stringType&quot;:&quot;10.0;Automatic&quot;,&quot;LockEnable&quot;:&quot;NO&quot;,&quot;title&quot;:&quot;Set the binary value (0 / 1).&quot;,&quot;batchID&quot;:1}] ,&quot;listDown&quot;:[],&quot;listUp&quot;:[]}">
-                    <linearGradient id="genericSetGlow1"
+                   inkscape:componentData="{&quot;attr&quot;:&quot;Comp&quot;,&quot;name&quot;:&quot;Display&quot;,&quot;desc&quot;:&quot;Digital display&quot;,&quot;author&quot;:&quot;mySCADA Team&quot;,&quot;uniqueID&quot;:&quot;generic-set-&quot;,&quot;MasterID&quot;:&quot;000000001&quot;,&quot;list&quot;:[{&quot;variableName&quot;:&quot;color1&quot;,&quot;name&quot;:&quot;Base color&quot;,&quot;desc&quot;:&quot;Set color&quot;,&quot;value&quot;:&quot;#0099CC&quot;,&quot;type&quot;:4},{&quot;variableName&quot;:&quot;color3&quot;,&quot;name&quot;:&quot;Stroke color&quot;,&quot;desc&quot;:&quot;Set color&quot;,&quot;value&quot;:&quot;#0099CC&quot;,&quot;type&quot;:4},{&quot;variableName&quot;:&quot;txt&quot;,&quot;name&quot;:&quot;Text&quot;,&quot;desc&quot;:&quot;Edit text&quot;,&quot;value&quot;:&quot;Set&quot;,&quot;type&quot;:1},{&quot;variableName&quot;:&quot;size&quot;,&quot;name&quot;:&quot;Text size&quot;,&quot;desc&quot;:&quot;Set size&quot;,&quot;value&quot;:&quot;12&quot;,&quot;type&quot;:2},{&quot;variableName&quot;:&quot;color2&quot;,&quot;name&quot;:&quot;Text color&quot;,&quot;desc&quot;:&quot;Set color&quot;,&quot;value&quot;:&quot;#FFFFFF&quot;,&quot;type&quot;:4},{&quot;variableName&quot;:&quot;glow&quot;,&quot;name&quot;:&quot;Glow&quot;,&quot;desc&quot;:&quot;Set glow&quot;,&quot;value&quot;:&quot;0&quot;,&quot;type&quot;:5}]}"
+                   inkscape:label="{&quot;attr&quot;:&quot;setlist&quot;,&quot;listClick&quot;:[{&quot;attr&quot;:&quot;set&quot;,&quot;tag&quot;:&quot;2:${scada_tags[i]}@OPC&quot;,&quot;alias&quot;:&quot;2:${scada_tags[i]}&quot;,&quot;plcName&quot;:&quot;&quot;,&quot;prompt&quot;:&quot;&quot;,&quot;src&quot;:&quot;toggle&quot;,&quot;type&quot;:&quot;&quot;,&quot;memory&quot;:&quot;NO&quot;,&quot;logging&quot;:&quot;NO&quot;,&quot;loggingText&quot;:&quot;&quot;,&quot;stringType&quot;:&quot;10.0;Automatic&quot;,&quot;LockEnable&quot;:&quot;NO&quot;,&quot;title&quot;:&quot;Set the binary value (0 / 1).&quot;,&quot;batchID&quot;:1}] ,&quot;listDown&quot;:[],&quot;listUp&quot;:[]}">
+                    <linearGradient id="genericSetGlow${1}"
                                     gradientUnits="userSpaceOnUse"
                                     x1="0"
                                     y1="0"
@@ -177,14 +177,14 @@ def get_direction(regtype):
                                  font-family:'Ubuntu';
                                  fill:#FFFFFF;
                                  stroke:none;"
-                          id="genericSetLabel1"
+                          id="genericSetLabel${i}"
                           inkscape:textFontSize="size">
-                        <tspan inkscape:label="{&quot;attr&quot;:&quot;get&quot;,&quot;tag&quot;:&quot;2:${scada_tags[1]}@OPC&quot;,&quot;alias&quot;:&quot;2:${scada_tags[1]}&quot;,&quot;type&quot;:&quot;Value&quot;,&quot;param&quot;:&quot;Decimal&quot;,&quot;stringType&quot;:&quot;10;0;Automatic&quot;}">
+                        <tspan inkscape:label="{&quot;attr&quot;:&quot;get&quot;,&quot;tag&quot;:&quot;2:${scada_tags[i]}@OPC&quot;,&quot;alias&quot;:&quot;2:${scada_tags[i]}&quot;,&quot;type&quot;:&quot;Value&quot;,&quot;param&quot;:&quot;Decimal&quot;,&quot;stringType&quot;:&quot;10;0;Automatic&quot;}">
                             Toggle
                         </tspan>
                     </text>
                     <path d="M0 0L10 0L10 10L0 10Z"
-                          id="genericSetPositionCheck1"
+                          id="genericSetPositionCheck${i}"
                           style="display:none"
                           transform="matrix(1 0 0 1 99 99)"/>
                 </g>
