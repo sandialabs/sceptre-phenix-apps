@@ -872,6 +872,27 @@ class Sceptre(AppBase):
             fd_configs.append(fd_config)
             fd_server_configs[fd_.hostname] = fd_config
 
+            # Gather internal tags that might be defined in logic
+            internal_tags = {}
+
+            output_name_to_tag = {}
+            for protocol in fd_config.protocols:
+                for device in protocol.devices:
+                    for register in device.registers:
+                        input_regs = ['analog-input', 'binary-input', 'input-register', 'discrete-input']
+                        if register.regtype not in input_regs:
+                            io_name = f"{fd_config.name}_O{register.addr}"
+                            output_name_to_tag[f"{register.devname}.{register.field}"] = f"var_{io_name}"
+
+            lines = [line.strip() for line in fd_logic.split(';') if line.strip()]
+            for line in lines:
+                parts = line.split('=', 1)
+                if len(parts) == 2:
+                    lhs = parts[0].strip()
+                    mapped_lhs = output_name_to_tag.get(lhs, None)
+                    if mapped_lhs is None:
+                        internal_tags[lhs] = 0.0
+
             # Write fd server config file injection
             config_file = f"{fd_directory}/config.xml"
 
@@ -900,6 +921,7 @@ class Sceptre(AppBase):
                     fd_config=fd_config,
                     logic=fd_logic,
                     cycle_time=fd_cycle_time,
+                    internal_tags=internal_tags,
                 )
 
             self.render_sceptre_start(
@@ -1212,6 +1234,29 @@ class Sceptre(AppBase):
             InfrastructureFieldDeviceConfig = configs.get_fdconfig_class(
                 fd_.metadata.infrastructure
             )
+            
+            # Gather internal tags that might be defined in logic
+            internal_tags = {}
+
+            output_name_to_tag = {}
+            for protocol in fd_config.protocols:
+                for device in protocol.devices:
+                    for register in device.registers:
+                        input_regs = ['analog-input', 'binary-input', 'input-register', 'discrete-input']
+                        if register.regtype not in input_regs:
+                            io_name = f"{fd_config.name}_O{register.addr}"
+                            output_name_to_tag[f"{register.devname}.{register.field}"] = f"var_{io_name}"
+
+            lines = [line.strip() for line in fd_logic.split(';') if line.strip()]
+            for line in lines:
+                parts = line.split('=', 1)
+                if len(parts) == 2:
+                    lhs = parts[0].strip()
+                    mapped_lhs = output_name_to_tag.get(lhs, None)
+                    if mapped_lhs is None:
+                        internal_tags[lhs] = 0.0
+
+
 
             # instantiate the FieldDeviceConfig class
             fep_config = InfrastructureFieldDeviceConfig(
@@ -1223,6 +1268,7 @@ class Sceptre(AppBase):
                 server_endpoint=srv_endpoint,
                 reg_config=reg_config,
                 counter=fep_counter,
+                internal_tags=internal_tags,
             )
             fd_server_configs[fep_config.name] = fep_config
 
