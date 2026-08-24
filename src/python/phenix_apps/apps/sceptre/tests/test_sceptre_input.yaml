@@ -1,0 +1,376 @@
+# Golden-test input for the sceptre app.
+#
+# Deliberately exercises every branch that the configure and pre-start stages
+# reach, including several that only fire on odd topologies:
+#
+#   - three providers with different simulators: PowerWorld (Windows paths),
+#     PyPower, and Simulink with ground truth (the solver/publish-points/gt
+#     injections, which no other host exercises)
+#   - fd-servers on both dnp3 and modbus, plus a serial interface
+#   - a primary OPC and a "bak" OPC on different subnets
+#   - a scada-server with a project file and one without (autoproject/copytree)
+#   - an hmi with connected_scadas and one that falls back to subnet matching
+#   - three historians: primary, "bak" secondary, and one on a subnet that
+#     matches NO opc (this is what exercises the leaked opc_config path)
+#   - helics broker, a non-Helics federate, and a Helics federate
+#   - a fep adopting rtu-2, which also covers the fd_server_configs.pop() path
+#   - an RTDS provider, whose YAML config is the one file configure declares
+#     and pre-start renders from the provider's own metadata
+#
+# opc-1 and hist-1 use a lowercase "mgmt" vlan on purpose. The opc/scada/historian
+# blocks filter with `iface.vlan != "mgmt"` (case-sensitive) while the fd-server
+# block uses `.lower() != "mgmt"`, so lowercase is the only way to exercise the
+# branch where that filter actually drops an interface.
+#
+# Provider case/oneline/solver paths are only ever used as injection "src"
+# strings, so they do not need to exist on disk.
+metadata:
+  annotations:
+    topology: sceptre-golden-topo
+    scenario: sceptre-golden-scenario
+spec:
+  experimentName: sceptre-golden
+  baseDir: /tmp/sceptre-golden
+  scenario:
+    apps:
+      - name: sceptre
+        assetDir: /nonexistent/sceptre-assets
+        hosts:
+          - hostname: provider-pw
+            metadata:
+              type: provider
+              simulator: PowerWorld
+              case: /phenix/topologies/golden/case.PWB
+              oneline: /phenix/topologies/golden/oneline.pwd
+              publish_endpoint: "udp://*;239.0.0.1:40000"
+              hil_tags:
+                - hil-bus-9.voltage
+              debug: true
+
+          - hostname: provider-pp
+            metadata:
+              type: provider
+              simulator: PyPower
+              case: /phenix/topologies/golden/case.py
+              labels:
+                - helics-federate
+              helics:
+                broker: helics-broker-1
+                log_level: 3
+                period: 1
+                real_time: true
+
+          - hostname: provider-sim
+            metadata:
+              type: provider
+              simulator: Simulink
+              solver: /phenix/topologies/golden/simulink_solver
+              publish_points: /phenix/topologies/golden/publish_points.txt
+              # Ground truth: a second, unmodified copy of the same simulator.
+              gt: /phenix/topologies/golden/simulink_gt
+              gt_template: /phenix/topologies/golden/main.tmpl
+
+          - hostname: provider-rtds
+            metadata:
+              type: provider
+              simulator: RTDS
+              rack: 1
+              mapping: /phenix/topologies/golden/rtds_map.csv
+
+          - hostname: fed-helics
+            metadata:
+              simulator: Helics
+              labels:
+                - helics-federate
+              helics:
+                broker: helics-broker-1
+                request_time: max
+                end_time: 100
+                publications:
+                  - key: extra.pub
+                    type: double
+                subscriptions:
+                  - key: extra.sub
+                    type: double
+                    info: extra-info
+                endpoints:
+                  - name: extra.end
+                    destination: somewhere/extra.end
+
+          - hostname: helics-broker-1
+            metadata:
+              labels:
+                - helics-broker
+              helics_broker_loglevel: 5
+
+          - hostname: rtu-1
+            metadata:
+              type: fd-server
+              provider: provider-pw
+              infrastructure: power-transmission
+              cycle_time: 1000
+              dnp3:
+                - type: bus
+                  name: bus-1
+                - type: generator
+                  name: gen-1
+
+          - hostname: rtu-2
+            metadata:
+              type: fd-server
+              provider: provider-pw
+              infrastructure: power-transmission
+              modbus:
+                - type: load
+                  name: load-2
+                - type: branch
+                  name: branch-2-3
+
+          - hostname: rtu-3
+            metadata:
+              type: fd-server
+              provider: provider-pp
+              infrastructure: power-transmission
+              subtype: multi
+              dnp3:
+                - type: bus
+                  name: bus-3
+              modbus-serial:
+                - type: shunt
+                  name: shunt-3
+
+          - hostname: fep-1
+            metadata:
+              type: fep
+              provider: provider-pw
+              infrastructure: power-transmission
+              connected_rtus:
+                - rtu-2
+              dnp3:
+                - type: bus
+                  name: bus-fep
+
+          - hostname: client-1
+            metadata:
+              type: fd-client
+              connected_rtus:
+                - rtu-1
+
+          - hostname: opc-1
+            metadata:
+              type: opc
+              connected_rtus:
+                - rtu-1
+                - rtu-3
+
+          - hostname: opc-bak
+            metadata:
+              type: opc
+
+          - hostname: scada-1
+            metadata:
+              type: scada-server
+              project: /phenix/topologies/golden/myscada.mep
+              automation: /phenix/topologies/golden/myscada.exe
+
+          - hostname: scada-2
+            metadata:
+              type: scada-server
+
+          - hostname: hmi-1
+            metadata:
+              type: hmi
+              connected_scadas:
+                - scada-2
+
+          - hostname: hmi-2
+            metadata:
+              type: hmi
+
+          - hostname: eng-1
+            metadata:
+              type: engineer-workstation
+              connect_interval: 30
+              connected_rtus:
+                - rtu-1
+
+          - hostname: hist-1
+            metadata:
+              type: historian
+              fields:
+                - mw
+                - mvar
+                - voltage
+
+          - hostname: hist-2-bak
+            metadata:
+              type: historian
+              primary: hist-1
+
+          - hostname: hist-3
+            metadata:
+              type: historian
+
+          - hostname: elk-1
+            metadata:
+              type: elk
+              labels:
+                - elk
+  topology:
+    nodes:
+      - general: {hostname: provider-pw}
+        hardware: {os_type: windows}
+        network:
+          interfaces:
+            - {name: IF0, type: ethernet, vlan: MGMT, address: 172.16.0.10, mask: 16}
+            - {name: IF1, type: ethernet, vlan: field, address: 10.2.0.10, mask: 24}
+
+      - general: {hostname: provider-pp}
+        hardware: {os_type: linux}
+        network:
+          interfaces:
+            - {name: IF0, type: ethernet, vlan: MGMT, address: 172.16.0.11, mask: 16}
+            - {name: IF1, type: ethernet, vlan: field, address: 10.2.0.11, mask: 24}
+
+      - general: {hostname: fed-helics}
+        hardware: {os_type: linux}
+        network:
+          interfaces:
+            - {name: IF0, type: ethernet, vlan: field, address: 10.2.0.12, mask: 24}
+
+      - general: {hostname: helics-broker-1}
+        hardware: {os_type: linux}
+        network:
+          interfaces:
+            - {name: IF0, type: ethernet, vlan: field, address: 10.2.0.13, mask: 24}
+
+      - general: {hostname: provider-sim}
+        hardware: {os_type: linux}
+        network:
+          interfaces:
+            - {name: IF0, type: ethernet, vlan: field, address: 10.4.0.3, mask: 24}
+
+      - general: {hostname: provider-rtds}
+        hardware: {os_type: linux}
+        network:
+          interfaces:
+            - {name: IF0, type: ethernet, vlan: field, address: 10.4.0.4, mask: 24}
+
+      - general: {hostname: rtu-1}
+        hardware: {os_type: linux}
+        network:
+          interfaces:
+            - {name: IF0, type: ethernet, vlan: MGMT, address: 172.16.0.20, mask: 16}
+            - {name: IF1, type: ethernet, vlan: field, address: 10.2.0.20, mask: 24}
+
+      - general: {hostname: rtu-2}
+        hardware: {os_type: linux}
+        network:
+          interfaces:
+            - {name: IF0, type: ethernet, vlan: MGMT, address: 172.16.0.21, mask: 16}
+            - {name: IF1, type: ethernet, vlan: field, address: 10.2.0.21, mask: 24}
+
+      - general: {hostname: fep-1}
+        hardware: {os_type: linux}
+        network:
+          interfaces:
+            - {name: IF0, type: ethernet, vlan: mgmt, address: 172.16.0.30, mask: 16}
+            - {name: IF1-upstream, type: ethernet, vlan: field, address: 10.2.0.30, mask: 24}
+
+      - general: {hostname: rtu-3}
+        hardware: {os_type: linux}
+        network:
+          interfaces:
+            - {name: IF0, type: ethernet, vlan: MGMT, address: 172.16.0.22, mask: 16}
+            - {name: IF1, type: ethernet, vlan: field, address: 10.2.0.22, mask: 24}
+            - {name: IF2, type: serial, vlan: serial, address: 10.9.0.22, mask: 24, device: /dev/ttyS0}
+
+      - general: {hostname: client-1}
+        hardware: {os_type: linux}
+        network:
+          interfaces:
+            - {name: IF0, type: ethernet, vlan: MGMT, address: 172.16.0.31, mask: 16}
+            - {name: IF1, type: ethernet, vlan: scada, address: 10.1.0.31, mask: 24}
+
+      - general: {hostname: opc-1}
+        hardware: {os_type: windows}
+        network:
+          interfaces:
+            - {name: IF0, type: ethernet, vlan: mgmt, address: 172.16.0.40, mask: 16}
+            - {name: IF1, type: ethernet, vlan: scada, address: 10.1.0.40, mask: 24}
+
+      - general: {hostname: opc-bak}
+        hardware: {os_type: windows}
+        network:
+          interfaces:
+            - {name: IF0, type: ethernet, vlan: MGMT, address: 172.16.0.41, mask: 16}
+            - {name: IF1, type: ethernet, vlan: scada2, address: 10.3.0.41, mask: 24}
+
+      - general: {hostname: scada-1}
+        hardware: {os_type: windows}
+        network:
+          interfaces:
+            - {name: IF0, type: ethernet, vlan: scada, address: 10.1.0.50, mask: 24}
+            - {name: IF1, type: ethernet, vlan: MGMT, address: 172.16.0.50, mask: 16}
+
+      - general: {hostname: scada-2}
+        hardware: {os_type: windows}
+        network:
+          interfaces:
+            - {name: IF0, type: ethernet, vlan: scada, address: 10.1.0.51, mask: 24}
+            - {name: IF1, type: ethernet, vlan: MGMT, address: 172.16.0.51, mask: 16}
+
+      - general: {hostname: hmi-1}
+        hardware: {os_type: windows}
+        network:
+          interfaces:
+            - {name: IF0, type: ethernet, vlan: scada, address: 10.1.0.60, mask: 24}
+
+      - general: {hostname: hmi-2}
+        hardware: {os_type: windows}
+        network:
+          interfaces:
+            - {name: IF0, type: ethernet, vlan: scada, address: 10.1.0.61, mask: 24}
+
+      - general: {hostname: eng-1}
+        hardware: {os_type: windows}
+        network:
+          interfaces:
+            - {name: IF0, type: ethernet, vlan: scada, address: 10.1.0.70, mask: 24}
+
+      - general: {hostname: hist-1}
+        hardware: {os_type: windows}
+        network:
+          interfaces:
+            - {name: IF0, type: ethernet, vlan: mgmt, address: 172.16.0.80, mask: 16}
+            - {name: IF1, type: ethernet, vlan: scada, address: 10.1.0.80, mask: 24}
+
+      - general: {hostname: hist-2-bak}
+        hardware: {os_type: windows}
+        network:
+          interfaces:
+            - {name: IF0, type: ethernet, vlan: MGMT, address: 172.16.0.81, mask: 16}
+            - {name: IF1, type: ethernet, vlan: scada, address: 10.1.0.81, mask: 24}
+
+      # NOTE: 10.7.0.x matches no OPC subnet. This is what drives the historian
+      # down the path where opc_config is whatever the previous section left behind.
+      - general: {hostname: hist-3}
+        hardware: {os_type: windows}
+        network:
+          interfaces:
+            - {name: IF0, type: ethernet, vlan: MGMT, address: 172.16.0.82, mask: 16}
+            - {name: IF1, type: ethernet, vlan: scada3, address: 10.7.0.82, mask: 24}
+
+      - general: {hostname: elk-1}
+        hardware: {os_type: linux}
+        network:
+          interfaces:
+            - {name: IF0, type: ethernet, vlan: MGMT, address: 172.16.0.90, mask: 16}
+status:
+  vlans:
+    MGMT: 100
+    scada: 200
+    scada2: 201
+    scada3: 202
+    field: 300
+    serial: 400

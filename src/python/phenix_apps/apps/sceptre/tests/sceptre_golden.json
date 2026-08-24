@@ -1,0 +1,2590 @@
+{
+  "configure": {
+    "experiment": {
+      "metadata": {
+        "annotations": {
+          "scenario": "sceptre-golden-scenario",
+          "topology": "sceptre-golden-topo"
+        }
+      },
+      "spec": {
+        "baseDir": "{BASE_DIR}",
+        "experimentName": "sceptre-golden",
+        "scenario": {
+          "apps": [
+            {
+              "assetDir": "/nonexistent/sceptre-assets",
+              "hosts": [
+                {
+                  "hostname": "provider-pw",
+                  "metadata": {
+                    "case": "/phenix/topologies/golden/case.PWB",
+                    "debug": true,
+                    "hil_tags": [
+                      "hil-bus-9.voltage"
+                    ],
+                    "oneline": "/phenix/topologies/golden/oneline.pwd",
+                    "publish_endpoint": "udp://*;239.0.0.1:40000",
+                    "simulator": "PowerWorld",
+                    "type": "provider"
+                  }
+                },
+                {
+                  "hostname": "provider-pp",
+                  "metadata": {
+                    "case": "/phenix/topologies/golden/case.py",
+                    "helics": {
+                      "broker": "helics-broker-1",
+                      "log_level": 3,
+                      "period": 1,
+                      "real_time": true
+                    },
+                    "labels": [
+                      "helics-federate"
+                    ],
+                    "simulator": "PyPower",
+                    "type": "provider"
+                  }
+                },
+                {
+                  "hostname": "provider-sim",
+                  "metadata": {
+                    "gt": "/phenix/topologies/golden/simulink_gt",
+                    "gt_template": "/phenix/topologies/golden/main.tmpl",
+                    "publish_points": "/phenix/topologies/golden/publish_points.txt",
+                    "simulator": "Simulink",
+                    "solver": "/phenix/topologies/golden/simulink_solver",
+                    "type": "provider"
+                  }
+                },
+                {
+                  "hostname": "provider-rtds",
+                  "metadata": {
+                    "mapping": "/phenix/topologies/golden/rtds_map.csv",
+                    "rack": 1,
+                    "simulator": "RTDS",
+                    "type": "provider"
+                  }
+                },
+                {
+                  "hostname": "fed-helics",
+                  "metadata": {
+                    "helics": {
+                      "broker": "helics-broker-1",
+                      "end_time": 100,
+                      "endpoints": [
+                        {
+                          "destination": "somewhere/extra.end",
+                          "name": "extra.end"
+                        }
+                      ],
+                      "publications": [
+                        {
+                          "key": "extra.pub",
+                          "type": "double"
+                        }
+                      ],
+                      "request_time": "max",
+                      "subscriptions": [
+                        {
+                          "info": "extra-info",
+                          "key": "extra.sub",
+                          "type": "double"
+                        }
+                      ]
+                    },
+                    "labels": [
+                      "helics-federate"
+                    ],
+                    "simulator": "Helics"
+                  }
+                },
+                {
+                  "hostname": "helics-broker-1",
+                  "metadata": {
+                    "helics_broker_loglevel": 5,
+                    "labels": [
+                      "helics-broker"
+                    ]
+                  }
+                },
+                {
+                  "hostname": "rtu-1",
+                  "metadata": {
+                    "cycle_time": 1000,
+                    "dnp3": [
+                      {
+                        "name": "bus-1",
+                        "type": "bus"
+                      },
+                      {
+                        "name": "gen-1",
+                        "type": "generator"
+                      }
+                    ],
+                    "infrastructure": "power-transmission",
+                    "provider": "provider-pw",
+                    "type": "fd-server"
+                  }
+                },
+                {
+                  "hostname": "rtu-2",
+                  "metadata": {
+                    "infrastructure": "power-transmission",
+                    "modbus": [
+                      {
+                        "name": "load-2",
+                        "type": "load"
+                      },
+                      {
+                        "name": "branch-2-3",
+                        "type": "branch"
+                      }
+                    ],
+                    "provider": "provider-pw",
+                    "type": "fd-server"
+                  }
+                },
+                {
+                  "hostname": "rtu-3",
+                  "metadata": {
+                    "dnp3": [
+                      {
+                        "name": "bus-3",
+                        "type": "bus"
+                      }
+                    ],
+                    "infrastructure": "power-transmission",
+                    "modbus-serial": [
+                      {
+                        "name": "shunt-3",
+                        "type": "shunt"
+                      }
+                    ],
+                    "provider": "provider-pp",
+                    "subtype": "multi",
+                    "type": "fd-server"
+                  }
+                },
+                {
+                  "hostname": "fep-1",
+                  "metadata": {
+                    "connected_rtus": [
+                      "rtu-2"
+                    ],
+                    "dnp3": [
+                      {
+                        "name": "bus-fep",
+                        "type": "bus"
+                      }
+                    ],
+                    "infrastructure": "power-transmission",
+                    "provider": "provider-pw",
+                    "type": "fep"
+                  }
+                },
+                {
+                  "hostname": "client-1",
+                  "metadata": {
+                    "connected_rtus": [
+                      "rtu-1"
+                    ],
+                    "type": "fd-client"
+                  }
+                },
+                {
+                  "hostname": "opc-1",
+                  "metadata": {
+                    "connected_rtus": [
+                      "rtu-1",
+                      "rtu-3"
+                    ],
+                    "type": "opc"
+                  }
+                },
+                {
+                  "hostname": "opc-bak",
+                  "metadata": {
+                    "type": "opc"
+                  }
+                },
+                {
+                  "hostname": "scada-1",
+                  "metadata": {
+                    "automation": "/phenix/topologies/golden/myscada.exe",
+                    "project": "/phenix/topologies/golden/myscada.mep",
+                    "type": "scada-server"
+                  }
+                },
+                {
+                  "hostname": "scada-2",
+                  "metadata": {
+                    "type": "scada-server"
+                  }
+                },
+                {
+                  "hostname": "hmi-1",
+                  "metadata": {
+                    "connected_scadas": [
+                      "scada-2"
+                    ],
+                    "type": "hmi"
+                  }
+                },
+                {
+                  "hostname": "hmi-2",
+                  "metadata": {
+                    "type": "hmi"
+                  }
+                },
+                {
+                  "hostname": "eng-1",
+                  "metadata": {
+                    "connect_interval": 30,
+                    "connected_rtus": [
+                      "rtu-1"
+                    ],
+                    "type": "engineer-workstation"
+                  }
+                },
+                {
+                  "hostname": "hist-1",
+                  "metadata": {
+                    "fields": [
+                      "mw",
+                      "mvar",
+                      "voltage"
+                    ],
+                    "type": "historian"
+                  }
+                },
+                {
+                  "hostname": "hist-2-bak",
+                  "metadata": {
+                    "primary": "hist-1",
+                    "type": "historian"
+                  }
+                },
+                {
+                  "hostname": "hist-3",
+                  "metadata": {
+                    "type": "historian"
+                  }
+                },
+                {
+                  "hostname": "elk-1",
+                  "metadata": {
+                    "labels": [
+                      "elk"
+                    ],
+                    "type": "elk"
+                  }
+                }
+              ],
+              "name": "sceptre"
+            }
+          ]
+        },
+        "topology": {
+          "nodes": [
+            {
+              "general": {
+                "hostname": "provider-pw"
+              },
+              "hardware": {
+                "os_type": "windows"
+              },
+              "injections": [
+                {
+                  "description": "PowerWorld config",
+                  "dst": "sceptre/config.ini",
+                  "src": "{BASE_DIR}/sceptre/provider-pw/config.ini"
+                },
+                {
+                  "description": "PowerWorld objects",
+                  "dst": "sceptre/objects.txt",
+                  "src": "{BASE_DIR}/sceptre/provider-pw/objects.txt"
+                },
+                {
+                  "description": "PowerWorld binary file",
+                  "dst": "sceptre/case.PWB",
+                  "src": "/phenix/topologies/golden/case.PWB"
+                },
+                {
+                  "description": "PowerWorld display file",
+                  "dst": "sceptre/oneline.pwd",
+                  "src": "/phenix/topologies/golden/oneline.pwd"
+                },
+                {
+                  "description": "provider_startup_scripts",
+                  "dst": "phenix/startup/30-sceptre-start.ps1",
+                  "src": "{BASE_DIR}/startup/provider-pw-start.ps1"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "172.16.0.10",
+                    "mask": 16,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "MGMT"
+                  },
+                  {
+                    "address": "10.2.0.10",
+                    "mask": 24,
+                    "name": "IF1",
+                    "type": "ethernet",
+                    "vlan": "field"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "provider-pp"
+              },
+              "hardware": {
+                "os_type": "linux"
+              },
+              "injections": [
+                {
+                  "description": "PyPower config",
+                  "dst": "/etc/sceptre/config.ini",
+                  "src": "{BASE_DIR}/sceptre/provider-pp/config.ini"
+                },
+                {
+                  "description": "PyPower case file",
+                  "dst": "/etc/sceptre/case.py",
+                  "src": "/phenix/topologies/golden/case.py"
+                },
+                {
+                  "description": "provider_startup_scripts",
+                  "dst": "/etc/phenix/startup/sceptre-start.sh",
+                  "src": "{BASE_DIR}/startup/provider-pp-start.sh"
+                },
+                {
+                  "description": "HELICS config",
+                  "dst": "/etc/sceptre/helics.json",
+                  "src": "{BASE_DIR}/sceptre/provider-pp/helics.json"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "172.16.0.11",
+                    "mask": 16,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "MGMT"
+                  },
+                  {
+                    "address": "10.2.0.11",
+                    "mask": 24,
+                    "name": "IF1",
+                    "type": "ethernet",
+                    "vlan": "field"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "fed-helics"
+              },
+              "hardware": {
+                "os_type": "linux"
+              },
+              "injections": [
+                {
+                  "description": "HELICS config",
+                  "dst": "/etc/sceptre/helics.json",
+                  "src": "{BASE_DIR}/sceptre/fed-helics/helics.json"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "10.2.0.12",
+                    "mask": 24,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "field"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "helics-broker-1"
+              },
+              "hardware": {
+                "os_type": "linux"
+              },
+              "injections": [
+                {
+                  "description": "HELICS broker start",
+                  "dst": "/etc/phenix/startup/helics-broker-start.sh",
+                  "src": "{BASE_DIR}/startup/helics-broker-1-helics.sh"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "10.2.0.13",
+                    "mask": 24,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "field"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "provider-sim"
+              },
+              "hardware": {
+                "os_type": "linux"
+              },
+              "injections": [
+                {
+                  "description": "Simulink solver binary",
+                  "dst": "/etc/sceptre/simulinksolver",
+                  "permissions": "0777",
+                  "src": "/phenix/topologies/golden/simulink_solver"
+                },
+                {
+                  "description": "Simulink solver publish points",
+                  "dst": "/etc/sceptre/publishPoints.txt",
+                  "permissions": "0664",
+                  "src": "/phenix/topologies/golden/publish_points.txt"
+                },
+                {
+                  "description": "Simulink solver ground truth binary",
+                  "dst": "/etc/sceptre/simulinkgt",
+                  "permissions": "0777",
+                  "src": "/phenix/topologies/golden/simulink_gt"
+                },
+                {
+                  "description": "Simulink solver ground truth web template",
+                  "dst": "/etc/sceptre/main.tmpl",
+                  "permissions": "0664",
+                  "src": "/phenix/topologies/golden/main.tmpl"
+                },
+                {
+                  "description": "provider_startup_scripts",
+                  "dst": "/etc/phenix/startup/sceptre-start.sh",
+                  "src": "{BASE_DIR}/startup/provider-sim-start.sh"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "10.4.0.3",
+                    "mask": 24,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "field"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "provider-rtds"
+              },
+              "hardware": {
+                "os_type": "linux"
+              },
+              "injections": [
+                {
+                  "description": "Provider config",
+                  "dst": "/etc/sceptre/config.ini",
+                  "src": "{BASE_DIR}/sceptre/provider-rtds/config.ini"
+                },
+                {
+                  "description": "YAML configuration file for Provider",
+                  "dst": "/etc/sceptre/rtds_config.yaml",
+                  "src": "{BASE_DIR}/sceptre/provider-rtds/rtds_config.yaml"
+                },
+                {
+                  "description": "provider_startup_scripts",
+                  "dst": "/etc/phenix/startup/sceptre-start.sh",
+                  "src": "{BASE_DIR}/startup/provider-rtds-start.sh"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "10.4.0.4",
+                    "mask": 24,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "field"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "rtu-1"
+              },
+              "hardware": {
+                "os_type": "linux"
+              },
+              "injections": [
+                {
+                  "description": "rtu-1 startup script",
+                  "dst": "/etc/phenix/startup/sceptre-start.sh",
+                  "permissions": "0744",
+                  "src": "{BASE_DIR}/startup/rtu-1-start.sh"
+                },
+                {
+                  "description": "rtu-1 config",
+                  "dst": "/etc/sceptre/config.xml",
+                  "src": "{BASE_DIR}/sceptre/rtu-1/config.xml"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "172.16.0.20",
+                    "mask": 16,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "MGMT"
+                  },
+                  {
+                    "address": "10.2.0.20",
+                    "mask": 24,
+                    "name": "IF1",
+                    "type": "ethernet",
+                    "vlan": "field"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "rtu-2"
+              },
+              "hardware": {
+                "os_type": "linux"
+              },
+              "injections": [
+                {
+                  "description": "rtu-2 startup script",
+                  "dst": "/etc/phenix/startup/sceptre-start.sh",
+                  "permissions": "0744",
+                  "src": "{BASE_DIR}/startup/rtu-2-start.sh"
+                },
+                {
+                  "description": "rtu-2 config",
+                  "dst": "/etc/sceptre/config.xml",
+                  "src": "{BASE_DIR}/sceptre/rtu-2/config.xml"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "172.16.0.21",
+                    "mask": 16,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "MGMT"
+                  },
+                  {
+                    "address": "10.2.0.21",
+                    "mask": 24,
+                    "name": "IF1",
+                    "type": "ethernet",
+                    "vlan": "field"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "fep-1"
+              },
+              "hardware": {
+                "os_type": "linux"
+              },
+              "injections": [
+                {
+                  "description": "fep-1 startup script",
+                  "dst": "/etc/phenix/startup/sceptre-start.sh",
+                  "permissions": "0744",
+                  "src": "{BASE_DIR}/startup/fep-1-start.sh"
+                },
+                {
+                  "description": "fep-1 config",
+                  "dst": "/etc/sceptre/config.xml",
+                  "src": "{BASE_DIR}/sceptre/fep-1/config.xml"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "172.16.0.30",
+                    "mask": 16,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "mgmt"
+                  },
+                  {
+                    "address": "10.2.0.30",
+                    "mask": 24,
+                    "name": "IF1-upstream",
+                    "type": "ethernet",
+                    "vlan": "field"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "rtu-3"
+              },
+              "hardware": {
+                "os_type": "linux"
+              },
+              "injections": [
+                {
+                  "description": "rtu-3 startup script",
+                  "dst": "/etc/phenix/startup/sceptre-start.sh",
+                  "permissions": "0744",
+                  "src": "{BASE_DIR}/startup/rtu-3-start.sh"
+                },
+                {
+                  "description": "rtu-3 config",
+                  "dst": "/etc/sceptre/config.xml",
+                  "src": "{BASE_DIR}/sceptre/rtu-3/config.xml"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "172.16.0.22",
+                    "mask": 16,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "MGMT"
+                  },
+                  {
+                    "address": "10.2.0.22",
+                    "mask": 24,
+                    "name": "IF1",
+                    "type": "ethernet",
+                    "vlan": "field"
+                  },
+                  {
+                    "address": "10.9.0.22",
+                    "device": "/dev/ttyS0",
+                    "mask": 24,
+                    "name": "IF2",
+                    "type": "serial",
+                    "vlan": "serial"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "client-1"
+              },
+              "hardware": {
+                "os_type": "linux"
+              },
+              "injections": [
+                {
+                  "description": "client-1 startup script",
+                  "dst": "/etc/phenix/startup/sceptre-start.sh",
+                  "permissions": "0744",
+                  "src": "{BASE_DIR}/startup/client-1-start.sh"
+                },
+                {
+                  "description": "client-1 config",
+                  "dst": "/etc/sceptre/config.xml",
+                  "src": "{BASE_DIR}/sceptre/client-1/config.xml"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "172.16.0.31",
+                    "mask": 16,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "MGMT"
+                  },
+                  {
+                    "address": "10.1.0.31",
+                    "mask": 24,
+                    "name": "IF1",
+                    "type": "ethernet",
+                    "vlan": "scada"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "opc-1"
+              },
+              "hardware": {
+                "os_type": "windows"
+              },
+              "injections": [
+                {
+                  "description": "OPC configuration for TopServer",
+                  "dst": "Users/wwuser/Documents/Configs/Inject/opc.xml",
+                  "src": "{BASE_DIR}/sceptre/opc-1/opc.xml"
+                },
+                {
+                  "description": "OPC TopServer startup script",
+                  "dst": "/sceptre/startup/30-topserver.ps1",
+                  "src": "{BASE_DIR}/sceptre/opc-1/topserver.ps1"
+                },
+                {
+                  "description": "sceptre startup scheduler",
+                  "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
+                  "src": "{BASE_DIR}/startup/sceptre-startup-scheduler.cmd"
+                },
+                {
+                  "description": "sceptre startup script",
+                  "dst": "sceptre/sceptre-startup.ps1",
+                  "src": "{BASE_DIR}/startup/sceptre-startup.ps1"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "172.16.0.40",
+                    "mask": 16,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "mgmt"
+                  },
+                  {
+                    "address": "10.1.0.40",
+                    "mask": 24,
+                    "name": "IF1",
+                    "type": "ethernet",
+                    "vlan": "scada"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "opc-bak"
+              },
+              "hardware": {
+                "os_type": "windows"
+              },
+              "injections": [
+                {
+                  "description": "OPC configuration for TopServer",
+                  "dst": "Users/wwuser/Documents/Configs/Inject/opc.xml",
+                  "src": "{BASE_DIR}/sceptre/opc-bak/opc.xml"
+                },
+                {
+                  "description": "OPC TopServer startup script",
+                  "dst": "/sceptre/startup/30-topserver.ps1",
+                  "src": "{BASE_DIR}/sceptre/opc-bak/topserver.ps1"
+                },
+                {
+                  "description": "sceptre startup scheduler",
+                  "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
+                  "src": "{BASE_DIR}/startup/sceptre-startup-scheduler.cmd"
+                },
+                {
+                  "description": "sceptre startup script",
+                  "dst": "sceptre/sceptre-startup.ps1",
+                  "src": "{BASE_DIR}/startup/sceptre-startup.ps1"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "172.16.0.41",
+                    "mask": 16,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "MGMT"
+                  },
+                  {
+                    "address": "10.3.0.41",
+                    "mask": 24,
+                    "name": "IF1",
+                    "type": "ethernet",
+                    "vlan": "scada2"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "scada-1"
+              },
+              "hardware": {
+                "os_type": "windows"
+              },
+              "injections": [
+                {
+                  "description": "SCADA project file",
+                  "dst": "Users/wwuser/Documents/Configs/Inject/myscada.mep",
+                  "src": "/phenix/topologies/golden/myscada.mep"
+                },
+                {
+                  "description": "Windows automation binary",
+                  "dst": "myscada.exe",
+                  "src": "/phenix/topologies/golden/myscada.exe"
+                },
+                {
+                  "description": "scada",
+                  "dst": "/sceptre/startup/30-scada.ps1",
+                  "src": "{BASE_DIR}/sceptre/scada-1/scada.ps1"
+                },
+                {
+                  "description": "sceptre startup scheduler",
+                  "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
+                  "src": "{BASE_DIR}/startup/sceptre-startup-scheduler.cmd"
+                },
+                {
+                  "description": "sceptre startup script",
+                  "dst": "sceptre/sceptre-startup.ps1",
+                  "src": "{BASE_DIR}/startup/sceptre-startup.ps1"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "10.1.0.50",
+                    "mask": 24,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "scada"
+                  },
+                  {
+                    "address": "172.16.0.50",
+                    "mask": 16,
+                    "name": "IF1",
+                    "type": "ethernet",
+                    "vlan": "MGMT"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "scada-2"
+              },
+              "hardware": {
+                "os_type": "windows"
+              },
+              "injections": [
+                {
+                  "description": "autogenerated SCADA project file",
+                  "dst": "Users/wwuser/Documents/",
+                  "src": "{BASE_DIR}/sceptre/scada-2/autoproject"
+                },
+                {
+                  "description": "scada",
+                  "dst": "/sceptre/startup/30-scada.ps1",
+                  "src": "{BASE_DIR}/sceptre/scada-2/scada_autoproject.ps1"
+                },
+                {
+                  "description": "sceptre startup scheduler",
+                  "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
+                  "src": "{BASE_DIR}/startup/sceptre-startup-scheduler.cmd"
+                },
+                {
+                  "description": "sceptre startup script",
+                  "dst": "sceptre/sceptre-startup.ps1",
+                  "src": "{BASE_DIR}/startup/sceptre-startup.ps1"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "10.1.0.51",
+                    "mask": 24,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "scada"
+                  },
+                  {
+                    "address": "172.16.0.51",
+                    "mask": 16,
+                    "name": "IF1",
+                    "type": "ethernet",
+                    "vlan": "MGMT"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "hmi-1"
+              },
+              "hardware": {
+                "os_type": "windows"
+              },
+              "injections": [
+                {
+                  "description": "HMI startup script",
+                  "dst": "/sceptre/startup/30-hmi.ps1",
+                  "src": "{BASE_DIR}/sceptre/hmi-1/hmi.ps1"
+                },
+                {
+                  "description": "sceptre startup scheduler",
+                  "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
+                  "src": "{BASE_DIR}/startup/sceptre-startup-scheduler.cmd"
+                },
+                {
+                  "description": "sceptre startup script",
+                  "dst": "sceptre/sceptre-startup.ps1",
+                  "src": "{BASE_DIR}/startup/sceptre-startup.ps1"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "10.1.0.60",
+                    "mask": 24,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "scada"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "hmi-2"
+              },
+              "hardware": {
+                "os_type": "windows"
+              },
+              "injections": [
+                {
+                  "description": "HMI startup script",
+                  "dst": "/sceptre/startup/30-hmi.ps1",
+                  "src": "{BASE_DIR}/sceptre/hmi-2/hmi.ps1"
+                },
+                {
+                  "description": "sceptre startup scheduler",
+                  "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
+                  "src": "{BASE_DIR}/startup/sceptre-startup-scheduler.cmd"
+                },
+                {
+                  "description": "sceptre startup script",
+                  "dst": "sceptre/sceptre-startup.ps1",
+                  "src": "{BASE_DIR}/startup/sceptre-startup.ps1"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "10.1.0.61",
+                    "mask": 24,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "scada"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "eng-1"
+              },
+              "hardware": {
+                "os_type": "windows"
+              },
+              "injections": [
+                {
+                  "description": "Engineer workstation PuTTY configurations",
+                  "dst": "/sceptre/startup/30-putty.ps1",
+                  "src": "{BASE_DIR}/sceptre/eng-1/putty.ps1"
+                },
+                {
+                  "description": "Engineer workstation auto putty connections",
+                  "dst": "/sceptre/startup/40-auto_winscp.ps1",
+                  "src": "{BASE_DIR}/sceptre/eng-1/auto_winscp.ps1"
+                },
+                {
+                  "description": "sceptre startup scheduler",
+                  "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
+                  "src": "{BASE_DIR}/startup/sceptre-startup-scheduler.cmd"
+                },
+                {
+                  "description": "sceptre startup script",
+                  "dst": "sceptre/sceptre-startup.ps1",
+                  "src": "{BASE_DIR}/startup/sceptre-startup.ps1"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "10.1.0.70",
+                    "mask": 24,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "scada"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "hist-1"
+              },
+              "hardware": {
+                "os_type": "windows"
+              },
+              "injections": [
+                {
+                  "description": "Historian configuration",
+                  "dst": "Users/wwuser/Documents/Configs/Inject/historian_config.txt",
+                  "src": "{BASE_DIR}/sceptre/hist-1/historian_config.txt"
+                },
+                {
+                  "description": "Historian startup script",
+                  "dst": "/sceptre/startup/30-historian.ps1",
+                  "src": "{BASE_DIR}/sceptre/hist-1/historian.ps1"
+                },
+                {
+                  "description": "sceptre startup scheduler",
+                  "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
+                  "src": "{BASE_DIR}/startup/sceptre-startup-scheduler.cmd"
+                },
+                {
+                  "description": "sceptre startup script",
+                  "dst": "sceptre/sceptre-startup.ps1",
+                  "src": "{BASE_DIR}/startup/sceptre-startup.ps1"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "172.16.0.80",
+                    "mask": 16,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "mgmt"
+                  },
+                  {
+                    "address": "10.1.0.80",
+                    "mask": 24,
+                    "name": "IF1",
+                    "type": "ethernet",
+                    "vlan": "scada"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "hist-2-bak"
+              },
+              "hardware": {
+                "os_type": "windows"
+              },
+              "injections": [
+                {
+                  "description": "Historian configuration",
+                  "dst": "Users/wwuser/Documents/Configs/Inject/historian_config.txt",
+                  "src": "{BASE_DIR}/sceptre/hist-2-bak/historian_config.txt"
+                },
+                {
+                  "description": "Historian startup script",
+                  "dst": "/sceptre/startup/30-historian.ps1",
+                  "src": "{BASE_DIR}/sceptre/hist-2-bak/historian.ps1"
+                },
+                {
+                  "description": "sceptre startup scheduler",
+                  "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
+                  "src": "{BASE_DIR}/startup/sceptre-startup-scheduler.cmd"
+                },
+                {
+                  "description": "sceptre startup script",
+                  "dst": "sceptre/sceptre-startup.ps1",
+                  "src": "{BASE_DIR}/startup/sceptre-startup.ps1"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "172.16.0.81",
+                    "mask": 16,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "MGMT"
+                  },
+                  {
+                    "address": "10.1.0.81",
+                    "mask": 24,
+                    "name": "IF1",
+                    "type": "ethernet",
+                    "vlan": "scada"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "hist-3"
+              },
+              "hardware": {
+                "os_type": "windows"
+              },
+              "injections": [
+                {
+                  "description": "Historian configuration",
+                  "dst": "Users/wwuser/Documents/Configs/Inject/historian_config.txt",
+                  "src": "{BASE_DIR}/sceptre/hist-3/historian_config.txt"
+                },
+                {
+                  "description": "Historian startup script",
+                  "dst": "/sceptre/startup/30-historian.ps1",
+                  "src": "{BASE_DIR}/sceptre/hist-3/historian.ps1"
+                },
+                {
+                  "description": "sceptre startup scheduler",
+                  "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
+                  "src": "{BASE_DIR}/startup/sceptre-startup-scheduler.cmd"
+                },
+                {
+                  "description": "sceptre startup script",
+                  "dst": "sceptre/sceptre-startup.ps1",
+                  "src": "{BASE_DIR}/startup/sceptre-startup.ps1"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "172.16.0.82",
+                    "mask": 16,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "MGMT"
+                  },
+                  {
+                    "address": "10.7.0.82",
+                    "mask": 24,
+                    "name": "IF1",
+                    "type": "ethernet",
+                    "vlan": "scada3"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "elk-1"
+              },
+              "hardware": {
+                "os_type": "linux"
+              },
+              "injections": [
+                {
+                  "description": "vm_elk_startup",
+                  "dst": "/etc/phenix/startup/elk-start.sh",
+                  "permissions": "0774",
+                  "src": "{BASE_DIR}/startup/elk-1-elk-start.sh"
+                },
+                {
+                  "description": "elk",
+                  "dst": "/etc/phenix/analytics/files/fdlist.json",
+                  "src": "{BASE_DIR}/elk/fdlist.json"
+                },
+                {
+                  "description": "elk",
+                  "dst": "/etc/phenix/analytics/files/reg_addrs.json",
+                  "src": "{BASE_DIR}/elk/reg_addrs.json"
+                },
+                {
+                  "description": "elk",
+                  "dst": "/etc/phenix/analytics/files/sceptre_provider_restart.py",
+                  "src": "{BASE_DIR}/elk/sceptre_provider_restart.py"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "172.16.0.90",
+                    "mask": 16,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "MGMT"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "status": {
+        "vlans": {
+          "MGMT": 100,
+          "field": 300,
+          "scada": 200,
+          "scada2": 201,
+          "scada3": 202,
+          "serial": 400
+        }
+      }
+    },
+    "files": {
+      "startup/elk-1-elk-start.sh": "a244b66f50265583e13fe1dd4aed01470facd5ac4680b09704f02ae1c0e0f712",
+      "startup/helics-broker-1-helics.sh": "0de248c2b918bbce674fe114b4d051759fe3a30116ebb5d648cfffc0428490c6"
+    }
+  },
+  "pre_start": {
+    "experiment": {
+      "metadata": {
+        "annotations": {
+          "scenario": "sceptre-golden-scenario",
+          "topology": "sceptre-golden-topo"
+        }
+      },
+      "spec": {
+        "baseDir": "{BASE_DIR}",
+        "experimentName": "sceptre-golden",
+        "scenario": {
+          "apps": [
+            {
+              "assetDir": "/nonexistent/sceptre-assets",
+              "hosts": [
+                {
+                  "hostname": "provider-pw",
+                  "metadata": {
+                    "case": "/phenix/topologies/golden/case.PWB",
+                    "debug": true,
+                    "hil_tags": [
+                      "hil-bus-9.voltage"
+                    ],
+                    "oneline": "/phenix/topologies/golden/oneline.pwd",
+                    "publish_endpoint": "udp://*;239.0.0.1:40000",
+                    "simulator": "PowerWorld",
+                    "type": "provider"
+                  }
+                },
+                {
+                  "hostname": "provider-pp",
+                  "metadata": {
+                    "case": "/phenix/topologies/golden/case.py",
+                    "helics": {
+                      "broker": "helics-broker-1",
+                      "log_level": 3,
+                      "period": 1,
+                      "real_time": true
+                    },
+                    "labels": [
+                      "helics-federate"
+                    ],
+                    "simulator": "PyPower",
+                    "type": "provider"
+                  }
+                },
+                {
+                  "hostname": "provider-sim",
+                  "metadata": {
+                    "gt": "/phenix/topologies/golden/simulink_gt",
+                    "gt_template": "/phenix/topologies/golden/main.tmpl",
+                    "publish_points": "/phenix/topologies/golden/publish_points.txt",
+                    "simulator": "Simulink",
+                    "solver": "/phenix/topologies/golden/simulink_solver",
+                    "type": "provider"
+                  }
+                },
+                {
+                  "hostname": "provider-rtds",
+                  "metadata": {
+                    "mapping": "/phenix/topologies/golden/rtds_map.csv",
+                    "rack": 1,
+                    "simulator": "RTDS",
+                    "type": "provider"
+                  }
+                },
+                {
+                  "hostname": "fed-helics",
+                  "metadata": {
+                    "helics": {
+                      "broker": "helics-broker-1",
+                      "end_time": 100,
+                      "endpoints": [
+                        {
+                          "destination": "somewhere/extra.end",
+                          "name": "extra.end"
+                        }
+                      ],
+                      "publications": [
+                        {
+                          "key": "extra.pub",
+                          "type": "double"
+                        }
+                      ],
+                      "request_time": "max",
+                      "subscriptions": [
+                        {
+                          "info": "extra-info",
+                          "key": "extra.sub",
+                          "type": "double"
+                        }
+                      ]
+                    },
+                    "labels": [
+                      "helics-federate"
+                    ],
+                    "simulator": "Helics"
+                  }
+                },
+                {
+                  "hostname": "helics-broker-1",
+                  "metadata": {
+                    "helics_broker_loglevel": 5,
+                    "labels": [
+                      "helics-broker"
+                    ]
+                  }
+                },
+                {
+                  "hostname": "rtu-1",
+                  "metadata": {
+                    "cycle_time": 1000,
+                    "dnp3": [
+                      {
+                        "name": "bus-1",
+                        "type": "bus"
+                      },
+                      {
+                        "name": "gen-1",
+                        "type": "generator"
+                      }
+                    ],
+                    "infrastructure": "power-transmission",
+                    "provider": "provider-pw",
+                    "type": "fd-server"
+                  }
+                },
+                {
+                  "hostname": "rtu-2",
+                  "metadata": {
+                    "infrastructure": "power-transmission",
+                    "modbus": [
+                      {
+                        "name": "load-2",
+                        "type": "load"
+                      },
+                      {
+                        "name": "branch-2-3",
+                        "type": "branch"
+                      }
+                    ],
+                    "provider": "provider-pw",
+                    "type": "fd-server"
+                  }
+                },
+                {
+                  "hostname": "rtu-3",
+                  "metadata": {
+                    "dnp3": [
+                      {
+                        "name": "bus-3",
+                        "type": "bus"
+                      }
+                    ],
+                    "infrastructure": "power-transmission",
+                    "modbus-serial": [
+                      {
+                        "name": "shunt-3",
+                        "type": "shunt"
+                      }
+                    ],
+                    "provider": "provider-pp",
+                    "subtype": "multi",
+                    "type": "fd-server"
+                  }
+                },
+                {
+                  "hostname": "fep-1",
+                  "metadata": {
+                    "connected_rtus": [
+                      "rtu-2"
+                    ],
+                    "dnp3": [
+                      {
+                        "name": "bus-fep",
+                        "type": "bus"
+                      }
+                    ],
+                    "infrastructure": "power-transmission",
+                    "provider": "provider-pw",
+                    "type": "fep"
+                  }
+                },
+                {
+                  "hostname": "client-1",
+                  "metadata": {
+                    "connected_rtus": [
+                      "rtu-1"
+                    ],
+                    "type": "fd-client"
+                  }
+                },
+                {
+                  "hostname": "opc-1",
+                  "metadata": {
+                    "connected_rtus": [
+                      "rtu-1",
+                      "rtu-3"
+                    ],
+                    "type": "opc"
+                  }
+                },
+                {
+                  "hostname": "opc-bak",
+                  "metadata": {
+                    "type": "opc"
+                  }
+                },
+                {
+                  "hostname": "scada-1",
+                  "metadata": {
+                    "automation": "/phenix/topologies/golden/myscada.exe",
+                    "project": "/phenix/topologies/golden/myscada.mep",
+                    "type": "scada-server"
+                  }
+                },
+                {
+                  "hostname": "scada-2",
+                  "metadata": {
+                    "type": "scada-server"
+                  }
+                },
+                {
+                  "hostname": "hmi-1",
+                  "metadata": {
+                    "connected_scadas": [
+                      "scada-2"
+                    ],
+                    "type": "hmi"
+                  }
+                },
+                {
+                  "hostname": "hmi-2",
+                  "metadata": {
+                    "type": "hmi"
+                  }
+                },
+                {
+                  "hostname": "eng-1",
+                  "metadata": {
+                    "connect_interval": 30,
+                    "connected_rtus": [
+                      "rtu-1"
+                    ],
+                    "type": "engineer-workstation"
+                  }
+                },
+                {
+                  "hostname": "hist-1",
+                  "metadata": {
+                    "fields": [
+                      "mw",
+                      "mvar",
+                      "voltage"
+                    ],
+                    "type": "historian"
+                  }
+                },
+                {
+                  "hostname": "hist-2-bak",
+                  "metadata": {
+                    "primary": "hist-1",
+                    "type": "historian"
+                  }
+                },
+                {
+                  "hostname": "hist-3",
+                  "metadata": {
+                    "type": "historian"
+                  }
+                },
+                {
+                  "hostname": "elk-1",
+                  "metadata": {
+                    "labels": [
+                      "elk"
+                    ],
+                    "type": "elk"
+                  }
+                }
+              ],
+              "name": "sceptre"
+            }
+          ]
+        },
+        "topology": {
+          "nodes": [
+            {
+              "general": {
+                "hostname": "provider-pw"
+              },
+              "hardware": {
+                "os_type": "windows"
+              },
+              "injections": [
+                {
+                  "description": "PowerWorld config",
+                  "dst": "sceptre/config.ini",
+                  "src": "{BASE_DIR}/sceptre/provider-pw/config.ini"
+                },
+                {
+                  "description": "PowerWorld objects",
+                  "dst": "sceptre/objects.txt",
+                  "src": "{BASE_DIR}/sceptre/provider-pw/objects.txt"
+                },
+                {
+                  "description": "PowerWorld binary file",
+                  "dst": "sceptre/case.PWB",
+                  "src": "/phenix/topologies/golden/case.PWB"
+                },
+                {
+                  "description": "PowerWorld display file",
+                  "dst": "sceptre/oneline.pwd",
+                  "src": "/phenix/topologies/golden/oneline.pwd"
+                },
+                {
+                  "description": "provider_startup_scripts",
+                  "dst": "phenix/startup/30-sceptre-start.ps1",
+                  "src": "{BASE_DIR}/startup/provider-pw-start.ps1"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "172.16.0.10",
+                    "mask": 16,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "MGMT"
+                  },
+                  {
+                    "address": "10.2.0.10",
+                    "mask": 24,
+                    "name": "IF1",
+                    "type": "ethernet",
+                    "vlan": "field"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "provider-pp"
+              },
+              "hardware": {
+                "os_type": "linux"
+              },
+              "injections": [
+                {
+                  "description": "PyPower config",
+                  "dst": "/etc/sceptre/config.ini",
+                  "src": "{BASE_DIR}/sceptre/provider-pp/config.ini"
+                },
+                {
+                  "description": "PyPower case file",
+                  "dst": "/etc/sceptre/case.py",
+                  "src": "/phenix/topologies/golden/case.py"
+                },
+                {
+                  "description": "provider_startup_scripts",
+                  "dst": "/etc/phenix/startup/sceptre-start.sh",
+                  "src": "{BASE_DIR}/startup/provider-pp-start.sh"
+                },
+                {
+                  "description": "HELICS config",
+                  "dst": "/etc/sceptre/helics.json",
+                  "src": "{BASE_DIR}/sceptre/provider-pp/helics.json"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "172.16.0.11",
+                    "mask": 16,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "MGMT"
+                  },
+                  {
+                    "address": "10.2.0.11",
+                    "mask": 24,
+                    "name": "IF1",
+                    "type": "ethernet",
+                    "vlan": "field"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "fed-helics"
+              },
+              "hardware": {
+                "os_type": "linux"
+              },
+              "injections": [
+                {
+                  "description": "HELICS config",
+                  "dst": "/etc/sceptre/helics.json",
+                  "src": "{BASE_DIR}/sceptre/fed-helics/helics.json"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "10.2.0.12",
+                    "mask": 24,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "field"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "helics-broker-1"
+              },
+              "hardware": {
+                "os_type": "linux"
+              },
+              "injections": [
+                {
+                  "description": "HELICS broker start",
+                  "dst": "/etc/phenix/startup/helics-broker-start.sh",
+                  "src": "{BASE_DIR}/startup/helics-broker-1-helics.sh"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "10.2.0.13",
+                    "mask": 24,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "field"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "provider-sim"
+              },
+              "hardware": {
+                "os_type": "linux"
+              },
+              "injections": [
+                {
+                  "description": "Simulink solver binary",
+                  "dst": "/etc/sceptre/simulinksolver",
+                  "permissions": "0777",
+                  "src": "/phenix/topologies/golden/simulink_solver"
+                },
+                {
+                  "description": "Simulink solver publish points",
+                  "dst": "/etc/sceptre/publishPoints.txt",
+                  "permissions": "0664",
+                  "src": "/phenix/topologies/golden/publish_points.txt"
+                },
+                {
+                  "description": "Simulink solver ground truth binary",
+                  "dst": "/etc/sceptre/simulinkgt",
+                  "permissions": "0777",
+                  "src": "/phenix/topologies/golden/simulink_gt"
+                },
+                {
+                  "description": "Simulink solver ground truth web template",
+                  "dst": "/etc/sceptre/main.tmpl",
+                  "permissions": "0664",
+                  "src": "/phenix/topologies/golden/main.tmpl"
+                },
+                {
+                  "description": "provider_startup_scripts",
+                  "dst": "/etc/phenix/startup/sceptre-start.sh",
+                  "src": "{BASE_DIR}/startup/provider-sim-start.sh"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "10.4.0.3",
+                    "mask": 24,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "field"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "provider-rtds"
+              },
+              "hardware": {
+                "os_type": "linux"
+              },
+              "injections": [
+                {
+                  "description": "Provider config",
+                  "dst": "/etc/sceptre/config.ini",
+                  "src": "{BASE_DIR}/sceptre/provider-rtds/config.ini"
+                },
+                {
+                  "description": "YAML configuration file for Provider",
+                  "dst": "/etc/sceptre/rtds_config.yaml",
+                  "src": "{BASE_DIR}/sceptre/provider-rtds/rtds_config.yaml"
+                },
+                {
+                  "description": "provider_startup_scripts",
+                  "dst": "/etc/phenix/startup/sceptre-start.sh",
+                  "src": "{BASE_DIR}/startup/provider-rtds-start.sh"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "10.4.0.4",
+                    "mask": 24,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "field"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "rtu-1"
+              },
+              "hardware": {
+                "os_type": "linux"
+              },
+              "injections": [
+                {
+                  "description": "rtu-1 startup script",
+                  "dst": "/etc/phenix/startup/sceptre-start.sh",
+                  "permissions": "0744",
+                  "src": "{BASE_DIR}/startup/rtu-1-start.sh"
+                },
+                {
+                  "description": "rtu-1 config",
+                  "dst": "/etc/sceptre/config.xml",
+                  "src": "{BASE_DIR}/sceptre/rtu-1/config.xml"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "172.16.0.20",
+                    "mask": 16,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "MGMT"
+                  },
+                  {
+                    "address": "10.2.0.20",
+                    "mask": 24,
+                    "name": "IF1",
+                    "type": "ethernet",
+                    "vlan": "field"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "rtu-2"
+              },
+              "hardware": {
+                "os_type": "linux"
+              },
+              "injections": [
+                {
+                  "description": "rtu-2 startup script",
+                  "dst": "/etc/phenix/startup/sceptre-start.sh",
+                  "permissions": "0744",
+                  "src": "{BASE_DIR}/startup/rtu-2-start.sh"
+                },
+                {
+                  "description": "rtu-2 config",
+                  "dst": "/etc/sceptre/config.xml",
+                  "src": "{BASE_DIR}/sceptre/rtu-2/config.xml"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "172.16.0.21",
+                    "mask": 16,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "MGMT"
+                  },
+                  {
+                    "address": "10.2.0.21",
+                    "mask": 24,
+                    "name": "IF1",
+                    "type": "ethernet",
+                    "vlan": "field"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "fep-1"
+              },
+              "hardware": {
+                "os_type": "linux"
+              },
+              "injections": [
+                {
+                  "description": "fep-1 startup script",
+                  "dst": "/etc/phenix/startup/sceptre-start.sh",
+                  "permissions": "0744",
+                  "src": "{BASE_DIR}/startup/fep-1-start.sh"
+                },
+                {
+                  "description": "fep-1 config",
+                  "dst": "/etc/sceptre/config.xml",
+                  "src": "{BASE_DIR}/sceptre/fep-1/config.xml"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "172.16.0.30",
+                    "mask": 16,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "mgmt"
+                  },
+                  {
+                    "address": "10.2.0.30",
+                    "mask": 24,
+                    "name": "IF1-upstream",
+                    "type": "ethernet",
+                    "vlan": "field"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "rtu-3"
+              },
+              "hardware": {
+                "os_type": "linux"
+              },
+              "injections": [
+                {
+                  "description": "rtu-3 startup script",
+                  "dst": "/etc/phenix/startup/sceptre-start.sh",
+                  "permissions": "0744",
+                  "src": "{BASE_DIR}/startup/rtu-3-start.sh"
+                },
+                {
+                  "description": "rtu-3 config",
+                  "dst": "/etc/sceptre/config.xml",
+                  "src": "{BASE_DIR}/sceptre/rtu-3/config.xml"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "172.16.0.22",
+                    "mask": 16,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "MGMT"
+                  },
+                  {
+                    "address": "10.2.0.22",
+                    "mask": 24,
+                    "name": "IF1",
+                    "type": "ethernet",
+                    "vlan": "field"
+                  },
+                  {
+                    "address": "10.9.0.22",
+                    "device": "/dev/ttyS0",
+                    "mask": 24,
+                    "name": "IF2",
+                    "type": "serial",
+                    "vlan": "serial"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "client-1"
+              },
+              "hardware": {
+                "os_type": "linux"
+              },
+              "injections": [
+                {
+                  "description": "client-1 startup script",
+                  "dst": "/etc/phenix/startup/sceptre-start.sh",
+                  "permissions": "0744",
+                  "src": "{BASE_DIR}/startup/client-1-start.sh"
+                },
+                {
+                  "description": "client-1 config",
+                  "dst": "/etc/sceptre/config.xml",
+                  "src": "{BASE_DIR}/sceptre/client-1/config.xml"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "172.16.0.31",
+                    "mask": 16,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "MGMT"
+                  },
+                  {
+                    "address": "10.1.0.31",
+                    "mask": 24,
+                    "name": "IF1",
+                    "type": "ethernet",
+                    "vlan": "scada"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "opc-1"
+              },
+              "hardware": {
+                "os_type": "windows"
+              },
+              "injections": [
+                {
+                  "description": "OPC configuration for TopServer",
+                  "dst": "Users/wwuser/Documents/Configs/Inject/opc.xml",
+                  "src": "{BASE_DIR}/sceptre/opc-1/opc.xml"
+                },
+                {
+                  "description": "OPC TopServer startup script",
+                  "dst": "/sceptre/startup/30-topserver.ps1",
+                  "src": "{BASE_DIR}/sceptre/opc-1/topserver.ps1"
+                },
+                {
+                  "description": "sceptre startup scheduler",
+                  "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
+                  "src": "{BASE_DIR}/startup/sceptre-startup-scheduler.cmd"
+                },
+                {
+                  "description": "sceptre startup script",
+                  "dst": "sceptre/sceptre-startup.ps1",
+                  "src": "{BASE_DIR}/startup/sceptre-startup.ps1"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "172.16.0.40",
+                    "mask": 16,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "mgmt"
+                  },
+                  {
+                    "address": "10.1.0.40",
+                    "mask": 24,
+                    "name": "IF1",
+                    "type": "ethernet",
+                    "vlan": "scada"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "opc-bak"
+              },
+              "hardware": {
+                "os_type": "windows"
+              },
+              "injections": [
+                {
+                  "description": "OPC configuration for TopServer",
+                  "dst": "Users/wwuser/Documents/Configs/Inject/opc.xml",
+                  "src": "{BASE_DIR}/sceptre/opc-bak/opc.xml"
+                },
+                {
+                  "description": "OPC TopServer startup script",
+                  "dst": "/sceptre/startup/30-topserver.ps1",
+                  "src": "{BASE_DIR}/sceptre/opc-bak/topserver.ps1"
+                },
+                {
+                  "description": "sceptre startup scheduler",
+                  "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
+                  "src": "{BASE_DIR}/startup/sceptre-startup-scheduler.cmd"
+                },
+                {
+                  "description": "sceptre startup script",
+                  "dst": "sceptre/sceptre-startup.ps1",
+                  "src": "{BASE_DIR}/startup/sceptre-startup.ps1"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "172.16.0.41",
+                    "mask": 16,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "MGMT"
+                  },
+                  {
+                    "address": "10.3.0.41",
+                    "mask": 24,
+                    "name": "IF1",
+                    "type": "ethernet",
+                    "vlan": "scada2"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "scada-1"
+              },
+              "hardware": {
+                "os_type": "windows"
+              },
+              "injections": [
+                {
+                  "description": "SCADA project file",
+                  "dst": "Users/wwuser/Documents/Configs/Inject/myscada.mep",
+                  "src": "/phenix/topologies/golden/myscada.mep"
+                },
+                {
+                  "description": "Windows automation binary",
+                  "dst": "myscada.exe",
+                  "src": "/phenix/topologies/golden/myscada.exe"
+                },
+                {
+                  "description": "scada",
+                  "dst": "/sceptre/startup/30-scada.ps1",
+                  "src": "{BASE_DIR}/sceptre/scada-1/scada.ps1"
+                },
+                {
+                  "description": "sceptre startup scheduler",
+                  "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
+                  "src": "{BASE_DIR}/startup/sceptre-startup-scheduler.cmd"
+                },
+                {
+                  "description": "sceptre startup script",
+                  "dst": "sceptre/sceptre-startup.ps1",
+                  "src": "{BASE_DIR}/startup/sceptre-startup.ps1"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "10.1.0.50",
+                    "mask": 24,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "scada"
+                  },
+                  {
+                    "address": "172.16.0.50",
+                    "mask": 16,
+                    "name": "IF1",
+                    "type": "ethernet",
+                    "vlan": "MGMT"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "scada-2"
+              },
+              "hardware": {
+                "os_type": "windows"
+              },
+              "injections": [
+                {
+                  "description": "autogenerated SCADA project file",
+                  "dst": "Users/wwuser/Documents/",
+                  "src": "{BASE_DIR}/sceptre/scada-2/autoproject"
+                },
+                {
+                  "description": "scada",
+                  "dst": "/sceptre/startup/30-scada.ps1",
+                  "src": "{BASE_DIR}/sceptre/scada-2/scada_autoproject.ps1"
+                },
+                {
+                  "description": "sceptre startup scheduler",
+                  "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
+                  "src": "{BASE_DIR}/startup/sceptre-startup-scheduler.cmd"
+                },
+                {
+                  "description": "sceptre startup script",
+                  "dst": "sceptre/sceptre-startup.ps1",
+                  "src": "{BASE_DIR}/startup/sceptre-startup.ps1"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "10.1.0.51",
+                    "mask": 24,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "scada"
+                  },
+                  {
+                    "address": "172.16.0.51",
+                    "mask": 16,
+                    "name": "IF1",
+                    "type": "ethernet",
+                    "vlan": "MGMT"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "hmi-1"
+              },
+              "hardware": {
+                "os_type": "windows"
+              },
+              "injections": [
+                {
+                  "description": "HMI startup script",
+                  "dst": "/sceptre/startup/30-hmi.ps1",
+                  "src": "{BASE_DIR}/sceptre/hmi-1/hmi.ps1"
+                },
+                {
+                  "description": "sceptre startup scheduler",
+                  "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
+                  "src": "{BASE_DIR}/startup/sceptre-startup-scheduler.cmd"
+                },
+                {
+                  "description": "sceptre startup script",
+                  "dst": "sceptre/sceptre-startup.ps1",
+                  "src": "{BASE_DIR}/startup/sceptre-startup.ps1"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "10.1.0.60",
+                    "mask": 24,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "scada"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "hmi-2"
+              },
+              "hardware": {
+                "os_type": "windows"
+              },
+              "injections": [
+                {
+                  "description": "HMI startup script",
+                  "dst": "/sceptre/startup/30-hmi.ps1",
+                  "src": "{BASE_DIR}/sceptre/hmi-2/hmi.ps1"
+                },
+                {
+                  "description": "sceptre startup scheduler",
+                  "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
+                  "src": "{BASE_DIR}/startup/sceptre-startup-scheduler.cmd"
+                },
+                {
+                  "description": "sceptre startup script",
+                  "dst": "sceptre/sceptre-startup.ps1",
+                  "src": "{BASE_DIR}/startup/sceptre-startup.ps1"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "10.1.0.61",
+                    "mask": 24,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "scada"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "eng-1"
+              },
+              "hardware": {
+                "os_type": "windows"
+              },
+              "injections": [
+                {
+                  "description": "Engineer workstation PuTTY configurations",
+                  "dst": "/sceptre/startup/30-putty.ps1",
+                  "src": "{BASE_DIR}/sceptre/eng-1/putty.ps1"
+                },
+                {
+                  "description": "Engineer workstation auto putty connections",
+                  "dst": "/sceptre/startup/40-auto_winscp.ps1",
+                  "src": "{BASE_DIR}/sceptre/eng-1/auto_winscp.ps1"
+                },
+                {
+                  "description": "sceptre startup scheduler",
+                  "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
+                  "src": "{BASE_DIR}/startup/sceptre-startup-scheduler.cmd"
+                },
+                {
+                  "description": "sceptre startup script",
+                  "dst": "sceptre/sceptre-startup.ps1",
+                  "src": "{BASE_DIR}/startup/sceptre-startup.ps1"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "10.1.0.70",
+                    "mask": 24,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "scada"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "hist-1"
+              },
+              "hardware": {
+                "os_type": "windows"
+              },
+              "injections": [
+                {
+                  "description": "Historian configuration",
+                  "dst": "Users/wwuser/Documents/Configs/Inject/historian_config.txt",
+                  "src": "{BASE_DIR}/sceptre/hist-1/historian_config.txt"
+                },
+                {
+                  "description": "Historian startup script",
+                  "dst": "/sceptre/startup/30-historian.ps1",
+                  "src": "{BASE_DIR}/sceptre/hist-1/historian.ps1"
+                },
+                {
+                  "description": "sceptre startup scheduler",
+                  "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
+                  "src": "{BASE_DIR}/startup/sceptre-startup-scheduler.cmd"
+                },
+                {
+                  "description": "sceptre startup script",
+                  "dst": "sceptre/sceptre-startup.ps1",
+                  "src": "{BASE_DIR}/startup/sceptre-startup.ps1"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "172.16.0.80",
+                    "mask": 16,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "mgmt"
+                  },
+                  {
+                    "address": "10.1.0.80",
+                    "mask": 24,
+                    "name": "IF1",
+                    "type": "ethernet",
+                    "vlan": "scada"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "hist-2-bak"
+              },
+              "hardware": {
+                "os_type": "windows"
+              },
+              "injections": [
+                {
+                  "description": "Historian configuration",
+                  "dst": "Users/wwuser/Documents/Configs/Inject/historian_config.txt",
+                  "src": "{BASE_DIR}/sceptre/hist-2-bak/historian_config.txt"
+                },
+                {
+                  "description": "Historian startup script",
+                  "dst": "/sceptre/startup/30-historian.ps1",
+                  "src": "{BASE_DIR}/sceptre/hist-2-bak/historian.ps1"
+                },
+                {
+                  "description": "sceptre startup scheduler",
+                  "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
+                  "src": "{BASE_DIR}/startup/sceptre-startup-scheduler.cmd"
+                },
+                {
+                  "description": "sceptre startup script",
+                  "dst": "sceptre/sceptre-startup.ps1",
+                  "src": "{BASE_DIR}/startup/sceptre-startup.ps1"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "172.16.0.81",
+                    "mask": 16,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "MGMT"
+                  },
+                  {
+                    "address": "10.1.0.81",
+                    "mask": 24,
+                    "name": "IF1",
+                    "type": "ethernet",
+                    "vlan": "scada"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "hist-3"
+              },
+              "hardware": {
+                "os_type": "windows"
+              },
+              "injections": [
+                {
+                  "description": "Historian configuration",
+                  "dst": "Users/wwuser/Documents/Configs/Inject/historian_config.txt",
+                  "src": "{BASE_DIR}/sceptre/hist-3/historian_config.txt"
+                },
+                {
+                  "description": "Historian startup script",
+                  "dst": "/sceptre/startup/30-historian.ps1",
+                  "src": "{BASE_DIR}/sceptre/hist-3/historian.ps1"
+                },
+                {
+                  "description": "sceptre startup scheduler",
+                  "dst": "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
+                  "src": "{BASE_DIR}/startup/sceptre-startup-scheduler.cmd"
+                },
+                {
+                  "description": "sceptre startup script",
+                  "dst": "sceptre/sceptre-startup.ps1",
+                  "src": "{BASE_DIR}/startup/sceptre-startup.ps1"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "172.16.0.82",
+                    "mask": 16,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "MGMT"
+                  },
+                  {
+                    "address": "10.7.0.82",
+                    "mask": 24,
+                    "name": "IF1",
+                    "type": "ethernet",
+                    "vlan": "scada3"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "elk-1"
+              },
+              "hardware": {
+                "os_type": "linux"
+              },
+              "injections": [
+                {
+                  "description": "vm_elk_startup",
+                  "dst": "/etc/phenix/startup/elk-start.sh",
+                  "permissions": "0774",
+                  "src": "{BASE_DIR}/startup/elk-1-elk-start.sh"
+                },
+                {
+                  "description": "elk",
+                  "dst": "/etc/phenix/analytics/files/fdlist.json",
+                  "src": "{BASE_DIR}/elk/fdlist.json"
+                },
+                {
+                  "description": "elk",
+                  "dst": "/etc/phenix/analytics/files/reg_addrs.json",
+                  "src": "{BASE_DIR}/elk/reg_addrs.json"
+                },
+                {
+                  "description": "elk",
+                  "dst": "/etc/phenix/analytics/files/sceptre_provider_restart.py",
+                  "src": "{BASE_DIR}/elk/sceptre_provider_restart.py"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "172.16.0.90",
+                    "mask": 16,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "MGMT"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "status": {
+        "vlans": {
+          "MGMT": 100,
+          "field": 300,
+          "scada": 200,
+          "scada2": 201,
+          "scada3": 202,
+          "serial": 400
+        }
+      }
+    },
+    "files": {
+      "elk/fdlist.json": "1bbe3e5f3bef2e40a4ace011de246b820f304ac59b2b1caa92a13879908c0228",
+      "elk/reg_addrs.json": "f6846ccea1b17f04790e1ad31413844e8c568ccfa068c72a591ce4d2def2b235",
+      "elk/sceptre_provider_restart.py": "116430ff58f47275131804b449c61cfe8b95761aaa651bf9020d08d591fc8d07",
+      "sceptre/client-1/config.xml": "276ef3fdce8f9883f1f2a852df2cc609d4361626ee692ac854ebbf6610287c72",
+      "sceptre/eng-1/auto_winscp.ps1": "62757ece7b4b81054400582c1dd5a9ffb1da71ddeed9df581b0006e6ab769468",
+      "sceptre/eng-1/putty.ps1": "40e11cf66230f0045b991d3cab33cea4788c56278c83983f9f7638fd9f0724a2",
+      "sceptre/fed-helics/helics.json": "9151a006eec4a78d1e747be48136883bba069660b50df0d52f41fd81bdc2cda1",
+      "sceptre/fep-1/config.xml": "27aa3b7338044d89b0f6011f629a28a4a953ca4eae2d797b57f9ddf1684215c2",
+      "sceptre/hist-1/historian.ps1": "f6c3b7a63d63e13f50af4e25215263f6e8e521af708cb0a817e2dee869e35da7",
+      "sceptre/hist-1/historian_config.txt": "c0b712539bcef202fea62294a1300a72b2dc65c843edbea9ad2d146a1f618322",
+      "sceptre/hist-2-bak/historian.ps1": "41c97107f52d47db94807bf02444d18c500f04016a1c4e13974b1d34c37dae9c",
+      "sceptre/hist-2-bak/historian_config.txt": "ccc7db51e7623d55617752685c38d8e5f7b8e4aa7f1cc252a1f0e7a2eabbdf72",
+      "sceptre/hist-3/historian.ps1": "c23be7b30a767ffec547670ccbb32f5fb84488c6da9a009ac1fbdae95931ba4b",
+      "sceptre/hist-3/historian_config.txt": "eb9c6e5726c7ee40bdbbe736858c49ee77f223c4c4c596257ddcfe29be3d09de",
+      "sceptre/hmi-1/hmi.ps1": "3087824c0dbd82c91e49f7ca091f88fb8eab2f104fab0428200aaf6332fb5200",
+      "sceptre/hmi-2/hmi.ps1": "cab792ea470e40579c1941dd0d2e3bc7d0c1ea47cbed9e504f252d61249260ca",
+      "sceptre/opc-1/opc.xml": "a17ab86567c54d05bfbc9044e7c530c4c59e0d59dfe5881c6ddd9880d2be8e61",
+      "sceptre/opc-1/topserver.ps1": "fd6384d4f2b09425beb5d6a9e1dc191a1d58475da45ca1d2ec53fe0259e61119",
+      "sceptre/opc-bak/opc.xml": "1da4bfa96b876d59f345d7ade4eede6fc73ff2a97413f74091eec143acdf5021",
+      "sceptre/opc-bak/topserver.ps1": "4d1b2cb40bce813090677eb8d37bd75ff94ad0da8530df94db6a4c538f13cd3d",
+      "sceptre/provider-pp/config.ini": "453336b18c48792b87baf5b3dbd95cb293aa039435256bbf37522b7a5e2da2fa",
+      "sceptre/provider-pp/helics.json": "409221c7a256e9a101b0094f85c69c943096d4d02ae0bcf658aade05ed8a7634",
+      "sceptre/provider-pw/config.ini": "b2043f396a69f09e3cc58346e7a73f168fc50597040b0db228edab199d0bd6a1",
+      "sceptre/provider-pw/objects.txt": "b4ca885b13f095ed5d03c77192906bbb9b267b237abdfaca6cfed9fbdb5cc736",
+      "sceptre/provider-rtds/config.ini": "5cad195ee1b8aab37b602b8a13544ac610eb5fbacc4345d9f990242fc9b12d5f",
+      "sceptre/provider-rtds/rtds_config.yaml": "56cd0f1f580ddb3c5d82371e4813747c9e9e07249576c6cc8d92c928b2df60b9",
+      "sceptre/provider-sim/config.ini": "25a5a8e94b02f65e2c582a3e22051bb5c9bb7d1bb960bffaaf4c2da8ae96783d",
+      "sceptre/rtu-1/config.xml": "c7b185aaa69660df28a4caa296503b0ebec1e4681152a70ce75e7d00318a8d60",
+      "sceptre/rtu-2/config.xml": "c309a8d236fb7ec8fc1ded1f45d28179c5bea98ef807998b9447d254755e8869",
+      "sceptre/rtu-3/config.xml": "c8fb21701d767bc903786a4472b0647a3d6e7f82742a3e4271dcb5f5f0f7479d",
+      "sceptre/scada-1/scada.ps1": "7f1662c317457e43d69ea67538c916cb8d5ed6ddd2105c475129cf1195a37edf",
+      "sceptre/scada-2/autoproject/Fonts/tahoma.ttf": "bc872275da387214f892f4a7d80492910f545cf5d3d443dc73f674dda98d7540",
+      "sceptre/scada-2/autoproject/Fonts/tahomabd.ttf": "6c8ad300898b2cfef2f9168ab9d7bbb344842e42177acc350489fbc5769ca94b",
+      "sceptre/scada-2/autoproject/Layouts/layoutViews.csv": "7454595b4e8a4915b80643ec5b7f8bd1f9c3181233304db7f011f1932c2855f3",
+      "sceptre/scada-2/autoproject/Python/main.py": "9e7266ae648dca8ca1d343a040e3c9670468d744152ef1f348a91c1aef478c90",
+      "sceptre/scada-2/autoproject/Scripts/UserFiles/Ubuntu-R.ttf": "ff6c85b5b809994e8f4a24027db9d6d64505001b0cb2fa7176ac3377e94a6e4f",
+      "sceptre/scada-2/autoproject/Scripts/main.js": "f012f5b9b8293924230b51701fea6c7d87d112ade44e79461344f4ab876aa859",
+      "sceptre/scada-2/autoproject/Table.svg": "eb562ce04ea0f3c9b6af384e1e38b38b32db37e570885ddb71de09f8bad9a619",
+      "sceptre/scada-2/autoproject/cas.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "sceptre/scada-2/autoproject/colors.css": "cc697744650d7752284da00bb8cd2807013206ae2289f8085f324408b3a05427",
+      "sceptre/scada-2/autoproject/connectionsdef.json": "2e7dc9b06a9e7a35b1a1593f8cef70bd4e61f5c7fdf8cbe114c1480b1a819d59",
+      "sceptre/scada-2/autoproject/default.dlg.json": "c106cdb883311758391f4af9a1a8fd2c1a4d9a3b9e1d4d9a6dd4226b97555ccb",
+      "sceptre/scada-2/autoproject/groups.json": "8a82c6ce1f12293ddfba95b58516ff20c8bf2199fdf19fd42e98299a047baa2a",
+      "sceptre/scada-2/autoproject/setting.json": "2af4d35c6f8f24e433dc925b738fad5e37ba8ee4c30308ede641098cc2a145c0",
+      "sceptre/scada-2/autoproject/sounds/beep-1.mp3": "a4b2b465b45b670914e799ffc44f0a237e59b0a8957b20c7c95f77bc81212b6b",
+      "sceptre/scada-2/autoproject/sounds/beep-1.ogg": "3a4d65cd4d2aced2de7a7a800c7533b1a18758c683f98bc57e32227539453fd2",
+      "sceptre/scada-2/autoproject/sounds/beep-2.mp3": "4c77c52302e7c37c8897e828a5a6b7c0c4451bc3b62b2afea46fcc5a509e167e",
+      "sceptre/scada-2/autoproject/sounds/beep-2.ogg": "cca39f3cb1ffc8288a262f658dddc89108ab7f84f0b9ad0b6a832d2d76c8b630",
+      "sceptre/scada-2/autoproject/sounds/sound1.mp3": "821a39a77af3d12a184706be130d81132a6a9f29077d569c024d3c6c2e738b16",
+      "sceptre/scada-2/autoproject/sounds/sound1.ogg": "db76563f60bffc40eb7b1199cefc3903273d2ef3e44bbe6a17f5e44711632a2c",
+      "sceptre/scada-2/autoproject/sounds/sound10.mp3": "a1c0e4a450820d133eafedd76bdf127520fc878179e3845a85cb23a6001175b2",
+      "sceptre/scada-2/autoproject/sounds/sound10.ogg": "c33c969bdc4f7b09a49bbcaacc4caec027efc21ae4335ef6872a34d9dd080a4d",
+      "sceptre/scada-2/autoproject/sounds/sound11.mp3": "4e334c58e21aa8abe79cb09a726cc0ce9ed9e11b8b6a5b587135f28b26d6101b",
+      "sceptre/scada-2/autoproject/sounds/sound11.ogg": "2d941a9dcf31930d9a4b4e696b15c6b273b7ca4f2936f8038b0e3f97f342e7bb",
+      "sceptre/scada-2/autoproject/sounds/sound12.mp3": "f8e16cc1f39f5b57e761e39e684f473640ae82f1ce84990b043b166913cfe6b1",
+      "sceptre/scada-2/autoproject/sounds/sound12.ogg": "198bf3321779eec608ed877541ebe60527d8a38b68c969259f2602c804bef88a",
+      "sceptre/scada-2/autoproject/sounds/sound13.mp3": "a6f95e01e5b5479533483c97db814bea64a009339c6cba61b948fabb5ce9f0ae",
+      "sceptre/scada-2/autoproject/sounds/sound13.ogg": "71a0a37828c9242baccd4877ebde7affec222cc278497006c3b1883ecb0a01ab",
+      "sceptre/scada-2/autoproject/sounds/sound14.mp3": "912177b78279a04f5258cc2d67cae8d510d3656519013790897c90610feff3a3",
+      "sceptre/scada-2/autoproject/sounds/sound14.ogg": "ce4a2cc7b1533d631890f0f13a7ce3253039f12578a224e435128abeed62be33",
+      "sceptre/scada-2/autoproject/sounds/sound15.mp3": "7166ec03207bd44c8042232dca2e2208de996fc8876d1f0c64784000c80d62b5",
+      "sceptre/scada-2/autoproject/sounds/sound15.ogg": "f125c4fb9f7bfdda3120add56f4b8357e5eb175e06cac3db4c49b8600244bcb4",
+      "sceptre/scada-2/autoproject/sounds/sound16.mp3": "2b754af1a8b0c032249ca60a0e4b4f2e7601ab74e59c895b8d6e323cd36cd26c",
+      "sceptre/scada-2/autoproject/sounds/sound16.ogg": "167401ab6b27b9f88a8484e7a9927dbbb288316a5dda05b0106bd7cc4857823e",
+      "sceptre/scada-2/autoproject/sounds/sound17.mp3": "67c2c79b005889fa094feb61555e2ccb7ce95972174befb3556f92e4f9199e5b",
+      "sceptre/scada-2/autoproject/sounds/sound17.ogg": "51597475f1497d49af69f1371bf86660377064481c9433b66c0c4777456f473c",
+      "sceptre/scada-2/autoproject/sounds/sound2.mp3": "9ccb170f9d796174ec9c892d5ab7de061f97155b44ef0312efc4de6a63731782",
+      "sceptre/scada-2/autoproject/sounds/sound2.ogg": "e2b69f59807153951b222c806f7efff74255d45f71c5943d1689a829c8e52100",
+      "sceptre/scada-2/autoproject/sounds/sound3.mp3": "10e938215a422caefca813b77637eb26a7f9ca2b51296562bd976f9f12331639",
+      "sceptre/scada-2/autoproject/sounds/sound3.ogg": "50e8064ff1ef846214bb06d2229d7634a79a01f9bb5c267b5765336b806ada18",
+      "sceptre/scada-2/autoproject/sounds/sound4.mp3": "b745bdbe9f2836ecf417fe0f75cb208905f14037215d9d49b4f104951d31f531",
+      "sceptre/scada-2/autoproject/sounds/sound4.ogg": "e8ae4ccef8917416dfca4f53661da3cf7a576f0aa388826a694c298a28dddbf5",
+      "sceptre/scada-2/autoproject/sounds/sound5.mp3": "daf848ddcbf3f44e7b12c30a49510b739ecd846b1b682e79da2e8a7a8f12d40a",
+      "sceptre/scada-2/autoproject/sounds/sound5.ogg": "81d615cc3a9d9eb28d22cf7087beec96e3f2db26d3ecc1a0d3fcecbb8e62d676",
+      "sceptre/scada-2/autoproject/sounds/sound6.mp3": "3908b62fc00006fef01c1512ff9167f3c0e9f7a8631ebdad9c1e5a06d677b4a8",
+      "sceptre/scada-2/autoproject/sounds/sound6.ogg": "f072d2862eaf1f60563a5875acfd82ac3a1fd24fd9de46e112d3bde241839b1b",
+      "sceptre/scada-2/autoproject/sounds/sound7.mp3": "d3bb6693ba09ac248c5a2e3eee38e62d928eaebc4a2735ee7deaff5caf3ba2a7",
+      "sceptre/scada-2/autoproject/sounds/sound7.ogg": "9f73814c2209e2c218ca4dea1727905fc527bb344debdfbdbc59d5b3800dd3a7",
+      "sceptre/scada-2/autoproject/sounds/sound8.mp3": "ac469e9dd0ceafd7706a13355e85f94f473fc4225326e2dc3fc0c51b7b6ddde3",
+      "sceptre/scada-2/autoproject/sounds/sound8.ogg": "fb3ee34d49f96edaac18da9f501d0cdec6e9c1c126752f683940ede953a206b9",
+      "sceptre/scada-2/autoproject/sounds/sound9.mp3": "19607574d9d95059c14f45b34cfcdd3eb08d479e94874de1e09cc103ea3028e8",
+      "sceptre/scada-2/autoproject/sounds/sound9.ogg": "835fd5b31ed76cbc7bfbd22dcb7c2b1a339790c1b026c9b5c37568ea267c7859",
+      "sceptre/scada-2/autoproject/tag.db": "f99b46edc00dc35a36c13c47d2eff1f8c30c2b6da24887aadc1dc3472549cea5",
+      "sceptre/scada-2/autoproject/translations.json": "efaab169cdfba2c9b0fb66d93b55bb1aadc98ee1b97b2613a45c7e23429ad2f1",
+      "sceptre/scada-2/autoproject/users.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "sceptre/scada-2/autoproject/views.json": "17eaa50367b80ea624cc5dc12ea260d59514aa3a885c3ed26e90840a9e6d6d0e",
+      "sceptre/scada-2/scada_autoproject.ps1": "8d53b5df6f4171fab34fb0a000e76bc9c3fb91077840d7c2ad4a62cd9a322a3a",
+      "startup/client-1-start.sh": "5021cd4af9a7429eeddc685b9dee84a8e7e3c0ff8c87643eea0f249fab67abbc",
+      "startup/elk-1-elk-start.sh": "a244b66f50265583e13fe1dd4aed01470facd5ac4680b09704f02ae1c0e0f712",
+      "startup/fep-1-start.sh": "95c1a980e4756b13b8a01650aa76834a3d7821f29452e45d2ad69b4e0d47ada3",
+      "startup/helics-broker-1-helics.sh": "0de248c2b918bbce674fe114b4d051759fe3a30116ebb5d648cfffc0428490c6",
+      "startup/provider-pp-start.sh": "e868ec95b313ced8bbddb30b73cde23a966265fbb24ef34f78265297be814c10",
+      "startup/provider-pw-start.ps1": "48a44e9ae3efb74ace2ccdd9267f457e7e871c7c2282bd18ecf49b3f5433f595",
+      "startup/provider-rtds-start.sh": "0826e4f39d5581aca2c1a0bfa584ad9eae3a095d19c59e2e5695faf47d3a8adb",
+      "startup/provider-sim-start.sh": "f8d9d6638776b895686a3acd9e6d678eb8670952e80c87006ce657f8d4ac900d",
+      "startup/rtu-1-start.sh": "f8c77b3f4e99563d9f2568f9edd73312aac1b49ef4c9e0a119a47b5ad656c04e",
+      "startup/rtu-2-start.sh": "ea49e327b98e857aa3282b9c3e82168e2aa7604dcad5213d182229ff3db7ebb2",
+      "startup/rtu-3-start.sh": "197642747bc04247754830231eda22e87cc8300b0c94b9ad652cc934927ac81c",
+      "startup/sceptre-startup-scheduler.cmd": "317ac5be4a7f1f3727d73b0131c5cd3a13b81aec0a8cb2594fa6b80ca5865b43",
+      "startup/sceptre-startup.ps1": "9b0e205b1ae517d7dc558120d6f3ff3589026ea245f411f027ac699ffb366587"
+    }
+  }
+}
