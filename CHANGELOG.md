@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **SCEPTRE App**: Pre-flight scenario validation: one pydantic model, run before either stage, reporting every problem at once with the host and field.
+- **SCEPTRE App**: Stage accounting in the logs: a scenario inventory by device type, and what each handler produced.
+- **SCEPTRE App**: Files in `<assetDir>/injects/override/` that match no injection are reported as probable typos.
+- **SCEPTRE App**: Test suite (128 tests), two of them characterization tests over both stages and all 310 infrastructure/device-type/protocol combinations, plus `apps/sceptre/README.md`.
+
+### Changed
+- **SCEPTRE App**: `configure()` and `pre_start()` are stage classes, `ConfigureStage` and `PreStart`, sharing pre-start state through `PreStartState`.
+- **SCEPTRE App**: The device-type table is `configs/infrastructures.yaml`; adding a device type needs no code change.
+- **SCEPTRE App**: Injections are declared with `Sceptre.inject()`, and all of them in the configure stage.
+- **SCEPTRE App**: Type annotations on every app function, `Final` on module constants.
+- **SCEPTRE App**: Validation failures raise `error.AppError` instead of calling `sys.exit(1)`, matching the app contract.
+- **SCEPTRE App**: `metadata.simulator` matches case-insensitively in both stages, as validation already did; a miscased name used to silently get the default config.
+- **Build System**: `package-data` now ships the SunSpec models, the `mydesigner` SCADA tree and the infrastructure table; an installed wheel was missing all three.
+
+### Fixed
+- **SCEPTRE App**: `fep` hosts raised `TypeError`, built without the required `device_subtype`.
+- **SCEPTRE App**: Per-device register overrides raised `RuntimeError` in `SceptreMetadataParser`, which popped keys while iterating a live dict view.
+- **SCEPTRE App**: A `power-transmission` inverter raised `TypeError`, passing `infrastructure` twice into `Device()`.
+- **SCEPTRE App**: A `fep` without a mgmt interface raised `UnboundLocalError`, or reused the previous fep's endpoints.
+- **SCEPTRE App**: A historian on a subnet with no OPC server was configured with an unrelated OPC's tag list and no address to collect from. It now gets no tags and a warning naming the subnet.
+
 ## [2.0.0] - 2026-03-04
 
 ### Changed
