@@ -1,7 +1,7 @@
 from .app import Sceptre
 
 
-def main():
+def main() -> None:
     Sceptre.main("sceptre")
 
 

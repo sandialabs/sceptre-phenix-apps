@@ -107,6 +107,11 @@ phenix_apps = [
     "apps/scorch/opcexport/*.ps1",
     "apps/scorch/opcexport/*.zip",
     "apps/scorch/opcexport/*.exe",
+    # sceptre reads all three of these at runtime; without them an installed
+    # wheel cannot build a field device, a SunSpec device, or a SCADA project.
+    "apps/sceptre/configs/*.yaml",
+    "apps/sceptre/protocols/sunspec/models/smdx/*",
+    "apps/sceptre/templates/mydesigner/**/*",
 ]
 
 # dynamically read version from phenix_apps.__version__
@@ -156,20 +161,7 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 [tool.ruff.lint.per-file-ignores]
 "test_*.py" = ["ARG"] # ignore unused-argument in test files
-"phenix_apps/apps/sceptre/*" = [ # ignore errors in sceptre app until it can be tested
-    "E721",
-    "RUF012",
-    "C414",
-    "B006",
-    "RET503",
-    "E701",
-    "A002",
-    "ARG002",
-    "ARG004",
-    "B007",
-    "F841",
-    "RUF059",
-]
+"phenix_apps/apps/sceptre/protocols/*" = ["RUF012"]
 
 
 [tool.ruff.lint.isort]

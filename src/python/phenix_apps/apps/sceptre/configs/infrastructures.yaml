@@ -1,0 +1,228 @@
+# What each infrastructure's device types expose, and the register range they
+# use. This is data, not config: it mirrors what the bennu field device and the
+# simulation providers agree on, so a change here changes what an experiment
+# publishes.
+#
+# range        the register range for the whole infrastructure, which OpcConfig
+#              reads. A device type repeats it only when it differs.
+# devices      device type -> the fields it exposes per field type. An
+#              inverter's analog-read-write list holds SunSpec model numbers
+#              rather than field names.
+#
+# Adding a device type here is enough for validation to accept it and for
+# create_device to build it; tests/test_infrastructures.py pins every
+# combination, so regenerate that golden file after editing.
+
+power-transmission:
+  range: [-600, 1800]
+  devices:
+    generator:
+      analog-read: [voltage, mw, mvar]
+      binary-read: [active]
+      binary-read-write: [active]
+    bus:
+      analog-read: [voltage, angle, gen_mw, gen_mvar, load_mw, load_mvar, shunt_mvar]
+      binary-read: [active, slack]
+      binary-read-write: [active]
+    load:
+      analog-read: [mw, mvar]
+      binary-read: [active]
+      binary-read-write: [active]
+    branch:
+      analog-read: [charging, current, source_mw, target_mw, phase_angle]
+      binary-read: [active]
+      binary-read-write: [active]
+    shunt:
+      analog-read: [actual_mvar]
+      binary-read: [active]
+      binary-read-write: [active]
+    inverter:
+      analog-read-write: [1, 103, 120, 123]
+power-distribution:
+  range: [-600, 1800]
+  devices:
+    generator:
+      analog-read: [voltage_mag_p1, voltage_mag_p2, voltage_mag_p3, voltage_ang_p1, voltage_ang_p2,
+        voltage_ang_p3, current_mag_p1, current_mag_p2, current_mag_p3, current_ang_p1, current_ang_p2,
+        current_ang_p3, active_power_output, real_power_p1, real_power_p2, real_power_p3,
+        reactive_power_p1, reactive_power_p2, reactive_power_p3, power_factor]
+      analog-read-write: [active_power_output, power_factor]
+      binary-read: [active]
+      binary-read-write: [active]
+    bus:
+      analog-read: [voltage_mag_p1, voltage_mag_p2, voltage_mag_p3, voltage_ang_p1, voltage_ang_p2,
+        voltage_ang_p3]
+    load:
+      analog-read: [voltage_mag_p1, voltage_mag_p2, voltage_mag_p3, voltage_ang_p1, voltage_ang_p2,
+        voltage_ang_p3, current_mag_p1, current_mag_p2, current_mag_p3, current_ang_p1, current_ang_p2,
+        current_ang_p3, real_power_p1, real_power_p2, real_power_p3, reactive_power_p1, reactive_power_p2,
+        reactive_power_p3]
+      binary-read: [active]
+      binary-read-write: [active]
+    branch:
+      analog-read: [voltage_mag_src_p1, voltage_mag_src_p2, voltage_mag_src_p3, voltage_ang_src_p1,
+        voltage_ang_src_p2, voltage_ang_src_p3, current_mag_src_p1, current_mag_src_p2, current_mag_src_p3,
+        current_ang_src_p1, current_ang_src_p2, current_ang_src_p3, real_power_src_p1, real_power_src_p2,
+        real_power_src_p3, reactive_power_src_p1, reactive_power_src_p2, reactive_power_src_p3]
+      binary-read: [active]
+      binary-read-write: [active]
+    shunt:
+      analog-read: [voltage_mag_p1, voltage_mag_p2, voltage_mag_p3, voltage_ang_p1, voltage_ang_p2,
+        voltage_ang_p3, current_mag_p1, current_mag_p2, current_mag_p3, current_ang_p1, current_ang_p2,
+        current_ang_p3, real_power_p1, real_power_p2, real_power_p3, reactive_power_p1, reactive_power_p2,
+        reactive_power_p3]
+      binary-read: [active]
+      binary-read-write: [active]
+    transformer:
+      analog-read: [voltage_mag_wdg1_p1, voltage_mag_wdg1_p2, voltage_mag_wdg1_p3, voltage_ang_wdg1_p1,
+        voltage_ang_wdg1_p2, voltage_ang_wdg1_p3, current_mag_wdg1_p1, current_mag_wdg1_p2,
+        current_mag_wdg1_p3, current_ang_wdg1_p1, current_ang_wdg1_p2, current_ang_wdg1_p3,
+        voltage_mag_wdg2_p1, voltage_mag_wdg2_p2, voltage_mag_wdg2_p3, voltage_ang_wdg2_p1,
+        voltage_ang_wdg2_p2, voltage_ang_wdg2_p3, current_mag_wdg2_p1, current_mag_wdg2_p2,
+        current_mag_wdg2_p3, current_ang_wdg2_p1, current_ang_wdg2_p2, current_ang_wdg2_p3,
+        real_power_p1, real_power_p2, real_power_p3, reactive_power_p1, reactive_power_p2,
+        reactive_power_p3, tap_setting_wdg1, tap_setting_wdg2]
+      analog-read-write: [tap_setting_wdg1, tap_setting_wdg2]
+      binary-read: [active]
+      binary-read-write: [active]
+    inverter:
+      analog-read: [voltage_mag_p1, voltage_mag_p2, voltage_mag_p3, voltage_ang_p1, voltage_ang_p2,
+        voltage_ang_p3, current_mag_p1, current_mag_p2, current_mag_p3, current_ang_p1, current_ang_p2,
+        current_ang_p3, active_power_output, real_power_p1, real_power_p2, real_power_p3,
+        reactive_power_p1, reactive_power_p2, reactive_power_p3]
+      analog-read-write: [1, 101, 123, 126]
+      binary-read: [active]
+      binary-read-write: [active]
+batch-process:
+  range: [0, 1000]
+  devices:
+    fillingstation:
+      analog-read: [request, volume_wasted, backlog]
+    generator:
+      analog-read: [fuel]
+    heatingtank:
+      analog-read: [heating_rate, level_setpoint, flow_in, flow_out, temperature_setpoint,
+        tank_level, tank_volume, temperature]
+      analog-read-write: [heating_rate, level_setpoint, temperature_setpoint]
+      binary-read: [fill_control, empty_control, heater_control, emergency_shutoff]
+      binary-read-write: [fill_control, empty_control, heater_control]
+    mixingtank:
+      analog-read: [requested_fill_rate, mixing_rate, requested_empty_rate, level_setpoint,
+        flow_in, flow_out, mix_percent_setpoint, tank_level, tank_volume, mix_percent, temperature]
+      analog-read-write: [mixing_rate, level_setpoint, mix_percent_setpoint]
+      binary-read: [fill_control, empty_control, mixing_control, emergency_shutoff]
+      binary-read-write: [fill_control, empty_control, mixing_control]
+    pump:
+      analog-read: [flow, temperature]
+      analog-read-write: [flow]
+      binary-read: [active, control]
+      binary-read-write: [active, control]
+    storagetank:
+      analog-read: [level_setpoint, flow_in, flow_out, tank_level, tank_volume, temperature,
+        volume_to_drain]
+      analog-read-write: [flow_in, level_setpoint]
+      binary-read: [fill_control, empty_control, emergency_shutoff]
+      binary-read-write: [fill_control, empty_control]
+    valve:
+      binary-read: [open]
+      binary-read-write: [open]
+hvac:
+  range: [0, 1000]
+  devices:
+    cooler:
+      binary-read: ['on']
+      binary-read-write: [turn_on]
+    fan:
+      analog-read: [speed]
+      analog-read-write: [change_speed]
+    heater:
+      binary-read: ['on']
+      binary-read-write: [turn_on]
+    room:
+      analog-read: [temperature]
+    thermostat:
+      analog-read: [setpoint, margin]
+      analog-read-write: [change_setpoint, change_margin]
+fuel:
+  range: [0, 1000]
+  devices:
+    fillingstation:
+      analog-read: [request, volume_wasted, backlog]
+    generator:
+      analog-read: [fuel]
+    pump:
+      analog-read: [flow, voltage_in]
+      analog-read-write: [flow, voltage_in]
+      binary-read: [active, control]
+      binary-read-write: [active, control]
+    storagetank:
+      analog-read: [level_setpoint, flow_in, tank_volume, volume_to_drain]
+      analog-read-write: [flow_in, level_setpoint]
+      binary-read: [fill_control]
+      binary-read-write: [fill_control]
+    valve:
+      binary-read: [open]
+      binary-read-write: [open]
+opalrt:
+  range: [-32767.0, 32767.0]
+  devices:
+    analog-read:
+      analog-read: [value]
+    analog-read-write:
+      analog-read-write: [value]
+    binary-read:
+      range: [0, 1000]
+      binary-read: [value]
+    binary-read-write:
+      range: [0, 1000]
+      binary-read-write: [value]
+rtds:
+  range: [-32767.0, 32767.0]
+  devices:
+    analog-read:
+      analog-read: [real, angle]
+    analog-read-write:
+      analog-read-write: [value]
+    binary-read-write:
+      range: [0, 1000]
+      binary-read-write: [closed]
+waterway:
+  range: [0, 1000]
+  devices:
+    water:
+      analog-read: [height]
+    gate:
+      analog-read: [open]
+      analog-read-write: [open]
+    valve:
+      analog-read: [open]
+      analog-read-write: [open]
+    boat-sensor:
+      analog-read: [active, direction]
+    boat:
+      analog-read: [location, direction]
+battery:
+  range: [-32767.0, 32767.0]
+  devices:
+    bmsscrtu:
+      analog-read: [istack, vstack, socstack]
+      binary-read-write: [disconnect]
+    bmsse:
+      analog-read: [istack, vstack, socstack]
+    battstack:
+      analog-read: [istack, vstack]
+    cps:
+      analog-read: [pinj, qinj, vbess, ibess]
+generic:
+  range: [-32767.0, 32767.0]
+  devices:
+    analog-read:
+      analog-read: [value]
+    analog-read-write:
+      analog-read-write: [value]
+    binary-read:
+      range: [0, 1000]
+      binary-read: [status]
+    binary-read-write:
+      range: [0, 1000]
+      binary-read-write: [status]

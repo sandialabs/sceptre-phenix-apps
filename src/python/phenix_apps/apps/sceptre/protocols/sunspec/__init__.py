@@ -30,7 +30,9 @@ class SunSpecDevice:
         prior to being passed here.
     """
 
-    def __init__(self, infra, devname, registers):
+    def __init__(
+        self, infra: str | None, devname: str, registers: list["SunSpecDevice.Register"]
+    ) -> None:
         self.infra = infra
         self.devname = devname
         self.registers = registers
@@ -46,7 +48,7 @@ class SunSpecDevice:
         # each configuration should start out at 40002.
         SunSpecDevice.Register.address = 40002
 
-    def generate_registers(self, models):
+    def generate_registers(self, models: list[int]) -> None:
         """Generates RTU register configs for the given models.
 
         Parameters:
@@ -218,7 +220,15 @@ class SunSpecDevice:
         # map identifier 'SunS' at register 40000.
         address = 40002
 
-        def __init__(self, infra, devname, name, fieldtype, field=None, scaling=None):
+        def __init__(
+            self,
+            infra: str,
+            devname: str,
+            name: str,
+            fieldtype: str,
+            field: str | None = None,
+            scaling: str | None = None,
+        ) -> None:
             self.devname = devname
             self.name = name
             self.fieldtype = fieldtype
