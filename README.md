@@ -53,6 +53,7 @@ make clean       # Clean build artifacts
 | :--- | :--- |
 | [caldera](src/python/phenix_apps/apps/caldera) | Runs operations and retrieves reports from a Caldera C2 server. |
 | [helics](src/python/phenix_apps/apps/helics) | Configures and manages HELICS (Hierarchical Engine for Large-scale Infrastructure Co-Simulation) federates. |
+| [ignition](src/python/phenix_apps/apps/ignition) | Configures an Ignition Gateway SCADA master from discovered DNP3 outstations or a hand-authored gateway backup. |
 | [mirror](src/go/cmd/phenix-app-mirror) | Configures cluster-wide packet mirroring to a target node using GRE or ERSPAN tunnels. |
 | [otsim](src/python/phenix_apps/apps/otsim) | Generates configuration files for OT-sim simulations. |
 | [protonuke](src/python/phenix_apps/apps/protonuke) | Injects command-line arguments for the `protonuke` agent service. |

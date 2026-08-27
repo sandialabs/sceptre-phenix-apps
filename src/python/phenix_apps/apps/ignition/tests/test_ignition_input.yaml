@@ -1,0 +1,65 @@
+spec:
+  experimentName: test-ignition
+  baseDir: /tmp/test-ignition
+  scenario:
+    apps:
+      - name: ignition
+        hosts:
+          - hostname: OT-scada
+            metadata:
+              type: gateway
+              perspective: true
+              connected_rtus:
+                - ieee13-1-rtu
+                - hostname: ieee13-2-rtu
+                  name: farm-controller
+                  destination_address: 1025
+          - hostname: hmi-1
+            metadata:
+              type: perspective
+  topology:
+    nodes:
+      - type: VirtualMachine
+        general:
+          hostname: OT-scada
+        hardware:
+          drives:
+            - image: OT-scada.qc2
+          os_type: windows
+        network:
+          interfaces:
+            - name: eth0
+              vlan: OT
+              address: 10.68.30.190
+              mask: 24
+      - type: VirtualMachine
+        general:
+          hostname: ieee13-1-rtu
+        network:
+          interfaces:
+            - name: eth0
+              vlan: OT
+              address: 10.68.30.201
+              mask: 24
+      - type: VirtualMachine
+        general:
+          hostname: hmi-1
+        hardware:
+          drives:
+            - image: hmi.qc2
+          os_type: windows
+        network:
+          interfaces:
+            - name: eth0
+              vlan: OT
+              address: 10.68.30.191
+              mask: 24
+      - type: VirtualMachine
+        general:
+          hostname: ieee13-2-rtu
+        network:
+          interfaces:
+            - name: eth0
+              vlan: OT
+              address: 10.68.30.202
+              mask: 24

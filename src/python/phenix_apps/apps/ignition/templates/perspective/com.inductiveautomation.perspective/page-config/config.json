@@ -1,0 +1,11 @@
+{
+  "pages": {
+    "/": {
+      "title": "Overview",
+      "viewPath": "overview"
+    }
+  },
+  "sharedDocks": {
+    "cornerPriority": "top-bottom"
+  }
+}

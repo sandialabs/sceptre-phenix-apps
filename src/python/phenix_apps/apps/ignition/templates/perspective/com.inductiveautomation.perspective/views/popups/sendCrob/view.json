@@ -1,0 +1,338 @@
+{
+  "custom": {},
+  "params": {
+    "deviceName": "value"
+  },
+  "propConfig": {
+    "params.deviceName": {
+      "paramDirection": "input",
+      "persistent": true
+    }
+  },
+  "props": {
+    "defaultSize": {
+      "height": 500,
+      "width": 400
+    }
+  },
+  "root": {
+    "children": [
+      {
+        "meta": {
+          "name": "IndexField"
+        },
+        "position": {
+          "height": 32,
+          "width": 150,
+          "x": 227,
+          "y": 52
+        },
+        "props": {
+          "value": 0
+        },
+        "type": "ia.input.numeric-entry-field"
+      },
+      {
+        "meta": {
+          "name": "ModeDropdown"
+        },
+        "position": {
+          "height": 36,
+          "width": 256,
+          "x": 121,
+          "y": 99
+        },
+        "props": {
+          "options": [
+            {
+              "label": "Select/Operate",
+              "value": "Select"
+            },
+            {
+              "label": "Direct Operate",
+              "value": "Direct"
+            }
+          ],
+          "value": "Select"
+        },
+        "type": "ia.input.dropdown"
+      },
+      {
+        "meta": {
+          "name": "OpTypeDropdown"
+        },
+        "position": {
+          "height": 36,
+          "width": 256,
+          "x": 121,
+          "y": 148
+        },
+        "props": {
+          "options": [
+            {
+              "label": "NUL",
+              "value": 0
+            },
+            {
+              "label": "PULSE_ON",
+              "value": 1
+            },
+            {
+              "label": "PULSE_OFF",
+              "value": 2
+            },
+            {
+              "label": "LATCH_ON",
+              "value": 3
+            },
+            {
+              "label": "LATCH_OFF",
+              "value": 4
+            }
+          ],
+          "value": 3
+        },
+        "type": "ia.input.dropdown"
+      },
+      {
+        "meta": {
+          "name": "TccDropdown"
+        },
+        "position": {
+          "height": 36,
+          "width": 256,
+          "x": 121,
+          "y": 195
+        },
+        "props": {
+          "options": [
+            {
+              "label": "NUL",
+              "value": 0
+            },
+            {
+              "label": "CLOSE",
+              "value": 1
+            },
+            {
+              "label": "TRIP",
+              "value": 2
+            }
+          ],
+          "value": 0
+        },
+        "type": "ia.input.dropdown"
+      },
+      {
+        "meta": {
+          "name": "CountField"
+        },
+        "position": {
+          "height": 32,
+          "width": 150,
+          "x": 227,
+          "y": 245
+        },
+        "props": {
+          "inputBounds": {
+            "minimum": 0
+          },
+          "value": 1
+        },
+        "type": "ia.input.numeric-entry-field"
+      },
+      {
+        "meta": {
+          "name": "OnTimeField"
+        },
+        "position": {
+          "height": 32,
+          "width": 150,
+          "x": 227,
+          "y": 291
+        },
+        "props": {
+          "inputBounds": {
+            "minimum": 0
+          },
+          "value": 0
+        },
+        "type": "ia.input.numeric-entry-field"
+      },
+      {
+        "meta": {
+          "name": "OffTimeField"
+        },
+        "position": {
+          "height": 32,
+          "width": 150,
+          "x": 227,
+          "y": 340
+        },
+        "props": {
+          "inputBounds": {
+            "minimum": 0
+          },
+          "value": 0
+        },
+        "type": "ia.input.numeric-entry-field"
+      },
+      {
+        "events": {
+          "component": {
+            "onActionPerformed": {
+              "config": {
+                "script": "\tdev \u003d self.view.params.deviceName\n\tidx \u003d self.getSibling(\"IndexField\").props.value\n\top \u003d self.getSibling(\"OpTypeDropdown\").props.value\n\ttcc \u003d self.getSibling(\"TccDropdown\").props.value\n\tcnt \u003d self.getSibling(\"CountField\").props.value\n\tonT \u003d self.getSibling(\"OnTimeField\").props.value\n\toffT \u003d self.getSibling(\"OffTimeField\").props.value\n\tmode \u003d self.getSibling(\"ModeDropdown\").props.value\n\t\n\ttry:\n\t\tif mode \u003d\u003d \"select\":\n\t\t\tsystem.dnp.selectOperateBinary(dev, idx, tcc, op, cnt, onT, offT)\n\t\telse:\n\t\t\tsystem.dnp.directOperateBinary(dev, idx, tcc, op, cnt, onT, offT)\n\t\t\t\n\t\tself.getSibling(\"ResultLabel\").props.text \u003d \"Sent OK\"\n\texcept Exception as e:\n\t\tself.getSibling(\"ResultLabel\").props.text \u003d \"FAILED: \" + str(e)\n\t\t\n\t"
+              },
+              "scope": "G",
+              "type": "script"
+            }
+          }
+        },
+        "meta": {
+          "name": "SendButton"
+        },
+        "position": {
+          "height": 34,
+          "width": 250,
+          "x": 127,
+          "y": 395
+        },
+        "props": {
+          "text": "Send"
+        },
+        "type": "ia.input.button"
+      },
+      {
+        "meta": {
+          "name": "ResultLabel"
+        },
+        "position": {
+          "height": 32,
+          "width": 76,
+          "x": 162,
+          "y": 454
+        },
+        "type": "ia.display.label"
+      },
+      {
+        "meta": {
+          "name": "LabelIndex"
+        },
+        "position": {
+          "height": 32,
+          "width": 70,
+          "x": 20,
+          "y": 52
+        },
+        "props": {
+          "text": "Index:"
+        },
+        "type": "ia.display.label"
+      },
+      {
+        "meta": {
+          "name": "LabelMode"
+        },
+        "position": {
+          "height": 32,
+          "width": 70,
+          "x": 20,
+          "y": 101
+        },
+        "props": {
+          "text": "Mode:"
+        },
+        "type": "ia.display.label"
+      },
+      {
+        "meta": {
+          "name": "LabelOperation"
+        },
+        "position": {
+          "height": 32,
+          "width": 70,
+          "x": 20,
+          "y": 152
+        },
+        "props": {
+          "text": "Operation:"
+        },
+        "type": "ia.display.label"
+      },
+      {
+        "meta": {
+          "name": "LabelTCC"
+        },
+        "position": {
+          "height": 32,
+          "width": 70,
+          "x": 20,
+          "y": 199
+        },
+        "props": {
+          "text": "TCC:"
+        },
+        "type": "ia.display.label"
+      },
+      {
+        "meta": {
+          "name": "LabelCount"
+        },
+        "position": {
+          "height": 32,
+          "rotate": {
+            "anchor": "50% 228%"
+          },
+          "width": 70,
+          "x": 20,
+          "y": 252
+        },
+        "props": {
+          "text": "Count:"
+        },
+        "type": "ia.display.label"
+      },
+      {
+        "meta": {
+          "name": "LabelOnTime"
+        },
+        "position": {
+          "height": 32,
+          "rotate": {
+            "anchor": "50% 228%"
+          },
+          "width": 70,
+          "x": 20,
+          "y": 296
+        },
+        "props": {
+          "text": "On Time:"
+        },
+        "type": "ia.display.label"
+      },
+      {
+        "meta": {
+          "name": "LabelOffTime"
+        },
+        "position": {
+          "height": 32,
+          "rotate": {
+            "anchor": "50% 228%"
+          },
+          "width": 70,
+          "x": 20,
+          "y": 340
+        },
+        "props": {
+          "text": "Off Time:"
+        },
+        "type": "ia.display.label"
+      }
+    ],
+    "meta": {
+      "name": "root"
+    },
+    "type": "ia.container.coord"
+  }
+}

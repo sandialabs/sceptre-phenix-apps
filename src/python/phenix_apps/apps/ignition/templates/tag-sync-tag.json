@@ -1,0 +1,15 @@
+{
+  "name": "_TagSync_",
+  "tagType": "AtomicTag",
+  "valueSource": "expr",
+  "dataType": "DateTime",
+  "expression": "now()",
+  "executionMode": "FixedRate",
+  "executionRate": 30000,
+  "eventScripts": [
+    {
+      "eventid": "valueChanged",
+      "script": ""
+    }
+  ]
+}

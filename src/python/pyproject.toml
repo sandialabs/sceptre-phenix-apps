@@ -41,6 +41,7 @@ dependencies = [
 [project.scripts]
 phenix-app-caldera = "phenix_apps.apps.caldera.__main__:main"
 phenix-app-helics = "phenix_apps.apps.helics.__main__:main"
+phenix-app-ignition = "phenix_apps.apps.ignition.__main__:main"
 phenix-app-ot-sim = "phenix_apps.apps.otsim.__main__:main"
 phenix-app-protonuke = "phenix_apps.apps.protonuke.__main__:main"
 phenix-app-scale = "phenix_apps.apps.scale.__main__:main"
@@ -112,6 +113,11 @@ phenix_apps = [
     "apps/sceptre/configs/*.yaml",
     "apps/sceptre/protocols/sunspec/models/smdx/*",
     "apps/sceptre/templates/mydesigner/**/*",
+    # ignition copies this static Perspective project tree at runtime,
+    # plus the non-mako tag templates at the templates root
+    "apps/ignition/templates/perspective/**/*",
+    "apps/ignition/templates/*.json",
+    "apps/ignition/templates/*.py",
 ]
 
 # dynamically read version from phenix_apps.__version__
@@ -122,6 +128,12 @@ version = {attr = "phenix_apps.__version__"}
 # Same as Black.
 line-length = 88
 indent-width = 4
+
+# captured/authored Ignition assets shipped verbatim (Jython, tab-indented)
+extend-exclude = [
+    "phenix_apps/apps/ignition/templates/perspective",
+    "phenix_apps/apps/ignition/templates/tag-sync.py",
+]
 
 # coupled with default on phenix image (ubuntu:24.04)
 target-version = "py312"
@@ -187,5 +199,6 @@ exclude = [
     "dist",
     "phenix_apps/apps/__init__.py",
     "phenix_apps/common/",
-    "phenix_apps/apps/sceptre/templates/mydesigner/"
+    "phenix_apps/apps/sceptre/templates/mydesigner/",
+    "phenix_apps/apps/ignition/templates/"
 ]
