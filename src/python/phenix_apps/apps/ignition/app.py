@@ -17,10 +17,6 @@ PERSPECTIVE_TYPE = "perspective"
 
 GUEST_APP_DIR = "/phenix/ignition"
 GUEST_STARTUP_DST = "/phenix/startup/99-ignition.ps1"
-GUEST_CLIENT_URL_DST = (
-    "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/"
-    "phenix-perspective-client.url"
-)
 
 TEMPLATES_DIR = utils.abs_path(__file__, "templates")
 PERSPECTIVE_TEMPLATES_DIR = utils.abs_path(__file__, "templates/perspective")
@@ -197,6 +193,7 @@ class Ignition(AppBase):
                 gwbk=bool(cfg.gwbk),
                 perspective=bool(cfg.perspective),
                 project=cfg.perspective.project if cfg.perspective else "",
+                open_client=bool(cfg.perspective and cfg.perspective.open_client),
             )
         self.add_inject(
             hostname=hostname, inject={"src": script, "dst": GUEST_STARTUP_DST}
@@ -292,8 +289,6 @@ class Ignition(AppBase):
             hostname=hostname,
             inject={"src": stage_dir, "dst": f"{GUEST_APP_DIR}/perspective"},
         )
-        if pcfg.open_client:
-            self._write_client_url(hostname, host_dir, "localhost", pcfg.project)
 
     def _write_perspective_project(
         self, project_dir: str, project: str, device_names: list[str]
@@ -386,21 +381,15 @@ class Ignition(AppBase):
 
         host_dir = f"{self.app_dir}/{hostname}"
         os.makedirs(host_dir, exist_ok=True)
-        self._write_client_url(hostname, host_dir, ip, gateways[gw_hostname].project)
 
-    def _write_client_url(
-        self, hostname: str, host_dir: str, gateway: str, project: str
-    ) -> None:
-        url_file = f"{host_dir}/perspective-client.url"
-        with open(url_file, "w", newline="\r\n") as f:
+        script = f"{host_dir}/99-ignition.ps1"
+        url = (
+            f"http://{ip}:8088/data/perspective/client/{gateways[gw_hostname].project}"
+        )
+        with open(script, "w", newline="\r\n") as f:
             utils.mako_serve_template(
-                "perspective-client.url.mako",
-                TEMPLATES_DIR,
-                f,
-                gateway=gateway,
-                project=project,
+                "99-ignition-client.ps1.mako", TEMPLATES_DIR, f, client_url=url
             )
         self.add_inject(
-            hostname=hostname,
-            inject={"src": url_file, "dst": GUEST_CLIENT_URL_DST},
+            hostname=hostname, inject={"src": script, "dst": GUEST_STARTUP_DST}
         )

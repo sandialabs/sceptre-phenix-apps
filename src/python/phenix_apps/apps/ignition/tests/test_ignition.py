@@ -9,7 +9,6 @@ from pydantic import ValidationError
 
 from phenix_apps.apps.ignition.app import (
     GATEWAY_TYPE,
-    GUEST_CLIENT_URL_DST,
     GUEST_STARTUP_DST,
     PERSPECTIVE_TYPE,
     Ignition,
@@ -281,6 +280,11 @@ def test_write_tag_tree_seeds_sync_tag(mock_app, tmp_path):
     assert "system.device.listDevices()" in script
     assert 'system.opc.browse(opcServer="Ignition OPC UA Server"' in script
     assert 'system.tag.configure("[default]", [root], "m")' in script
+    # browse reports java classes, tags need Ignition type names
+    assert '"Double": "Float8"' in script
+    # driver diagnostics browse as "[Diagnostics]"; brackets are illegal in
+    # tag names and must sanitize to the "_Diagnostics_" the views read
+    assert 'replace("[", "_").replace("]", "_")' in script
     # runs under the gateway's jython 2.7: no f-strings
     assert 'f"' not in script
 
@@ -339,7 +343,6 @@ def test_pre_start_perspective_stages_one_directory_inject(mock_app):
         "/phenix/ignition/devices/rtu-1/config.json",
         "/phenix/ignition/devices/rtu-1/resource.json",
         "/phenix/ignition/perspective",
-        GUEST_CLIENT_URL_DST,
         GUEST_STARTUP_DST,
     ]
 
@@ -351,23 +354,29 @@ def test_pre_start_perspective_stages_one_directory_inject(mock_app):
         assert json.load(f)[0]["name"] == "_TagSync_"
 
 
-def test_gateway_client_url_points_at_localhost(mock_app):
+def test_gateway_open_client_points_at_localhost(mock_app):
     _perspective_setup(mock_app)
 
     mock_app.pre_start()
 
-    with open(f"{mock_app.app_dir}/OT-scada/perspective-client.url", newline="") as f:
-        url = f.read()
-    assert "URL=http://localhost:8088/data/perspective/client/hmi\r\n" in url
+    with open(f"{mock_app.app_dir}/OT-scada/99-ignition.ps1", newline="") as f:
+        script = f.read()
+    # the browser pop runs as an interactive logon task, not a Startup-folder
+    # shortcut (which Windows 10 doesn't reliably run)
+    assert "http://localhost:8088/data/perspective/client/hmi" in script
+    assert "Register-ScheduledTask" in script
+    assert "-LogonType Interactive" in script
 
 
-def test_open_client_false_skips_gateway_url(mock_app):
+def test_open_client_false_skips_gateway_pop(mock_app):
     _perspective_setup(mock_app, project="hmi", open_client=False)
 
     mock_app.pre_start()
 
-    dsts = [c.kwargs["inject"]["dst"] for c in mock_app.add_inject.call_args_list]
-    assert GUEST_CLIENT_URL_DST not in dsts
+    with open(f"{mock_app.app_dir}/OT-scada/99-ignition.ps1") as f:
+        script = f.read()
+    assert "Register-ScheduledTask" not in script
+    assert "perspective/client" not in script
 
 
 def test_boot_script_contents_perspective_mode(mock_app):
@@ -405,12 +414,15 @@ def test_perspective_client_infers_single_gateway(mock_app):
     mock_app.pre_start()
 
     mock_app.extract_node_interface_ip.assert_any_call("OT-scada", None)
-    with open(f"{mock_app.app_dir}/hmi-1/perspective-client.url", newline="") as f:
-        url = f.read()
-    assert "URL=http://10.68.30.11:8088/data/perspective/client/hmi\r\n" in url
+    with open(f"{mock_app.app_dir}/hmi-1/99-ignition.ps1", newline="") as f:
+        script = f.read()
+    assert "\r\n" in script
+    assert "% if" not in script  # no leftover mako syntax
+    assert "http://10.68.30.11:8088/data/perspective/client/hmi" in script
+    assert "Register-ScheduledTask" in script
 
     dsts = [c.kwargs["inject"]["dst"] for c in mock_app.add_inject.call_args_list]
-    assert dsts.count(GUEST_CLIENT_URL_DST) == 2  # gateway console + hmi-1
+    assert dsts.count(GUEST_STARTUP_DST) == 2  # gateway + hmi-1 boot scripts
 
 
 def test_perspective_client_without_gateway_raises(mock_app):

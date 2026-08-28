@@ -86,5 +86,9 @@ catch {
     Write-Error "[ignition] $_"
     exit 1
 }
+% if perspective and open_client:
+
+<%include file="perspective-open.ps1.mako" args="url='http://localhost:8088/data/perspective/client/' + project"/>\
+% endif
 
 Write-Output "[ignition] configured!"

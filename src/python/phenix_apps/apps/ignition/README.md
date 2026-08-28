@@ -110,12 +110,28 @@ tags survive.
 
 The DNP3 driver learns its point map by polling the outstation, so tags appear shortly
 after a device connects and keep the driver's flat point names (`AnalogInput0`,
-`BinaryOutput1`, ..., plus the `_Diagnostics_` folder the overview table reads);
-double-clicking a `BinaryOutput<N>` row in a dashboard pre-fills the CROB popup with that
+`BinaryOutput1`, ..., plus the driver's `[Diagnostics]` folder, sanitized to
+`_Diagnostics_` since brackets are illegal in tag names); the browse-reported data type
+of each point is mapped to the matching Ignition tag type (`Double` → `Float8`, etc.).
+Double-clicking a `BinaryOutput<N>` row in a dashboard pre-fills the CROB popup with that
 index. A device is skipped once the provider already holds at least as many of its points
 as the browse returns — delete the device's folder in the Designer to force a re-import,
 or delete `_TagSync_` to stop importing altogether. Progress and failures are logged on
 the gateway under the `phenix.tag-sync` logger.
+
+The overview table lists devices straight from the gateway's device connections
+(`system.device.listDevices`), so it populates even before tags import; the IP/port
+columns fill in from each device's `_Diagnostics_` tags once those exist.
+
+### Browser auto-open
+
+With `open_client` (and on every `type: perspective` host) the boot script registers a
+`phenix-perspective` scheduled task that opens the HMI URL at the console user's logon —
+Windows 10 doesn't reliably run Startup-folder shortcuts, but an interactive logon task
+fires in the logged-on session. The task is also kicked once right after the gateway is
+configured, with a short delay so the gateway web server is up; if nobody is logged on
+yet, an `HKLM ...\CurrentVersion\Run` entry opens it at first logon instead. This needs
+an auto-logon (or logged-in) interactive session and a default browser on the image.
 
 ## Dependencies
 
