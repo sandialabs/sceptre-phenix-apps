@@ -93,8 +93,10 @@ def power_world_kwargs(
 ) -> ProviderConfig:
     """Shared by the whole POWER_WORLD_FAMILY, PowerWorldDynamics included."""
 
-    stage.objects_file_path = str(provider_directory / "objects.txt")
-    stage.hil_object_list = provider.metadata.get("hil_tags", [])
+    # Append, don't assign: with several PowerWorld providers every one gets an
+    # objects.txt, and hil_tags from all of them reach the combined list.
+    stage.objects_file_paths.append(str(provider_directory / "objects.txt"))
+    stage.hil_object_list.extend(provider.metadata.get("hil_tags", []))
     return {"case_file": "case.PWB", "oneline_file": "oneline.pwd"}
 
 

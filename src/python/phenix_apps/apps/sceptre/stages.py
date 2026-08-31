@@ -95,7 +95,7 @@ class PreStartState(Stage):
         self.provider_hosts: list[Box] = []
 
         # Only a PowerWorld provider sets a path to write objects to.
-        self.objects_file_path: str | None = None
+        self.objects_file_paths: list[str] = []
         self.hil_object_list: list[str] = []
         self.power_object_list: list[str] = []
 

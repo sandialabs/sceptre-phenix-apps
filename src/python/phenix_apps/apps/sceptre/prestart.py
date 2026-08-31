@@ -118,12 +118,13 @@ class PreStart(FieldDevices, Scada, Stage):
     def provider_configs(self) -> None:
         """Render each provider's config.ini and startup script.
 
-        Writes: hil_object_list, objects_file_path, provider_hosts, provider_map
+        Writes: hil_object_list, objects_file_paths, provider_hosts, provider_map
         """
 
         self.provider_hosts = self.hosts("provider")
         self.provider_map = {}
-        self.objects_file_path = None
+        self.objects_file_paths = []
+        self.hil_object_list = []
 
         # an ignition hmi needs the provider to sleep first
         needsleep = bool(self.labelled("ignition"))
@@ -190,17 +191,18 @@ class PreStart(FieldDevices, Scada, Stage):
             )
 
     def power_objects(self) -> None:
-        """Write the combined power object list for a PowerWorld provider.
+        """Write the combined power object list for each PowerWorld provider.
 
-        Reads: hil_object_list, objects_file_path, power_object_list
+        Reads: hil_object_list, objects_file_paths, power_object_list
         Writes: power_object_list
         """
 
-        if self.objects_file_path:
+        if self.objects_file_paths:
             self.power_object_list = unique(
                 self.power_object_list + self.hil_object_list
             )
-            Path(self.objects_file_path).write_text("\n".join(self.power_object_list))
+        for path in self.objects_file_paths:
+            Path(path).write_text("\n".join(self.power_object_list))
 
     def register_topics(self, name: str, helics_provider: bool) -> dict:
         """subs/pubs/ends derived from every field device register.

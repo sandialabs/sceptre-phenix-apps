@@ -296,13 +296,37 @@ class TestWritePowerObjects:
     def test_merges_hil_tags_deduplicates_and_sorts(self, sceptre_app, tmp_path):
         objects = tmp_path / "objects.txt"
         ctx = PreStart(sceptre_app)
-        ctx.objects_file_path = str(objects)
+        ctx.objects_file_paths = [str(objects)]
         ctx.power_object_list = ["gen-2", "bus-1", "gen-2"]
         ctx.hil_object_list = ["hil-9", "bus-1"]
 
         ctx.power_objects()
 
         assert objects.read_text().split("\n") == ["bus-1", "gen-2", "hil-9"]
+
+    def test_every_powerworld_provider_gets_the_objects_file(
+        self, sceptre_app, tmp_path
+    ):
+        """Two providers: both objects.txt written, hil_tags from both merged.
+
+        Previously the second provider's path and hil_tags overwrote the
+        first's, so only the last objects.txt existed and only its tags
+        survived.
+        """
+        first = tmp_path / "pw-1" / "objects.txt"
+        second = tmp_path / "pw-2" / "objects.txt"
+        first.parent.mkdir()
+        second.parent.mkdir()
+        ctx = PreStart(sceptre_app)
+        ctx.objects_file_paths = [str(first), str(second)]
+        ctx.power_object_list = ["bus-1"]
+        ctx.hil_object_list = ["hil-1", "hil-2"]
+
+        ctx.power_objects()
+
+        expected = ["bus-1", "hil-1", "hil-2"]
+        assert first.read_text().split("\n") == expected
+        assert second.read_text().split("\n") == expected
 
     def test_writes_nothing_without_a_powerworld_provider(self, sceptre_app, tmp_path):
         ctx = PreStart(sceptre_app)
