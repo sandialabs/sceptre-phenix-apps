@@ -3,7 +3,7 @@
 # Deliberately exercises every branch that the configure and pre-start stages
 # reach, including several that only fire on odd topologies:
 #
-#   - three providers with different simulators: PowerWorld (Windows paths),
+#   - providers with different simulators: two PowerWorld (Windows paths),
 #     PyPower, and Simulink with ground truth (the solver/publish-points/gt
 #     injections, which no other host exercises)
 #   - fd-servers on both dnp3 and modbus, plus a serial interface
@@ -46,6 +46,19 @@ spec:
               hil_tags:
                 - hil-bus-9.voltage
               debug: true
+
+          # Second PowerWorld provider: pins that hil_tags aggregate across
+          # providers and that every PowerWorld provider gets an objects.txt
+          # (each used to be overwritten by the last provider seen).
+          - hostname: provider-pw2
+            metadata:
+              type: provider
+              simulator: PowerWorld
+              case: /phenix/topologies/golden/case2.PWB
+              oneline: /phenix/topologies/golden/oneline2.pwd
+              hil_tags:
+                - hil-bus-9.voltage
+                - hil-line-2.current
 
           - hostname: provider-pp
             metadata:
@@ -224,6 +237,13 @@ spec:
           interfaces:
             - {name: IF0, type: ethernet, vlan: MGMT, address: 172.16.0.10, mask: 16}
             - {name: IF1, type: ethernet, vlan: field, address: 10.2.0.10, mask: 24}
+
+      - general: {hostname: provider-pw2}
+        hardware: {os_type: windows}
+        network:
+          interfaces:
+            - {name: IF0, type: ethernet, vlan: MGMT, address: 172.16.0.14, mask: 16}
+            - {name: IF1, type: ethernet, vlan: field, address: 10.2.0.14, mask: 24}
 
       - general: {hostname: provider-pp}
         hardware: {os_type: linux}

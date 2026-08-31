@@ -30,6 +30,19 @@
                   }
                 },
                 {
+                  "hostname": "provider-pw2",
+                  "metadata": {
+                    "case": "/phenix/topologies/golden/case2.PWB",
+                    "hil_tags": [
+                      "hil-bus-9.voltage",
+                      "hil-line-2.current"
+                    ],
+                    "oneline": "/phenix/topologies/golden/oneline2.pwd",
+                    "simulator": "PowerWorld",
+                    "type": "provider"
+                  }
+                },
+                {
                   "hostname": "provider-pp",
                   "metadata": {
                     "case": "/phenix/topologies/golden/case.py",
@@ -332,6 +345,59 @@
                   },
                   {
                     "address": "10.2.0.10",
+                    "mask": 24,
+                    "name": "IF1",
+                    "type": "ethernet",
+                    "vlan": "field"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "provider-pw2"
+              },
+              "hardware": {
+                "os_type": "windows"
+              },
+              "injections": [
+                {
+                  "description": "PowerWorld config",
+                  "dst": "sceptre/config.ini",
+                  "src": "{BASE_DIR}/sceptre/provider-pw2/config.ini"
+                },
+                {
+                  "description": "PowerWorld objects",
+                  "dst": "sceptre/objects.txt",
+                  "src": "{BASE_DIR}/sceptre/provider-pw2/objects.txt"
+                },
+                {
+                  "description": "PowerWorld binary file",
+                  "dst": "sceptre/case.PWB",
+                  "src": "/phenix/topologies/golden/case2.PWB"
+                },
+                {
+                  "description": "PowerWorld display file",
+                  "dst": "sceptre/oneline.pwd",
+                  "src": "/phenix/topologies/golden/oneline2.pwd"
+                },
+                {
+                  "description": "provider_startup_scripts",
+                  "dst": "phenix/startup/30-sceptre-start.ps1",
+                  "src": "{BASE_DIR}/startup/provider-pw2-start.ps1"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "172.16.0.14",
+                    "mask": 16,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "MGMT"
+                  },
+                  {
+                    "address": "10.2.0.14",
                     "mask": 24,
                     "name": "IF1",
                     "type": "ethernet",
@@ -1275,6 +1341,19 @@
                   }
                 },
                 {
+                  "hostname": "provider-pw2",
+                  "metadata": {
+                    "case": "/phenix/topologies/golden/case2.PWB",
+                    "hil_tags": [
+                      "hil-bus-9.voltage",
+                      "hil-line-2.current"
+                    ],
+                    "oneline": "/phenix/topologies/golden/oneline2.pwd",
+                    "simulator": "PowerWorld",
+                    "type": "provider"
+                  }
+                },
+                {
                   "hostname": "provider-pp",
                   "metadata": {
                     "case": "/phenix/topologies/golden/case.py",
@@ -1577,6 +1656,59 @@
                   },
                   {
                     "address": "10.2.0.10",
+                    "mask": 24,
+                    "name": "IF1",
+                    "type": "ethernet",
+                    "vlan": "field"
+                  }
+                ]
+              }
+            },
+            {
+              "general": {
+                "hostname": "provider-pw2"
+              },
+              "hardware": {
+                "os_type": "windows"
+              },
+              "injections": [
+                {
+                  "description": "PowerWorld config",
+                  "dst": "sceptre/config.ini",
+                  "src": "{BASE_DIR}/sceptre/provider-pw2/config.ini"
+                },
+                {
+                  "description": "PowerWorld objects",
+                  "dst": "sceptre/objects.txt",
+                  "src": "{BASE_DIR}/sceptre/provider-pw2/objects.txt"
+                },
+                {
+                  "description": "PowerWorld binary file",
+                  "dst": "sceptre/case.PWB",
+                  "src": "/phenix/topologies/golden/case2.PWB"
+                },
+                {
+                  "description": "PowerWorld display file",
+                  "dst": "sceptre/oneline.pwd",
+                  "src": "/phenix/topologies/golden/oneline2.pwd"
+                },
+                {
+                  "description": "provider_startup_scripts",
+                  "dst": "phenix/startup/30-sceptre-start.ps1",
+                  "src": "{BASE_DIR}/startup/provider-pw2-start.ps1"
+                }
+              ],
+              "network": {
+                "interfaces": [
+                  {
+                    "address": "172.16.0.14",
+                    "mask": 16,
+                    "name": "IF0",
+                    "type": "ethernet",
+                    "vlan": "MGMT"
+                  },
+                  {
+                    "address": "10.2.0.14",
                     "mask": 24,
                     "name": "IF1",
                     "type": "ethernet",
@@ -2508,7 +2640,9 @@
       "sceptre/provider-pp/config.ini": "453336b18c48792b87baf5b3dbd95cb293aa039435256bbf37522b7a5e2da2fa",
       "sceptre/provider-pp/helics.json": "409221c7a256e9a101b0094f85c69c943096d4d02ae0bcf658aade05ed8a7634",
       "sceptre/provider-pw/config.ini": "b2043f396a69f09e3cc58346e7a73f168fc50597040b0db228edab199d0bd6a1",
-      "sceptre/provider-pw/objects.txt": "b4ca885b13f095ed5d03c77192906bbb9b267b237abdfaca6cfed9fbdb5cc736",
+      "sceptre/provider-pw/objects.txt": "07c0fec4f15314f12e77110caafaba2768153da8cdb88af9efb26155ac2bd483",
+      "sceptre/provider-pw2/config.ini": "ecd08893debbb1b370391d577b0e3a5855871872cf547316142430e53d9ea767",
+      "sceptre/provider-pw2/objects.txt": "07c0fec4f15314f12e77110caafaba2768153da8cdb88af9efb26155ac2bd483",
       "sceptre/provider-rtds/config.ini": "5cad195ee1b8aab37b602b8a13544ac610eb5fbacc4345d9f990242fc9b12d5f",
       "sceptre/provider-rtds/rtds_config.yaml": "56cd0f1f580ddb3c5d82371e4813747c9e9e07249576c6cc8d92c928b2df60b9",
       "sceptre/provider-sim/config.ini": "25a5a8e94b02f65e2c582a3e22051bb5c9bb7d1bb960bffaaf4c2da8ae96783d",
@@ -2578,6 +2712,7 @@
       "startup/helics-broker-1-helics.sh": "0de248c2b918bbce674fe114b4d051759fe3a30116ebb5d648cfffc0428490c6",
       "startup/provider-pp-start.sh": "e868ec95b313ced8bbddb30b73cde23a966265fbb24ef34f78265297be814c10",
       "startup/provider-pw-start.ps1": "48a44e9ae3efb74ace2ccdd9267f457e7e871c7c2282bd18ecf49b3f5433f595",
+      "startup/provider-pw2-start.ps1": "48a44e9ae3efb74ace2ccdd9267f457e7e871c7c2282bd18ecf49b3f5433f595",
       "startup/provider-rtds-start.sh": "0826e4f39d5581aca2c1a0bfa584ad9eae3a095d19c59e2e5695faf47d3a8adb",
       "startup/provider-sim-start.sh": "f8d9d6638776b895686a3acd9e6d678eb8670952e80c87006ce657f8d4ac900d",
       "startup/rtu-1-start.sh": "f8c77b3f4e99563d9f2568f9edd73312aac1b49ef4c9e0a119a47b5ad656c04e",
