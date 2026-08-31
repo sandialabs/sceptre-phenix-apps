@@ -72,7 +72,6 @@ DEVICE_TYPES = (
 def render(infrastructure: str, device_type, protocol: str) -> str:
     """One combination's behaviour, as a single line."""
 
-    Register.reset_addresses()
     try:
         device = get_fdconfig_class(infrastructure).create_device(
             device_type, "dev-1", protocol

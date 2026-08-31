@@ -19,6 +19,7 @@ class Device:
         fields: dict[str, list[str | int]],
         range_: tuple[float, float],
         infrastructure: str,
+        addresses: dict[str, int] | None = None,
     ) -> None:
         self.device_type = device_type
         self.device_name = device_name
@@ -27,6 +28,10 @@ class Device:
         self.range = range_
         self.infrastructure = infrastructure
         self.registers = []
+        # Register numbering state. A FieldDeviceConfig passes one shared dict
+        # so numbering runs across all its devices; standalone construction
+        # (tests) gets a fresh one.
+        self.addresses = dict(Register.START) if addresses is None else addresses
         self.__generate_register_list()
 
     def __generate_register_list(self) -> None:
@@ -48,6 +53,7 @@ class Device:
                     self.device_type,
                     self.protocol,
                     self.range,
+                    self.addresses,
                 )
                 for field in fields
             ]
@@ -76,9 +82,8 @@ class Register:
         "iec60870-5-104": ANALOG,
     }
 
-    # Next free address per protocol or register type. Class-level on purpose:
-    # numbering runs across every device in one field device config, and
-    # configs.py resets it between them.
+    # Initial next-free address per protocol or register type; each
+    # FieldDeviceConfig starts numbering from a fresh copy.
     START: ClassVar[dict[str, int]] = {
         "dnp3": 0,
         "dnp3-serial": 0,
@@ -91,7 +96,6 @@ class Register:
         "float-point": 1000,
         "single-point": 3000,
     }
-    addresses: ClassVar[dict[str, int]] = dict(START)
 
     def __init__(
         self,
@@ -101,6 +105,7 @@ class Register:
         devtype: str,
         protocol: str,
         range_: tuple[float, float],
+        addresses: dict[str, int],
     ) -> None:
         self.devname = devname
         self.field = field
@@ -116,12 +121,8 @@ class Register:
             or "bacnet" in self.protocol
             or "iec60870-5-104" in self.protocol
         ):
-            self.addr = type(self).addresses[self.protocol]
-            type(self).addresses[self.protocol] += 1
+            key = self.protocol
         else:
-            self.addr = type(self).addresses[self.regtype]
-            type(self).addresses[self.regtype] += 1
-
-    @staticmethod
-    def reset_addresses() -> None:
-        Register.addresses = dict(Register.START)
+            key = self.regtype
+        self.addr = addresses[key]
+        addresses[key] += 1

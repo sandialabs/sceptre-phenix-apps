@@ -55,6 +55,9 @@ def get_fdconfig_class(infrastructure: str) -> type:
             self, devices_by_protocol: dict[str, list[dict[str, Any]]]
         ) -> list[Protocol]:
             protocols_list = []
+            # One numbering state for the whole config: registers of every
+            # device and protocol in it share the address space.
+            addresses = dict(Register.START)
             for protocol in devices_by_protocol.keys():
                 if "serial" in protocol:
                     protocols_list.append(
@@ -63,6 +66,7 @@ def get_fdconfig_class(infrastructure: str) -> type:
                             devices_by_protocol[protocol],
                             type(self),
                             self.serial_dev.pop(0),
+                            addresses,
                         )
                     )
                 else:
@@ -71,9 +75,9 @@ def get_fdconfig_class(infrastructure: str) -> type:
                             protocol,
                             devices_by_protocol[protocol],
                             type(self),
+                            addresses,
                         )
                     )
-            Register.reset_addresses()
             return protocols_list
 
     return FieldDeviceConfig
@@ -85,12 +89,16 @@ class Protocol:
         protocol: str,
         devices: list[dict[str, Any]],
         infrastructure_class: type,
+        addresses: dict[str, int],
     ) -> None:
         self.protocol = protocol
-        self.devices = self.__generate_devices(devices, infrastructure_class)
+        self.devices = self.__generate_devices(devices, infrastructure_class, addresses)
 
     def __generate_devices(
-        self, devices: list[dict[str, Any]], infrastructure_class: type
+        self,
+        devices: list[dict[str, Any]],
+        infrastructure_class: type,
+        addresses: dict[str, int],
     ) -> list[Device]:
         devices_list = []
         for device in devices:
@@ -101,7 +109,11 @@ class Protocol:
                 kwargs[key] = device[key]
             devices_list.append(
                 infrastructure_class.create_device(
-                    device["type"], device["name"], self.protocol, **kwargs
+                    device["type"],
+                    device["name"],
+                    self.protocol,
+                    addresses=addresses,
+                    **kwargs,
                 )
             )
         return devices_list
@@ -114,9 +126,10 @@ class SerialProtocol(Protocol):
         devices: list[dict[str, Any]],
         infrastructure_class: type,
         serial_dev: str,
+        addresses: dict[str, int],
     ) -> None:
         self.serial_dev = serial_dev
-        super().__init__(protocol, devices, infrastructure_class)
+        super().__init__(protocol, devices, infrastructure_class, addresses)
 
 
 class OpcConfig:

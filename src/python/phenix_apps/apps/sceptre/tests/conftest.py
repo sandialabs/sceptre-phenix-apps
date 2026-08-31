@@ -13,8 +13,6 @@ import pytest
 from box import Box
 from loguru import logger
 
-from phenix_apps.apps.sceptre.configs.registers import Register
-
 
 @pytest.fixture(autouse=True)
 def caplog_loguru_sink(caplog):  # noqa: ARG001
@@ -31,18 +29,6 @@ def caplog_loguru_sink(caplog):  # noqa: ARG001
     handler_id = logger.add(PropagateHandler(), format="{message}")
     yield
     logger.remove(handler_id)
-
-
-@pytest.fixture(autouse=True)
-def _reset_register_addresses():
-    """Register.addresses is class-level mutable state.
-
-    FieldDeviceConfig.__generate_protocols resets it after building each config,
-    but a test that raises part-way through leaves it dirty for the next test.
-    """
-    Register.reset_addresses()
-    yield
-    Register.reset_addresses()
 
 
 @pytest.fixture
