@@ -9,11 +9,23 @@ spec:
             metadata:
               type: gateway
               perspective: true
+              api:
+                auth: true
+                require_https: true
+                roles: [Operator]
+              # Requires Historian Core, SQL Historian, and PostgreSQL JDBC.
+              # Existing DB: gateway-restricted passwordless access, CONNECT,
+              # schema USAGE/CREATE, and ownership of history tables/sequences.
+              historian:
+                ip: 10.68.30.200
+                port: 5432
+                user: ignition
+                database: ignition_history
               connected_rtus:
                 - ieee13-1-rtu
                 - hostname: ieee13-2-rtu
                   name: farm-controller
-                  destination_address: 1025
+                  destination_address: 1023
           - hostname: hmi-1
             metadata:
               type: perspective

@@ -1,0 +1,24 @@
+{
+  "scope": "G",
+  "version": 1,
+  "restricted": false,
+  "overridable": true,
+  "files": [
+    "config.json",
+    "doPut.py",
+    "doTrace.py",
+    "doHead.py",
+    "doPatch.py",
+    "doPost.py",
+    "doOptions.py",
+    "doGet.py",
+    "doDelete.py"
+  ],
+  "attributes": {
+    "lastModification": {
+      "actor": "ignition",
+      "timestamp": "2026-09-01T14:44:13Z"
+    },
+    "lastModificationSignature": "25d7e97d957743711691b7501ed970b290ad5b797d5b64752189474fbb5b96dc"
+  }
+}
