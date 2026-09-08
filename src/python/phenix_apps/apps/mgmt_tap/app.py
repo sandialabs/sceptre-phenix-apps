@@ -21,13 +21,18 @@ class MgmtTap(AppBase):
           metadata:
             subnet: 172.16.0.0/16
             vlan: MGMT_1
+            bridge: phenix
     """
+
+    DEFAULT_BRIDGE = "phenix"
 
     def __init__(self, name: str, stage: str, dryrun: bool = False) -> None:
         super().__init__(name, stage, dryrun)
         # Check if subnet and namespace is specified in app metadata
         self.subnet = self.metadata.get("subnet", None) if self.metadata else None
         self.vlan = self.metadata.get("vlan", "MGMT") if self.metadata else "MGMT"
+        # Bridge from app metadata, falling back to the experiment default bridge
+        self.bridge = self._get_bridge()
         # Must limit the tap_name to 14 characters. minimega won't create the host taps otherwise
         self.exp_name = self.exp_name[:9]
         self.vlan_name = self.exp_name[:4]
@@ -40,6 +45,27 @@ class MgmtTap(AppBase):
             logger.error("No hosts found in 'mgmt_tap' application!")
             raise RuntimeError("No hosts found in mgmt_tap application")
         self.hostname = socket.gethostname().split("-")[0]
+
+    def _get_bridge(self) -> str:
+        """Determine which OVS bridge the tap should be created on.
+
+        Priority:
+            1. ``bridge`` key in the app metadata
+            2. The experiment's ``spec.defaultBridge``
+            3. ``phenix`` (the phenix built-in default)
+        """
+        bridge = self.metadata.get("bridge", None) if self.metadata else None
+        if bridge:
+            logger.debug(f"Using bridge '{bridge}' from app metadata")
+            return bridge
+
+        bridge = self.experiment.spec.get("defaultBridge", None)
+        if bridge:
+            logger.debug(f"Using experiment default bridge '{bridge}'")
+            return bridge
+
+        logger.debug(f"Falling back to bridge '{self.DEFAULT_BRIDGE}'")
+        return self.DEFAULT_BRIDGE
 
     def _get_mm_connection(self) -> minimega.minimega:
         """Get or create minimega connection."""
@@ -82,12 +108,12 @@ class MgmtTap(AppBase):
                 raise RuntimeError("Ran out of IP addresses on host") from err
 
             ip_ = f"{ip_addr}/{network.prefixlen}"
-            logger.debug(f"Creating host tap {ip_} on {host}")
+            logger.debug(f"Creating host tap {ip_} on {host} (bridge: {self.bridge})")
             kwargs = {
                 "experiment": self.exp_name,
                 "computes": host,
                 "command_type": "tap",
-                "command": f"create {vlan} bridge phenix ip {ip_} {self.tap}",
+                "command": f"create {vlan} bridge {self.bridge} ip {ip_} {self.tap}",
                 "ignore_error": True,
             }
             mm_obj = self._get_mm_connection()

@@ -54,6 +54,7 @@ make clean       # Clean build artifacts
 | [caldera](src/python/phenix_apps/apps/caldera) | Runs operations and retrieves reports from a Caldera C2 server. |
 | [helics](src/python/phenix_apps/apps/helics) | Configures and manages HELICS (Hierarchical Engine for Large-scale Infrastructure Co-Simulation) federates. |
 | [ignition](src/python/phenix_apps/apps/ignition) | Configures an Ignition Gateway SCADA master from discovered DNP3 outstations or a hand-authored gateway backup. |
+| [mgmt_tap](src/python/phenix_apps/apps/mgmt_tap) | Creates a host tap on the experiment's management network to copy files to and from VMs. |
 | [mirror](src/go/cmd/phenix-app-mirror) | Configures cluster-wide packet mirroring to a target node using GRE or ERSPAN tunnels. |
 | [otsim](src/python/phenix_apps/apps/otsim) | Generates configuration files for OT-sim simulations. |
 | [protonuke](src/python/phenix_apps/apps/protonuke) | Injects command-line arguments for the `protonuke` agent service. |
@@ -72,6 +73,7 @@ make clean       # Clean build artifacts
 | [cc](src/python/phenix_apps/apps/scorch/cc) | Executes arbitrary shell commands on nodes via minimega's command and control. |
 | [collector](src/python/phenix_apps/apps/scorch/collector) | Collects files from specified nodes for post-experiment analysis. |
 | [disruption](src/python/phenix_apps/apps/scorch/disruption) | Simulates network disruptions like Denial of Service (DoS) attacks. |
+| [erspan](src/python/phenix_apps/apps/scorch/erspan) | Mirrors traffic from an experiment's OVS bridge to a remote capture host via ERSPAN. |
 | [ettercap](src/python/phenix_apps/apps/scorch/ettercap) | Runs the Ettercap suite for man-in-the-middle attacks. |
 | [hoststats](src/python/phenix_apps/apps/scorch/hoststats) | Collects host performance statistics (CPU, memory, etc.). |
 | [iperf](src/python/phenix_apps/apps/scorch/iperf) | Measures network performance between nodes using iperf. |
@@ -84,6 +86,7 @@ make clean       # Clean build artifacts
 | [qos](src/python/phenix_apps/apps/scorch/qos) | Applies Quality of Service (QoS) rules (e.g., latency, packet loss) to interfaces. |
 | [rtds](src/python/phenix_apps/apps/scorch/rtds) | Interacts with RTDS (Real Time Digital Simulator) systems. |
 | [snort](src/python/phenix_apps/apps/scorch/snort) | Runs the Snort Intrusion Detection System on specified interfaces. |
+| [ssh](src/python/phenix_apps/apps/scorch/ssh) | Executes commands on and copies files from a remote host over SSH. |
 | [tcpdump](src/python/phenix_apps/apps/scorch/tcpdump) | Captures network traffic using tcpdump. |
 | [trafficgen](src/python/phenix_apps/apps/scorch/trafficgen) | Generates network traffic between specified source and destination nodes. |
 | [vmstats](src/python/phenix_apps/apps/scorch/vmstats) | Collects detailed VM statistics from minimega. |
