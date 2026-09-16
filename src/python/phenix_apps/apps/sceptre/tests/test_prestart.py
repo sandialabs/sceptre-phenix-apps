@@ -9,6 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 from phenix_apps.apps.sceptre.app import Sceptre
+from phenix_apps.apps.sceptre.field_devices import internal_tags
 from phenix_apps.apps.sceptre.prestart import PreStart
 from phenix_apps.apps.sceptre.tests.conftest import iface, node
 
@@ -175,6 +176,33 @@ class TestRegisterOverrides:
         assert analog == ["voltage"]
 
 
+def render_kwargs(sceptre_app, template):
+    """The kwargs of the one render call for `template`."""
+    calls = [c for c in sceptre_app.render.call_args_list if c.args[0] == template]
+    assert len(calls) == 1
+    return calls[0].kwargs
+
+
+class TestInternalTags:
+    """Logic scratch variables become <internal-tag>s; output targets do not."""
+
+    LOGIC = "bus-rtu-1.active = bus-rtu-1.gen_mw > 1; tmp = 2;  = 3; noassign"
+
+    def test_only_non_output_targets(self, sceptre_app, ctx_with_provider):
+        sceptre_app.extract_nodes_type.return_value = [
+            fd_server("rtu-1", [iface("IF0", "10.2.0.11")], logic=self.LOGIC)
+        ]
+
+        ctx_with_provider.fd_servers()
+
+        kwargs = render_kwargs(sceptre_app, "fd_server.mako")
+        assert kwargs["logic"] == self.LOGIC
+        assert kwargs["internal_tags"] == {"tmp": 0.0}
+
+    def test_no_logic_means_no_tags(self):
+        assert internal_tags(None) == internal_tags("") == {}
+
+
 class TestFeps:
     """A fep fronts the fd-servers it adopts, and takes their devices with it."""
 
@@ -210,6 +238,18 @@ class TestFeps:
         assert [d.device_name for p in config.protocols for d in p.devices] == [
             "bus-rtu-1"
         ]
+
+    def test_logic_targets_the_adopted_rtu_outputs(
+        self, sceptre_app, ctx_with_provider
+    ):
+        """The fep's logic writes the RTUs' outputs, so those are not internal."""
+
+        logic = "bus-rtu-1.active = 1; scratch = 0"
+        self.build(sceptre_app, ctx_with_provider, {"logic": logic})
+
+        kwargs = render_kwargs(sceptre_app, "fep_template.mako")
+        assert kwargs["logic"] == logic
+        assert kwargs["internal_tags"] == {"scratch": 0.0}
 
     def test_subtype_reaches_the_config(self, sceptre_app, ctx_with_provider):
         """Omitting it used to raise TypeError, so no fep could be built."""

@@ -38,6 +38,35 @@ ALWAYS_REPORTED: Final[tuple[str, ...]] = (
     "2404-local",
 )
 
+INPUT_REGS: Final[frozenset[str]] = frozenset(
+    {"analog-input", "binary-input", "input-register", "discrete-input"}
+)
+
+
+def internal_tags(logic: str | None, *fd_configs) -> dict[str, float]:
+    """Logic targets (``lhs = rhs;``) that are not an output register.
+
+    These are scratch variables the device must declare as ``<internal-tag>``.
+    0.0 is bennu's initial state, valid as both analog and (false) binary.
+    """
+    if not logic:
+        return {}
+    outputs = {
+        f"{reg.devname}.{reg.field}"
+        for fd_config in fd_configs
+        for protocol in fd_config.protocols
+        for device in protocol.devices
+        for reg in device.registers
+        if reg.regtype not in INPUT_REGS
+    }
+    tags = {}
+    for line in logic.split(";"):
+        name, sep, _ = line.partition("=")
+        name = name.strip()
+        if sep and name and name not in outputs:
+            tags[name] = 0.0
+    return tags
+
 
 class FieldDevices(PreStartState):
     """fd-server, fd-client and fep handling."""
@@ -163,6 +192,7 @@ class FieldDevices(PreStartState):
                     fd_config=fd_config,
                     logic=fd_logic,
                     cycle_time=fd_cycle_time,
+                    internal_tags=internal_tags(fd_logic, fd_config),
                 )
 
             self.app.render_sceptre_start(
@@ -308,6 +338,7 @@ class FieldDevices(PreStartState):
             )
             self.fd_server_configs[fep_config.name] = fep_config
 
+            fep_logic = fd_.metadata.get("logic", None)
             self.render(
                 "fep_template.mako",
                 fd_directory / "config.xml",
@@ -315,6 +346,8 @@ class FieldDevices(PreStartState):
                 command_endpoint=cmd_ip,
                 name=fd_.hostname,
                 fep_config=fep_config,
+                logic=fep_logic,
+                internal_tags=internal_tags(fep_logic, *server_configs),
             )
 
             self.app.render_sceptre_start(fd_, name="field-device")

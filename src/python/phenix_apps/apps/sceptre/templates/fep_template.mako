@@ -85,6 +85,12 @@ sunspec_register = ''
         % endfor
     % endfor
 % endfor
+% for tag, value in internal_tags.items():
+            <internal-tag>
+                <name>${tag}</name>
+                <value>${value}</value>
+            </internal-tag>
+% endfor
         </tags>
 
     <comms>
@@ -384,7 +390,7 @@ mapa_nombre_salida = {}
                         output_name = fd_config.name+'_'+'O'+str(register.addr)
                     binary_regs = ['binary-input', 'binary-output',
                                    'discrete-input', 'coil']
-                    mapa_nombre_salida[register.devname+'.'+register.field] = 'var_'+io_name
+                    mapa_nombre_salida[register.devname+'.'+register.field] = 'var_'+output_name
                     %>
                     % if register.regtype in binary_regs:
                 <binary>
