@@ -15,3 +15,43 @@ dist
 
 .DS_Store
 .vagrant
+
+# ==========================================
+# AI coding assistants and editors
+# ==========================================
+# AGENTS.md and CLAUDE.md are tracked on purpose; do not add them here.
+
+# Aider
+.aider*
+
+# Claude Code
+.claude/
+.claudecode/
+
+# Cline / Roo Cline
+.cline/
+.roocline/
+cline_tasks/
+
+# Codex and OpenCode
+.codex/
+.opencode/
+.opencode-workspace
+*.opencode-workspace
+codex_config.*
+opencode_config.*
+
+# Cursor
+.cursor/
+.cursorrules
+cursor_mcp.json
+
+# GitHub Copilot
+.github/copilot-instructions.md
+
+# Open Interpreter
+.interpreter/
+
+# Windsurf
+.windsurf/
+.windsurfrules
