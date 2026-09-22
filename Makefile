@@ -1,6 +1,6 @@
-.PHONY: all check clean format help install install-dev lint test
-.PHONY: go-check go-clean go-coverage go-format go-install-dev go-lint go-test
-.PHONY: python-check python-clean python-coverage python-format python-install-dev python-lint python-test
+.PHONY: all check clean coverage format help install install-dev lint test
+.PHONY: go-check go-clean go-coverage go-format go-install go-install-dev go-lint go-test
+.PHONY: python-check python-clean python-coverage python-format python-install python-install-dev python-lint python-test
 .DEFAULT_GOAL := help
 
 help:
@@ -29,6 +29,7 @@ check: python-check go-check
 test: python-test go-test
 lint: python-lint go-lint
 format: python-format go-format
+install: python-install go-install
 install-dev: python-install-dev go-install-dev
 clean: python-clean go-clean
 coverage: python-coverage go-coverage

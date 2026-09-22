@@ -1,5 +1,5 @@
 .PHONY: all check clean coverage format help install install-dev lint lint-clean test
-.pythopnDEFAULT_GOAL := help
+.DEFAULT_GOAL := help
 
 # Define a helper for checking command existence
 check-command = @if ! command -v $(1) > /dev/null; then \
