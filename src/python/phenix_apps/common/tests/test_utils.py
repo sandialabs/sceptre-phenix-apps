@@ -272,29 +272,28 @@ def test_mm_cc_client_locate_accepts_a_uuid_with_by_uuid():
     assert mm.client_calls == 1
 
 
+# The hostname a miniccc client reports can differ from the minimega VM name,
+# e.g. a Windows VM that still has its image's hostname because the startup app
+# has not yet renamed it and rebooted.
+_CLIENTS_UNRENAMED = [_clients_row("abc-1234", "WIN-3K7Q2M9J1AB")]
+_VM_INFO_WIN = [_vm_info_row("win-ws01", "abc-1234")]
+
+
 def test_mm_cc_client_locate_by_uuid_still_resolves_a_vm_name():
     # by_uuid must still try the name lookup first.
-    mm = _StubMM(
-        client_effects=[[_clients_row("abc-1234", "site-a-rtr")]],
-        vm_info_rows=[_vm_info_row("Site_A.RTR", "abc-1234")],
-    )
+    mm = _StubMM(client_effects=[_CLIENTS_UNRENAMED], vm_info_rows=_VM_INFO_WIN)
 
     got = utils.mm_cc_client_locate(
-        mm, "Site_A.RTR", grace=0.0, poll_rate=0.0, by_uuid=True
+        mm, "win-ws01", grace=0.0, poll_rate=0.0, by_uuid=True
     )
 
     assert got == ("abc-1234", "gibson1336")
 
 
-def test_mm_cc_client_locate_matches_router_whose_guest_hostname_differs():
-    # A router's guest hostname is lowercased and '.'/'_' mapped to '-', so it
-    # differs from the minimega VM name.
-    mm = _StubMM(
-        client_effects=[[_clients_row("abc-1234", "site-a-rtr")]],
-        vm_info_rows=[_vm_info_row("Site_A.RTR", "abc-1234")],
-    )
+def test_mm_cc_client_locate_matches_vm_whose_guest_hostname_differs():
+    mm = _StubMM(client_effects=[_CLIENTS_UNRENAMED], vm_info_rows=_VM_INFO_WIN)
 
-    assert utils.mm_cc_client_locate(mm, "Site_A.RTR", grace=0.0, poll_rate=0.0) == (
+    assert utils.mm_cc_client_locate(mm, "win-ws01", grace=0.0, poll_rate=0.0) == (
         "abc-1234",
         "gibson1336",
     )
