@@ -38,8 +38,8 @@ changing any of them:
 | phēnix CLI, API, and resource usage | [`skills/phenix/SKILL.md`](https://github.com/sandialabs/sceptre-phenix/blob/main/skills/phenix/SKILL.md) |
 | How core runs apps | [`src/go/app/`](https://github.com/sandialabs/sceptre-phenix/tree/main/src/go/app) |
 | Versioned resource definitions | [`src/go/types/version/`](https://github.com/sandialabs/sceptre-phenix/tree/main/src/go/types/version) |
-| Narrative app documentation | [Apps docs](https://phenix.sceptre.dev/latest/apps/), source in [`sceptre-phenix-docs`](https://github.com/sandialabs/sceptre-phenix-docs) |
-| minimega commands and behavior | [API docs](https://sandia-minimega.github.io/), [source](https://github.com/sandia-minimega/minimega) |
+| Narrative app documentation | [Apps docs](https://phenix.sceptre.dev/latest/apps/), source in [`sceptre-phenix/docs/content/apps.md`](https://github.com/sandialabs/sceptre-phenix/blob/main/docs/content/apps.md) |
+| minimega commands and behavior | [API docs](https://sandia-minimega.github.io/minimega/reference/minimega/), [source](https://github.com/sandia-minimega/minimega) |
 | Image configs, overlays, scripts | [`sceptre-phenix-images`](https://github.com/sandialabs/sceptre-phenix-images) |
 | Example topologies and disk images | [`sceptre-phenix-topologies`](https://github.com/sandialabs/sceptre-phenix-topologies) |
 
@@ -187,7 +187,8 @@ or create releases.
 - When adding or renaming an implementation, update console scripts, entry
   points, package-data declarations, tests, and docs together.
 - Core-contract or public-configuration changes may need a paired pull request
-  in `sceptre-phenix` or `sceptre-phenix-docs`; cross-link them.
+  in `sceptre-phenix`, whose `docs/` directory holds the phēnix documentation;
+  cross-link them.
 - Follow [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md) and use the
   templates under `.github/`.
 
