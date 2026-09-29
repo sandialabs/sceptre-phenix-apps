@@ -45,7 +45,7 @@ metadata:
   - `send`: send a file (Host -> VM)
   - `recv`: receive a file (VM -> Host)
 - Stage-level command types
-  - `reset`: reset miniccc state, by clearing filter and deleting all commands and responses. **WARNING**: THIS WILL INTERFERE WITH OPERATION OF MANY COMPONENTS! Reset should only be used at the start or end of a run or a loop (use with special care in loops!).
+  - `reset`: under managed Scorch execution, clear this component invocation\'s commands and responses. Other components and runs retain their CC state. Standalone invocations without `PHENIX_SCORCH_EXECUTION_ID` retain the legacy namespace-wide reset; this interferes with other components and must only be used with exclusive namespace access.
   - `exec`: execute a command (`cc exec`). Currently the only supported arguments for this stage-level command are `once` and `filter_`
 
 ## Notes on the `exec` and `background` Type

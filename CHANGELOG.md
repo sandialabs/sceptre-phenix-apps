@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Ignition App**: New app that configures an Inductive Automation Ignition Gateway 8.3 SCADA master
 
 ### Added
+
+- **Scorch**: Managed concurrency capability probe and execution-owned CC filter/prefix coordination, with scoped command/response resets for simultaneous runs.
 - **SCEPTRE App**: Pre-flight scenario validation: one pydantic model, run before either stage, reporting every problem at once with the host and field.
 - **SCEPTRE App**: Stage accounting in the logs: a scenario inventory by device type, and what each handler produced.
 - **SCEPTRE App**: Files in `<assetDir>/injects/override/` that match no injection are reported as probable typos.
