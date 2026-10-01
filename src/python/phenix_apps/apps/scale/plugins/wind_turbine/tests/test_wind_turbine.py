@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -198,9 +199,6 @@ def test_on_node_configured(wind_turbine, mocker):
     plugin.pre_configure(mock_app, profile)
 
     # Mock dependencies
-    mock_makedirs = mocker.patch(
-        "phenix_apps.apps.scale.plugins.wind_turbine.plugin.os.makedirs"
-    )
     mock_tarfile = mocker.patch(
         "phenix_apps.apps.scale.plugins.wind_turbine.plugin.tarfile.open"
     )
@@ -216,14 +214,16 @@ def test_on_node_configured(wind_turbine, mocker):
     plugin.on_node_configured(mock_app, 1, "test-wtg-1")
 
     # Assertions
-    # 1. Check directories created (1 for each of 6 containers)
-    assert mock_makedirs.call_count >= 6
+    # 1. Check directories created on disk (1 for each of 6 containers)
+    node_dir = Path(mock_app.app_dir) / "test-wtg-1"
+    assert node_dir.is_dir()
+    assert len([d for d in node_dir.iterdir() if d.is_dir()]) >= 6
 
     # 2. Check config files generated (6 configs)
     assert mock_config_instance.to_file.call_count == 6
 
     # 3. Check tarball creation
-    mock_tarfile.assert_called_with(f"{mock_app.exp_dir}/wind-configs.tgz", "w:gz")
+    mock_tarfile.assert_called_with(Path(mock_app.exp_dir) / "wind-configs.tgz", "w:gz")
 
     # 4. Check injection
     mock_app.add_inject.assert_any_call(

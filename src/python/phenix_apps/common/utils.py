@@ -2,8 +2,6 @@ import csv
 import datetime
 import json
 import math
-import os
-import os.path
 import random
 import re
 import shutil
@@ -26,6 +24,7 @@ import minimega
 from elasticsearch import Elasticsearch
 
 import phenix_apps.common.settings as phenix_settings
+from phenix_apps.common.error import AppError
 from phenix_apps.common.logger import logger
 
 
@@ -40,6 +39,44 @@ def utc_now() -> datetime.datetime:
 
 def kibana_format_time(ts: datetime.datetime) -> str:
     return ts.strftime("%b %d, %Y @ %H:%M:%S.%f").replace(".000000", ".000")
+
+
+# minimega's wildcard VM target, and the name phenix's Windows startup
+# wrapper and built images use.
+RESERVED_HOSTNAMES = frozenset({"all", "phenix"})
+
+
+def validate_hostname(name: str) -> str:
+    """
+    Validate a hostname against phenix core's node-name rules as of v2026.10.02:
+    2 to 63 letters, digits and interior hyphens, not all digits, and not a
+    reserved name.
+    """
+    if (
+        not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]", name)
+        or name.isdigit()
+        or name.lower() in RESERVED_HOSTNAMES
+    ):
+        raise AppError(f"invalid hostname '{name}'")
+
+    return name
+
+
+def safe_join(base: str | Path, *parts: str | Path) -> Path:
+    """
+    Join base with parts and ensure the resolved result stays within the
+    resolved base directory (rejects '..' traversal and absolute components).
+
+    This is the canonical pathlib containment idiom for this codebase: all
+    guest-controlled relative parts must be joined through here.
+    """
+    resolved_base = Path(base).resolve()
+    joined = resolved_base.joinpath(*parts).resolve()
+
+    if joined != resolved_base and not joined.is_relative_to(resolved_base):
+        raise AppError(f"path '{joined}' escapes base directory '{resolved_base}'")
+
+    return joined
 
 
 def mako_render(script_path: str, **kwargs) -> str:
@@ -83,8 +120,8 @@ def mark_executable(file_path: str) -> None:
     """
     Add executable by owner bit to file mode.
     """
-    st_ = os.stat(file_path)
-    os.chmod(file_path, st_.st_mode | stat.S_IEXEC)
+    path = Path(file_path)
+    path.chmod(path.stat().st_mode | stat.S_IEXEC)
 
 
 def generate_mac_addr() -> str:
@@ -126,7 +163,7 @@ def validate_mac_addr(macs: list[str]) -> bool:
     return True
 
 
-def abs_path(file_: str, relative_path: str | None = None) -> str | Path:
+def abs_path(file_: str, relative_path: str | None = None) -> Path:
     """Return absolute path to file_ with optional relative resource.
 
     Args:
@@ -134,11 +171,11 @@ def abs_path(file_: str, relative_path: str | None = None) -> str | Path:
         relative_path (str): Optional relative path of resource.
 
     Returns:
-        str: Full path to file_ (and optional relative resource).
+        Path: Full path to file_ (and optional relative resource).
     """
 
     base_path = Path(file_).parent.absolute()
-    return f"{base_path}/{relative_path}" if relative_path else base_path
+    return base_path / relative_path if relative_path else base_path
 
 
 def cidr_to_netmask(cidr: int) -> str:
@@ -288,7 +325,7 @@ def mm_send(
     dst: str,
     grace: float = phenix_settings.CC_CLIENT_GRACE,
 ) -> None:
-    if not os.path.exists(src):
+    if not Path(src).exists():
         raise ValueError(f"{src} not found locally")
 
     # Use PHENIX_DIR as base directory to ensure minimega has access to it. This
@@ -306,17 +343,17 @@ def mm_send(
     mm_cc_client_active(mm, vm, grace=grace)
 
     with tempfile.TemporaryDirectory(dir=base) as tmp:
-        vm_dst = os.path.join(tmp, dst.strip("/"))
-        dst_dir = os.path.dirname(vm_dst)
+        vm_dst = safe_join(tmp, dst.strip("/"))
+        dst_dir = vm_dst.parent
 
         try:
             mm.cc_mount(vm, tmp)
             time.sleep(1.0)
 
-            if not os.path.exists(dst_dir):
-                os.makedirs(dst_dir, exist_ok=True)
+            if not dst_dir.exists():
+                dst_dir.mkdir(parents=True, exist_ok=True)
 
-            if os.path.isdir(src):
+            if Path(src).is_dir():
                 shutil.copytree(src, vm_dst, dirs_exist_ok=True)
             else:
                 shutil.copyfile(src, vm_dst)
@@ -350,24 +387,32 @@ def mm_recv(
     if Path("/tmp/miniccc-mounts").is_dir():
         base = "/tmp/miniccc-mounts"
 
+    # PurePath construction collapses spurious slashes and single-dot segments
+    # (but not '..'), so str(Path(dst)) == dst is equivalent to the old
+    # os.path.normpath(dst) == dst normalization check.
+    if not Path(dst).is_absolute() or str(Path(dst)) != dst or ".." in Path(dst).parts:
+        raise AppError(
+            f"invalid host destination path '{dst}' (must be absolute and normalized, with no '..' segments)"
+        )
+
     mm_cc_client_active(mm, vm, grace=grace)
 
     with tempfile.TemporaryDirectory(dir=base) as tmp:
         if isinstance(src, str):
             src = [src]
 
-        vm_sources = [os.path.join(tmp, s.strip("/")) for s in src]
-        dst_dir = os.path.dirname(dst)
+        vm_sources = [safe_join(tmp, s.strip("/")) for s in src]
+        dst_dir = Path(dst).parent
 
-        if not os.path.exists(dst_dir):
-            os.makedirs(dst_dir, exist_ok=True)
+        if not dst_dir.exists():
+            dst_dir.mkdir(parents=True, exist_ok=True)
 
         try:
             mm.cc_mount(vm, tmp)
 
             for vm_src in vm_sources:
                 tries = 0
-                while not os.path.exists(vm_src):
+                while not vm_src.exists():
                     tries += 1
 
                     if tries >= 5:
@@ -375,7 +420,7 @@ def mm_recv(
                         raise ValueError(f"{src} not found in VM {vm}")
                     time.sleep(0.5)
 
-                if os.path.isdir(vm_src):
+                if vm_src.is_dir():
                     shutil.copytree(vm_src, dst, dirs_exist_ok=True)
                 else:
                     # shutil.copyfile(vm_src, dst)
@@ -523,7 +568,7 @@ def mm_cc_send_wait(
         client=uuid,
         host=host,
         match_column="sent",
-        match_value=f"[{exp_name}/{os.path.basename(src)}]",
+        match_value=f"[{exp_name}/{Path(src).name}]",
     )
 
 

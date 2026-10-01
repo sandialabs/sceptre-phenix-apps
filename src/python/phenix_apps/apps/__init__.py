@@ -3,6 +3,7 @@ import copy
 import os
 import re
 import sys
+from pathlib import Path
 from typing import Any
 
 from box import Box
@@ -45,7 +46,7 @@ class AppBase:
         self.topo = self.get_annotation("topology")
 
         # Create the experiment directory if it doesn't exist
-        os.makedirs(self.exp_dir, exist_ok=True)
+        Path(self.exp_dir).mkdir(parents=True, exist_ok=True)
 
         # Mako templates directory inside the app's code folder
         py_path = sys.modules[self.__class__.__module__].__file__
@@ -347,6 +348,8 @@ class AppBase:
         return None
 
     def add_node(self, new_node: Box | dict, overwrite: bool = False) -> None:
+        utils.validate_hostname(new_node["general"]["hostname"])
+
         found = None
 
         for idx, node in enumerate(self.experiment.spec.topology.nodes):
@@ -435,7 +438,7 @@ class AppBase:
         Returns the file path written to.
         """
 
-        with open(file_path, "w") as fp:
+        with Path(file_path).open("w") as fp:
             utils.mako_serve_template(
                 template_name=template_name,
                 templates_dir=self.templates_dir,

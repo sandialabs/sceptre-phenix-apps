@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 
 import lxml.etree as ET
 
@@ -16,8 +16,8 @@ class OTSim(AppBase):
     def __init__(self, name: str, stage: str, dryrun: bool = False) -> None:
         super().__init__(name, stage, dryrun)
 
-        self.otsim_dir: str = f"{self.exp_dir}/ot-sim"
-        os.makedirs(self.otsim_dir, exist_ok=True)
+        self.otsim_dir: Path = Path(self.exp_dir) / "ot-sim"
+        self.otsim_dir.mkdir(parents=True, exist_ok=True)
 
         self.__init_defaults()
 
@@ -249,12 +249,14 @@ class OTSim(AppBase):
                 # if we are not using the helics app add the wait script
                 if not self.extract_app("helics") and ":24000" not in addr:
                     if addr not in broker_addr_wait:
-                        wait_file = f"{self.otsim_dir}/wait-broker-{len(broker_addr_wait)}.sh"  # just need a unique name
-                        with open(wait_file, "w") as f:
+                        wait_file = (
+                            self.otsim_dir / f"wait-broker-{len(broker_addr_wait)}.sh"
+                        )  # just need a unique name
+                        with wait_file.open("w") as f:
                             utils.mako_serve_template(
                                 "wait_broker.mako", templates, f, rootbroker_ip=addr
                             )
-                        broker_addr_wait[addr] = wait_file
+                        broker_addr_wait[addr] = str(wait_file)
 
                     dst = "/etc/phenix/startup/5-wait-broker.sh"
                     self.add_inject(
@@ -274,12 +276,13 @@ class OTSim(AppBase):
 
             self.__config_node_red(server, config)
 
-            config_file = f"{self.otsim_dir}/{server.hostname}.xml"
+            utils.validate_hostname(server.hostname)
+            config_file = utils.safe_join(self.otsim_dir, f"{server.hostname}.xml")
 
             config.to_file(config_file)
             self.add_inject(
                 hostname=server.hostname,
-                inject={"src": config_file, "dst": "/etc/ot-sim/config.xml"},
+                inject={"src": str(config_file), "dst": "/etc/ot-sim/config.xml"},
             )
 
         # Front-end processor (FEP), assumed to act as a protocol gateway or
@@ -320,12 +323,13 @@ class OTSim(AppBase):
 
             self.__config_node_red(fep, config)
 
-            config_file = f"{self.otsim_dir}/{fep.hostname}.xml"
+            utils.validate_hostname(fep.hostname)
+            config_file = utils.safe_join(self.otsim_dir, f"{fep.hostname}.xml")
 
             config.to_file(config_file)
             self.add_inject(
                 hostname=fep.hostname,
-                inject={"src": config_file, "dst": "/etc/ot-sim/config.xml"},
+                inject={"src": str(config_file), "dst": "/etc/ot-sim/config.xml"},
             )
 
         # Field device client, acting as a protocol client via one or more protocol
@@ -360,27 +364,29 @@ class OTSim(AppBase):
 
             self.__config_node_red(client, config)
 
-            config_file = f"{self.otsim_dir}/{client.hostname}.xml"
+            utils.validate_hostname(client.hostname)
+            config_file = utils.safe_join(self.otsim_dir, f"{client.hostname}.xml")
 
             config.to_file(config_file)
             self.add_inject(
                 hostname=client.hostname,
-                inject={"src": config_file, "dst": "/etc/ot-sim/config.xml"},
+                inject={"src": str(config_file), "dst": "/etc/ot-sim/config.xml"},
             )
 
         # Create and inject config files for any brokers specified in the app
         # metadata.
 
         for hostname, cfg in self.brokers.items():
-            start_file = f"{self.otsim_dir}/{hostname}-helics-broker.sh"
+            utils.validate_hostname(hostname)
+            start_file = utils.safe_join(self.otsim_dir, f"{hostname}-helics-broker.sh")
 
-            with open(start_file, "w") as f:
+            with start_file.open("w") as f:
                 utils.mako_serve_template("helics_broker.mako", templates, f, cfg=cfg)
 
             self.add_inject(
                 hostname=hostname,
                 inject={
-                    "src": start_file,
+                    "src": str(start_file),
                     "dst": "/etc/phenix/startup/90-helics-broker.sh",
                 },
             )

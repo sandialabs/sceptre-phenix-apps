@@ -53,6 +53,16 @@ class Sceptre(AppBase):
         # Override files that matched an injection, for _warn_unused_overrides.
         self._used_overrides: set[str] = set()
 
+    def _validate_hostnames(self) -> None:
+        """Reject hostnames the app would build file paths from.
+
+        phenix core validates topology hostnames, but external_node hosts only
+        exist in the scenario metadata and bypass that check.
+        """
+
+        for host in self.extract_all_nodes():
+            utils.validate_hostname(host.hostname)
+
     def _log_inventory(self, stage: str) -> None:
         """Log what the app found in the scenario, by device type."""
 
@@ -167,7 +177,8 @@ class Sceptre(AppBase):
     def host_dir(self, hostname: str) -> Path:
         """A host's output directory under sceptre/, created. Pre-start only."""
 
-        path = Path(self.sceptre_dir) / hostname
+        utils.validate_hostname(hostname)
+        path = utils.safe_join(self.sceptre_dir, hostname)
         path.mkdir(parents=True, exist_ok=True)
         return path
 
@@ -181,7 +192,9 @@ class Sceptre(AppBase):
 
         ext = ".ps1" if hosts.os_type(device) == "windows" else ".sh"
 
-        startup_file = Path(self.startup_dir) / f"{device.hostname}-start{ext}"
+        startup_file = utils.safe_join(
+            self.startup_dir, f"{device.hostname}-start{ext}"
+        )
         self.render("sceptre_start.mako", startup_file, **kwargs)
         utils.mark_executable(startup_file)
 
@@ -191,13 +204,13 @@ class Sceptre(AppBase):
 
         self.inject(
             hostname,
-            f"{self.startup_dir}/sceptre-startup-scheduler.cmd",
+            self.startup_dir / "sceptre-startup-scheduler.cmd",
             "ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/sceptre-startup_scheduler.cmd",
             "sceptre startup scheduler",
         )
         self.inject(
             hostname,
-            f"{self.startup_dir}/sceptre-startup.ps1",
+            self.startup_dir / "sceptre-startup.ps1",
             "sceptre/sceptre-startup.ps1",
             "sceptre startup script",
         )
@@ -210,6 +223,7 @@ class Sceptre(AppBase):
         """
 
         validation.enforce(self)
+        self._validate_hostnames()
         self._log_inventory("configure")
 
         started = self._injection_count()
@@ -231,17 +245,18 @@ class Sceptre(AppBase):
 
         # Re-checked: phenix may run stages in separate processes.
         validation.enforce(self)
+        self._validate_hostnames()
         self._log_inventory("pre-start")
 
         # Rendered unconditionally: add_sceptre_startup_injects_windows()
         # injects both by path during configure, for any Windows host.
-        scheduler_file = Path(self.startup_dir) / "sceptre-startup-scheduler.cmd"
+        scheduler_file = self.startup_dir / "sceptre-startup-scheduler.cmd"
         self.render("sceptre-startup-scheduler.mako", scheduler_file)
-        scheduler_file.chmod(0o0777)
+        scheduler_file.chmod(0o755)
 
-        startup_file = Path(self.startup_dir) / "sceptre-startup.ps1"
+        startup_file = self.startup_dir / "sceptre-startup.ps1"
         self.render("sceptre-startup.mako", startup_file)
-        startup_file.chmod(0o777)
+        startup_file.chmod(0o755)
 
         started = self._generated_file_count()
 

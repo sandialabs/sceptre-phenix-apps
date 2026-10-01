@@ -13,7 +13,7 @@ The plugin is configured via the `profiles` list in the Scale App metadata.
 | `count` | Integer | `1` | The number of VMs to deploy. Ignored if `containers` > 0. |
 | `containers` | Integer | `0` | The total number of application containers required. |
 | `containers_per_node` | Integer | `0` | The number of containers to pack onto a single VM. |
-| `hostname_prefix` | String | `"node"` | The prefix used for generating VM hostnames (e.g., `node-1`). |
+| `hostname_prefix` | String | `"node"` | The prefix used for generating VM hostnames (e.g., `node-1`). Letters, digits and `-`, starting with a letter or digit, at most 58 characters. |
 | `node_template` | Dict | `{}` | Overrides for VM hardware (`cpu`, `memory`, `image`, `network`). |
 | `container_template`| Dict | `{}` | Configuration for containers (`rootfs`, `networks`, `gateway`, `cpu`, `memory`). |
 

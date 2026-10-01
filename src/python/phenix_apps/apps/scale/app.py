@@ -3,6 +3,7 @@ import ipaddress as ip
 import os
 import sys
 from importlib.metadata import entry_points
+from pathlib import Path
 from typing import Any
 
 import minimega
@@ -23,16 +24,16 @@ class Scale(AppBase):
         super().__init__(name, stage, dryrun)
 
         # Setup standard directories for the scale app
-        self.app_dir: str = f"{self.exp_dir}/{self.name}"
-        os.makedirs(self.app_dir, exist_ok=True)
+        self.app_dir: Path = Path(self.exp_dir) / self.name
+        self.app_dir.mkdir(parents=True, exist_ok=True)
 
-        self.files_dir: str
+        self.files_dir: Path
         if self.dryrun:
-            self.files_dir = f"/tmp/phenix/images/{self.exp_name}"
+            self.files_dir = Path("/tmp/phenix/images") / self.exp_name
         else:
-            self.files_dir = f"{settings.PHENIX_DIR}/images/{self.exp_name}"
+            self.files_dir = Path(settings.PHENIX_DIR) / "images" / self.exp_name
 
-        os.makedirs(self.files_dir, exist_ok=True)
+        self.files_dir.mkdir(parents=True, exist_ok=True)
 
         # Load all available plugins
         self._discover_plugins()
@@ -150,9 +151,9 @@ class Scale(AppBase):
         self, plugin: ScalePlugin, index: int, hostname: str, profile: dict[str, Any]
     ) -> None:
         """Adds standard startup script and injections."""
-        startup_config = f"{self.app_dir}/{hostname}-startup.sh"
-        mm_dir = f"/tmp/miniccc/files/{self.exp_name}"
-        mm_file = f"{mm_dir}/{hostname}.mm"
+        startup_config = utils.safe_join(self.app_dir, f"{hostname}-startup.sh")
+        mm_dir = Path("/tmp/miniccc/files") / self.exp_name
+        mm_file = mm_dir / f"{hostname}.mm"
 
         additional_cmds = plugin.get_additional_startup_commands(index, hostname)
 
@@ -166,13 +167,13 @@ mm read {mm_file}
 echo 'DONE!'
 """
 
-        with open(startup_config, "w") as f:
+        with startup_config.open("w") as f:
             f.write(startup_script_content)
 
         self.add_inject(
             hostname=hostname,
             inject={
-                "src": startup_config,
+                "src": str(startup_config),
                 "dst": "/etc/phenix/startup/999-scale.sh",
             },
         )
@@ -264,7 +265,7 @@ echo 'DONE!'
 
         if not self.dryrun:
             # minimega.connect prints to stdout on version mismatch, which corrupts JSON output
-            with open(os.devnull, "w") as devnull:
+            with Path(os.devnull).open("w") as devnull:
                 old_stdout = sys.stdout
                 sys.stdout = devnull
                 try:
@@ -331,7 +332,7 @@ echo 'DONE!'
                         ]
                     )
 
-                    mm_config = f"{self.files_dir}/{hostname}.mm"
+                    mm_config = utils.safe_join(self.files_dir, f"{hostname}.mm")
 
                     cfg = {
                         "NAMESPACE": self.name,
@@ -356,14 +357,14 @@ echo 'DONE!'
                         plugin, "templates_dir", self.templates_dir
                     )
 
-                    with open(mm_config, "w") as file_:
+                    with mm_config.open("w") as file_:
                         utils.mako_serve_template(
                             template_name, plugin_templates_dir, file_, config=cfg
                         )
 
                     if not self.dryrun:
                         mm.cc_filter(filter=f"name={hostname}")
-                        mm.cc_send(mm_config)
+                        mm.cc_send(str(mm_config))
 
                     # Increase all nets' starting IP for next loop
                     if net_info:

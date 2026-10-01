@@ -1,10 +1,16 @@
 import configparser
-import os.path
+from pathlib import Path, PurePosixPath
 from time import sleep
 
 from phenix_apps.apps.scorch import ComponentBase
-from phenix_apps.common import utils
+from phenix_apps.common import error, utils
 from phenix_apps.common.logger import logger
+
+
+def _check_fetch_path(path: str) -> str:
+    if ".." in PurePosixPath(path).parts:
+        raise error.AppError(f"invalid provider config path '{path}'")
+    return path
 
 
 class ProviderData(ComponentBase):
@@ -30,11 +36,11 @@ class ProviderData(ComponentBase):
             # get the ini config
             self.recv_file(vm=host, src="/etc/sceptre/config.ini")
             pconf = configparser.ConfigParser()
-            pconf.read(os.path.join(self.base_dir, "config.ini"))
+            pconf.read(Path(self.base_dir) / "config.ini")
 
             # read the yaml file based on what's in the config
-            config_path = pconf.get(
-                section="power-solver-service", option="config-file"
+            config_path = _check_fetch_path(
+                pconf.get(section="power-solver-service", option="config-file")
             )
             self.recv_file(vm=host, src=config_path)
 
@@ -133,11 +139,11 @@ class ProviderData(ComponentBase):
             # get the ini config
             self.recv_file(vm=host, src="/etc/sceptre/config.ini")
             pconf = configparser.ConfigParser()
-            pconf.read(os.path.join(self.base_dir, "config.ini"))
+            pconf.read(Path(self.base_dir) / "config.ini")
 
             # read the yaml file based on what's in the config
-            config_path = pconf.get(
-                section="power-solver-service", option="config-file"
+            config_path = _check_fetch_path(
+                pconf.get(section="power-solver-service", option="config-file")
             )
             self.recv_file(vm=host, src=config_path)
 

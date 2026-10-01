@@ -68,6 +68,12 @@ def test_rtu_name_override_wins():
     )
 
 
+@pytest.mark.parametrize("name", ["x", "all", "Phenix", "../etc"])
+def test_rtu_name_rejects_short_reserved_and_unsafe(name):
+    with pytest.raises(ValidationError, match="device names"):
+        RtuDeviceConfig(hostname="rtu-1", name=name)
+
+
 def test_host_config_defaults():
     cfg = IgnitionHostConfig()
     assert cfg.gwbk is None

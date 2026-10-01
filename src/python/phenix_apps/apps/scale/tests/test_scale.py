@@ -3,6 +3,7 @@ Unit tests for the Scale logic and plugin compliance.
 """
 
 import logging
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -11,6 +12,7 @@ from box import Box
 from phenix_apps.apps.scale.app import Scale
 from phenix_apps.apps.scale.interface import ScalePlugin
 from phenix_apps.apps.scale.registry import PLUGIN_REGISTRY
+from phenix_apps.common import utils as real_utils
 
 pytestmark = pytest.mark.app_class(cls=Scale, name="scale")
 
@@ -58,11 +60,15 @@ def test_post_start_logic(mocker, mock_app, mock_minimega, tmp_path):
     """Test post_start logic with mocked minimega and file operations."""
     mocker.patch("phenix_apps.apps.scale.app.logger")
     mocker.patch("phenix_apps.apps.scale.app.Progress")
-    mocker.patch("phenix_apps.apps.scale.app.utils")
+    mock_utils = mocker.patch("phenix_apps.apps.scale.app.utils")
+    # keep real path semantics so the generated .mm paths stay honest
+    mock_utils.safe_join.side_effect = real_utils.safe_join
+    mock_utils.validate_hostname.side_effect = real_utils.validate_hostname
 
     mock_mm_conn = mock_minimega
 
     app = mock_app
+    (tmp_path / "images").mkdir(exist_ok=True)
     app.files_dir = str(tmp_path / "images")
     app.metadata = {"name": "default", "plugin": "builtin", "count": 2}
     app.dryrun = False
@@ -161,11 +167,10 @@ def test_startup_script_generation(mocker, mock_app):
     # Case 1: With additional commands
     mock_plugin.get_additional_startup_commands.return_value = "echo 'custom command'"
 
-    mock_file = mocker.patch("builtins.open", mocker.mock_open())
     app._configure_node_common(mock_plugin, 1, "node-1", {})
 
-    mock_file.assert_called_with(f"{app.app_dir}/node-1-startup.sh", "w")
-    handle = mock_file()
+    startup_file = Path(app.app_dir) / "node-1-startup.sh"
+    assert startup_file.is_file()
 
     expected_content = """echo 'STARTING...'
 echo 'custom command'
@@ -176,15 +181,13 @@ ovs-vsctl add-port test_exp ens1
 mm read /tmp/miniccc/files/test_exp/node-1.mm
 echo 'DONE!'
 """
-    handle.write.assert_called_with(expected_content)
+    assert startup_file.read_text() == expected_content
 
     # Case 2: Without additional commands (None or empty string)
     mock_plugin.get_additional_startup_commands.return_value = None
 
-    mock_file = mocker.patch("builtins.open", mocker.mock_open())
     app._configure_node_common(mock_plugin, 1, "node-2", {})
 
-    handle = mock_file()
     expected_content_empty = """echo 'STARTING...'
 
 while [ ! -S /tmp/minimega/minimega ]; do sleep 1; done
@@ -194,15 +197,15 @@ ovs-vsctl add-port test_exp ens1
 mm read /tmp/miniccc/files/test_exp/node-2.mm
 echo 'DONE!'
 """
-    handle.write.assert_called_with(expected_content_empty)
+    assert (
+        Path(app.app_dir) / "node-2-startup.sh"
+    ).read_text() == expected_content_empty
 
     # Case 3: With multiline additional commands
     mock_plugin.get_additional_startup_commands.return_value = "cmd1\ncmd2"
 
-    mock_file = mocker.patch("builtins.open", mocker.mock_open())
     app._configure_node_common(mock_plugin, 1, "node-3", {})
 
-    handle = mock_file()
     expected_content_multiline = """echo 'STARTING...'
 cmd1
 cmd2
@@ -213,7 +216,9 @@ ovs-vsctl add-port test_exp ens1
 mm read /tmp/miniccc/files/test_exp/node-3.mm
 echo 'DONE!'
 """
-    handle.write.assert_called_with(expected_content_multiline)
+    assert (
+        Path(app.app_dir) / "node-3-startup.sh"
+    ).read_text() == expected_content_multiline
 
 
 def test_apply_node_defaults(mocker, mock_app):
