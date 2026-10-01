@@ -264,7 +264,9 @@ class ConfigureStage(Stage):
                 "helics_broker_logfile", "/etc/sceptre/log/helics_broker.log"
             )
 
-            startup_file = self.startup_dir / f"{bkr.hostname}-helics.sh"
+            startup_file = utils.safe_join(
+                self.startup_dir, f"{bkr.hostname}-helics.sh"
+            )
             startup_file.write_text(
                 f"helics_broker --autorestart --ipv4 -f {len(feds)}"
                 f" --logfile={logfile}"

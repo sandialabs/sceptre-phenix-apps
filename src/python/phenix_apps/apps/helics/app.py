@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 
 from phenix_apps.apps import AppBase
 from phenix_apps.common import utils
@@ -9,8 +9,8 @@ class Helics(AppBase):
     def __init__(self, name: str, stage: str, dryrun: bool = False) -> None:
         super().__init__(name, stage, dryrun)
 
-        self.helics_dir: str = f"{self.exp_dir}/helics"
-        os.makedirs(self.helics_dir, exist_ok=True)
+        self.helics_dir: Path = Path(self.exp_dir) / "helics"
+        self.helics_dir.mkdir(parents=True, exist_ok=True)
 
     def pre_start(self):
         logger.info(f"Starting user application: {self.name}")
@@ -47,8 +47,8 @@ class Helics(AppBase):
 
         # create the wait script to be injected into federates
         templates = utils.abs_path(__file__, "templates/")
-        wait_file = f"{self.helics_dir}/wait-broker.sh"
-        with open(wait_file, "w") as f:
+        wait_file = self.helics_dir / "wait-broker.sh"
+        with wait_file.open("w") as f:
             utils.mako_serve_template(
                 "wait_broker.mako", templates, f, rootbroker_ip=root_ip
             )
@@ -72,7 +72,8 @@ class Helics(AppBase):
             if configs and configs[0].get("broker-wait", True):
                 dst = "/etc/phenix/startup/5-wait-broker.sh"
                 self.add_inject(
-                    hostname=fed.general.hostname, inject={"src": wait_file, "dst": dst}
+                    hostname=fed.general.hostname,
+                    inject={"src": str(wait_file), "dst": dst},
                 )
 
             for config in configs:
@@ -129,7 +130,7 @@ class Helics(AppBase):
             "feds": total_fed_count,
             "endpoint": root_ip,
             "log-level": broker_md.get("log-level", "summary"),
-            "log-file": os.path.join(log_dir, "helics-root-broker.log"),
+            "log-file": str(Path(log_dir) / "helics-root-broker.log"),
         }
 
         # per-host broker configs, initialized with root broker
@@ -153,19 +154,22 @@ class Helics(AppBase):
                         "parent": root_ip,
                         "endpoint": endpoint,
                         "log-level": level,
-                        "log-file": os.path.join(log_dir, "helics-sub-broker.log"),
+                        "log-file": str(Path(log_dir) / "helics-sub-broker.log"),
                     }
                 )
 
             configs[hostname] = broker_configs
 
         for hostname, broker_configs in configs.items():
-            start_file = f"{self.helics_dir}/{hostname}-broker.sh"
+            utils.validate_hostname(hostname)
+            start_file = utils.safe_join(self.helics_dir, f"{hostname}-broker.sh")
 
-            with open(start_file, "w") as f:
+            with start_file.open("w") as f:
                 utils.mako_serve_template(
                     "broker.mako", templates, f, configs=broker_configs
                 )
 
             dst = "/etc/phenix/startup/90-helics-broker.sh"
-            self.add_inject(hostname=hostname, inject={"src": start_file, "dst": dst})
+            self.add_inject(
+                hostname=hostname, inject={"src": str(start_file), "dst": dst}
+            )

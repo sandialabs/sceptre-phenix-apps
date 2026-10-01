@@ -35,6 +35,7 @@ graph TD
 
 | Field | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
+| `name` | String | `"wind-turbine"` | The prefix used for generating VM hostnames (e.g., `wind-turbine-1`). Letters, digits and `-`, starting with a letter or digit, at most 58 characters. |
 | `count` | Integer | `1` | The number of **Wind Turbines** to simulate (not VMs). |
 | `containers_per_node` | Integer | `6` | The number of containers to run per VM. Since one turbine = 6 containers, set this to multiples of 6 (e.g., 18 for 3 turbines/VM). |
 | `node_template` | Dict | `{}` | VM hardware specifications (CPU, RAM, Network). |

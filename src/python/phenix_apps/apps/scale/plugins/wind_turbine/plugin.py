@@ -1,10 +1,10 @@
 import copy
 import ipaddress
 import math
-import os
 import shutil
 import sys
 import tarfile
+from pathlib import Path
 from typing import Any
 
 import lxml.etree as ET
@@ -25,7 +25,11 @@ from phenix_apps.common.logger import logger
 
 
 class WindTurbineConfig(BaseModel):
-    name: str = "wind-turbine"
+    # Name must be a valid phenix hostname fragment: the "-{index}" suffix is
+    # appended later, and the result feeds file paths and minimega commands.
+    name: str = Field(
+        default="wind-turbine", pattern=r"^[a-zA-Z0-9][a-zA-Z0-9-]{0,57}$"
+    )
     count: int = Field(default=1, ge=1)
     containers_per_node: int = 6
     node_template: dict[str, Any] = Field(default_factory=dict)
@@ -86,7 +90,7 @@ class WindTurbine(ScalePlugin):
     def __init__(self) -> None:
         # Set the template directory for this plugin
         py_path = sys.modules[self.__class__.__module__].__file__
-        self.templates_dir: str = utils.abs_path(py_path, "templates")
+        self.templates_dir: Path = Path(utils.abs_path(py_path, "templates"))
         self.brokers: dict[str, dict[str, Any]] = {}
 
     def _resolve_ext_start_ip(self) -> ipaddress.IPv4Address:
@@ -288,8 +292,8 @@ class WindTurbine(ScalePlugin):
             ips = d["component_ips"]
 
             # Prepare directory
-            cfg_dir = f"{self.app.app_dir}/{hostname}/{cnt_num}"
-            os.makedirs(cfg_dir, exist_ok=True)
+            cfg_dir = utils.safe_join(self.app.app_dir, hostname, str(cnt_num))
+            cfg_dir.mkdir(parents=True, exist_ok=True)
 
             # Generate Config
             # The otsim.Config class expects the raw app metadata structure.
@@ -348,18 +352,18 @@ class WindTurbine(ScalePlugin):
                 self._generate_blade_controller(config, node_meta)
 
             # Write config
-            config.to_file(f"{cfg_dir}/config.xml")
+            config.to_file(cfg_dir / "config.xml")
 
         # Create tarball of configs
-        tgz_path = f"{self.app.exp_dir}/wind-configs.tgz"
+        tgz_path = Path(self.app.exp_dir) / "wind-configs.tgz"
         with tarfile.open(tgz_path, "w:gz") as tar:
-            tar.add(self.app.app_dir, arcname=os.path.basename(self.app.app_dir))
+            tar.add(self.app.app_dir, arcname=Path(self.app.app_dir).name)
 
         # Inject tarball
         self.app.add_inject(
             hostname=hostname,
             inject={
-                "src": tgz_path,
+                "src": str(tgz_path),
                 "dst": "/wind-configs.tgz",
             },
         )
@@ -380,7 +384,7 @@ class WindTurbine(ScalePlugin):
         node: dict[str, Any],
         ips: dict[str, str],
         turbine_num: int,
-        cfg_dir: str,
+        cfg_dir: Path,
     ) -> None:
         tmpl = self.config.templates.get("default", {}).get("main-controller", {})
         anemo_tmpl = self.config.templates.get("default", {}).get("anemometer", {})
@@ -484,7 +488,7 @@ class WindTurbine(ScalePlugin):
             if inject:
                 shutil.copy(
                     inject["src"],
-                    os.path.join(cfg_dir, os.path.basename(inject["dst"])),
+                    cfg_dir / Path(inject["dst"]).name,
                 )
 
         # Logic Module

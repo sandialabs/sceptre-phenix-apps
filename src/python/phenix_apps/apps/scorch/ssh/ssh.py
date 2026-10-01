@@ -5,7 +5,6 @@ Contributors: Klaehn Burkes, cmulk, and some AI friends.
 """
 
 import json
-import os
 import stat
 from pathlib import Path, PurePath
 
@@ -223,7 +222,7 @@ class SSH(ComponentBase):
             if stat.S_ISDIR(rstat.st_mode):
                 self._sftp_get_dir(sftp, remote_path, local_path)
             else:
-                os.makedirs(os.path.dirname(local_path) or ".", exist_ok=True)
+                Path(local_path).parent.mkdir(parents=True, exist_ok=True)
                 sftp.get(remote_path, local_path)
 
         except Exception as e:
@@ -249,11 +248,18 @@ class SSH(ComponentBase):
             remote_dir (str): Path to the remote directory to download.
             local_dir (str): Local destination directory path.
         """
-        os.makedirs(local_dir, exist_ok=True)
+        Path(local_dir).mkdir(parents=True, exist_ok=True)
 
         for entry in sftp.listdir_attr(remote_dir):
-            remote_path = f"{remote_dir.rstrip('/')}/{entry.filename}"
-            local_path = os.path.join(local_dir, entry.filename)
+            name = entry.filename
+            if not name or name in (".", "..") or "/" in name:
+                logger.error(
+                    f"skipping remote entry with unsafe filename '{name}' in '{remote_dir}'"
+                )
+                continue
+
+            remote_path = f"{remote_dir.rstrip('/')}/{name}"
+            local_path = str(utils.safe_join(local_dir, name))
 
             if stat.S_ISDIR(entry.st_mode):
                 self._sftp_get_dir(sftp, remote_path, local_path)

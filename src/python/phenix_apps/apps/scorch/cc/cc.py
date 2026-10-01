@@ -1,10 +1,9 @@
-import os
 import subprocess
 import uuid
-from pathlib import PurePath
+from pathlib import Path, PurePath
 
 from phenix_apps.apps.scorch import ComponentBase
-from phenix_apps.common import utils
+from phenix_apps.common import error, utils
 from phenix_apps.common.logger import logger
 
 
@@ -116,18 +115,18 @@ class CC(ComponentBase):
                         if validator:
                             logger.info(f"validating results from '{cmd.args}'")
 
-                            tempfile = f"/tmp/{uuid.uuid4()!s}.sh"
+                            tempfile = Path(f"/tmp/{uuid.uuid4()!s}.sh")
 
-                            with open(tempfile, "w") as tf:
+                            with tempfile.open("w") as tf:
                                 tf.write(validator)
 
                             proc = subprocess.run(
-                                ["bash", tempfile, vm.hostname],
+                                ["bash", str(tempfile), vm.hostname],
                                 input=results["stdout"].encode(),
                                 capture_output=True,
                             )
 
-                            os.remove(tempfile)
+                            tempfile.unlink()
 
                             if proc.returncode != 0:
                                 stderr = proc.stderr.decode()
@@ -184,10 +183,10 @@ class CC(ComponentBase):
                             f"too many files provided for send command for VM {vm.hostname}: {cmd.args}"
                         )
 
-                    if not os.path.isabs(src):
+                    if not PurePath(src).is_absolute():
                         src = "/phenix/" + src
 
-                    if not os.path.isabs(dst):
+                    if not PurePath(dst).is_absolute():
                         dst = "/phenix/" + dst
 
                     logger.info(
@@ -211,7 +210,14 @@ class CC(ComponentBase):
                         dst = str(self.base_dir / PurePath(src).name)
                     elif len(args) == 2:
                         src = args[0]
-                        dst = args[1]
+                        dst_path = Path(args[1])
+                        if dst_path.is_absolute():
+                            if not dst_path.is_relative_to(self.base_dir):
+                                raise error.AppError(
+                                    f"path '{dst_path}' escapes base directory '{self.base_dir}'"
+                                )
+                            dst_path = dst_path.relative_to(self.base_dir)
+                        dst = str(utils.safe_join(self.base_dir, dst_path))
                     else:
                         raise ValueError(
                             f"too many files provided for recv command for VM {vm.hostname}: {cmd.args}"
@@ -246,16 +252,16 @@ class CC(ComponentBase):
         else:
             cmd_file += ".sh"
 
-        cmd_src = os.path.join(self.root_dir, self.exp_name, cmd_file)
-        cmd_dst = os.path.join("/tmp/miniccc/files", self.exp_name, cmd_file)
+        cmd_src = str(Path(self.root_dir) / self.exp_name / cmd_file)
+        cmd_dst = str(PurePath("/tmp/miniccc/files") / self.exp_name / cmd_file)
 
-        with open(cmd_src, "w") as f:
+        with Path(cmd_src).open("w") as f:
             f.write(cmd)
 
         utils.mm_cc_send_wait(self.mm, hostname, cmd_src, self.exp_name)
         self.mm.clear_cc_filter()
 
-        os.remove(cmd_src)
+        Path(cmd_src).unlink()
 
         if node.hardware.os_type.lower() == "windows":
             return f"powershell.exe -ExecutionPolicy Bypass -File {cmd_dst}"

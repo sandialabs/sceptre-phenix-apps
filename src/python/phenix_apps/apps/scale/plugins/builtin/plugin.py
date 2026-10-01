@@ -13,7 +13,11 @@ class BuiltinConfig(BaseModel):
     count: int = Field(default=1, ge=1)
     containers: int = Field(default=0, ge=0)
     containers_per_node: int = Field(default=0, ge=0)
-    hostname_prefix: str = "node"
+    # Prefix must be a valid phenix hostname fragment: the "-{index}" suffix is
+    # appended later, and the result feeds file paths and minimega commands.
+    hostname_prefix: str = Field(
+        default="node", pattern=r"^[a-zA-Z0-9][a-zA-Z0-9-]{0,57}$"
+    )
     # Ignore extra fields (like node_template, container_template) that are
     # handled by the core Scale app, not this plugin.
     model_config = {"extra": "ignore", "validate_assignment": True}
