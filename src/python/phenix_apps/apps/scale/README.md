@@ -211,7 +211,7 @@ Plugins can override the default Minimega template (`minimega.mako`) to customiz
 class MyPlugin(ScalePlugin):
     def __init__(self):
         # Set templates directory relative to this file
-        self.templates_dir = os.path.join(os.path.dirname(__file__), "templates")
+        self.templates_dir = Path(__file__).parent / "templates"
 
     def get_template_name(self) -> str:
         return "my_custom_vm.mako"

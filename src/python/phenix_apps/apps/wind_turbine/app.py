@@ -1,6 +1,6 @@
 import copy
-import os
 import re
+from pathlib import Path
 
 import lxml.etree as ET
 from box import Box
@@ -19,11 +19,11 @@ class WindTurbine(AppBase):
     def __init__(self, name: str, stage: str, dryrun: bool = False) -> None:
         super().__init__(name, stage, dryrun)
 
-        self.startup_dir: str = f"{self.exp_dir}/startup"
-        self.ot_sim_dir: str = f"{self.exp_dir}/ot-sim"
+        self.startup_dir: Path = Path(self.exp_dir) / "startup"
+        self.ot_sim_dir: Path = Path(self.exp_dir) / "ot-sim"
 
-        os.makedirs(self.startup_dir, exist_ok=True)
-        os.makedirs(self.ot_sim_dir, exist_ok=True)
+        self.startup_dir.mkdir(parents=True, exist_ok=True)
+        self.ot_sim_dir.mkdir(parents=True, exist_ok=True)
 
         self.__init_defaults()
 
@@ -414,11 +414,11 @@ class WindTurbine(AppBase):
 
         config.append_to_cpu(module)
 
-        config_file = f"{self.ot_sim_dir}/{node.hostname}.xml"
+        config_file = self.ot_sim_dir / f"{node.hostname}.xml"
         config.to_file(config_file)
 
         kwargs = {
-            "src": config_file,
+            "src": str(config_file),
             "dst": "/etc/ot-sim/config.xml",
         }
 
@@ -477,11 +477,11 @@ class WindTurbine(AppBase):
         config.append_to_root(mb.root)
         config.append_to_cpu(module)
 
-        config_file = f"{self.ot_sim_dir}/{node.hostname}.xml"
+        config_file = self.ot_sim_dir / f"{node.hostname}.xml"
         config.to_file(config_file)
 
         kwargs = {
-            "src": config_file,
+            "src": str(config_file),
             "dst": "/etc/ot-sim/config.xml",
         }
 
@@ -537,11 +537,11 @@ class WindTurbine(AppBase):
         config.append_to_root(logic.root)
         config.append_to_cpu(module)
 
-        config_file = f"{self.ot_sim_dir}/{node.hostname}.xml"
+        config_file = self.ot_sim_dir / f"{node.hostname}.xml"
         config.to_file(config_file)
 
         kwargs = {
-            "src": config_file,
+            "src": str(config_file),
             "dst": "/etc/ot-sim/config.xml",
         }
 
@@ -571,11 +571,11 @@ class WindTurbine(AppBase):
         config.append_to_root(mb.root)
         config.append_to_cpu(module)
 
-        config_file = f"{self.ot_sim_dir}/{hostname}.xml"
+        config_file = self.ot_sim_dir / f"{hostname}.xml"
         config.to_file(config_file)
 
         kwargs = {
-            "src": config_file,
+            "src": str(config_file),
             "dst": "/etc/ot-sim/config.xml",
         }
 

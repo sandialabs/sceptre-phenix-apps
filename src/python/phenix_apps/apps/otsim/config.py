@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import lxml.etree as ET
 
 
@@ -289,5 +291,5 @@ class Config:
         self.cpu.append(child)
 
     def to_file(self, path):
-        with open(path, "w") as f:
+        with Path(path).open("w") as f:
             f.write(ET.tostring(self.root, pretty_print=True).decode())

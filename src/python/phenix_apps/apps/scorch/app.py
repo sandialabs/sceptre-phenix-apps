@@ -83,19 +83,19 @@ class ComponentBase:
             ) from ex
 
         self.exp_name: str = self.experiment.spec.experimentName
-        self.exp_dir: str = self.experiment.spec.baseDir
+        self.exp_dir: Path = Path(self.experiment.spec.baseDir)
         self.metadata: Box | None = self.extract_metadata()
 
-        self.root_dir: str = os.path.join(PHENIX_DIR, "images")
-        self.files_dir: str = os.getenv(
-            "PHENIX_FILES_DIR", os.path.join(self.root_dir, self.exp_name, "files")
+        self.root_dir: Path = Path(PHENIX_DIR) / "images"
+        self.files_dir: Path = Path(
+            os.getenv("PHENIX_FILES_DIR", self.root_dir / self.exp_name / "files")
         )
-        self.base_dir: str = os.path.join(
-            self.files_dir,
-            f"scorch/run-{self.run}/{self.name}/loop-{self.loop}-count-{self.count}",
+        self.base_dir: Path = (
+            self.files_dir
+            / f"scorch/run-{self.run}/{self.name}/loop-{self.loop}-count-{self.count}"
         )
 
-        os.makedirs(self.base_dir, exist_ok=True)
+        self.base_dir.mkdir(parents=True, exist_ok=True)
 
         self._mm: minimega.minimega | None = None  # minimega instance
         self._es: Elasticsearch | None = None  # Elasticsearch instance
@@ -175,10 +175,7 @@ class ComponentBase:
         # filenames can't have colons, so replace with dashes
         start_ts_filename = start_dt.strftime("%Y-%m-%dT%H-%M-%SZ")
 
-        info_file = os.path.join(
-            self.base_dir,
-            f"{self.stage}-{start_ts_filename}.json",
-        )
+        info_file = self.base_dir / f"{self.stage}-{start_ts_filename}.json"
 
         content = {
             "experiment_name": self.exp_name,
@@ -194,7 +191,7 @@ class ComponentBase:
             "stderr": self._format_stream(stderr_mirror.getvalue()),
             "logs": self._format_stream(log_buffer.getvalue()),
         }
-        with open(info_file, "w") as f:
+        with info_file.open("w") as f:
             json.dump(content, f, indent=2)
 
         if error_occurred:
@@ -226,7 +223,7 @@ class ComponentBase:
 
         saved_stdout = sys.stdout
 
-        sys.stdout = open("/dev/null", "w")
+        sys.stdout = Path("/dev/null").open("w")
 
         mm = None
 
@@ -374,9 +371,9 @@ class ComponentBase:
 
     def recv_file(self, vm: str, src: list[str] | str, dst: str = "") -> None:
         if not dst and isinstance(src, str):
-            dst = os.path.join(self.base_dir, Path(src).name)
+            dst = str(self.base_dir / Path(src).name)
         elif not dst and isinstance(src, list):
-            dst = self.base_dir
+            dst = str(self.base_dir)
 
         logger.info(f"copying file from {vm} (src={src}, dst={dst})")
 

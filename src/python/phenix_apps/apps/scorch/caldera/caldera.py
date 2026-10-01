@@ -1,7 +1,7 @@
 import json
-import os
 import time
 import uuid
+from pathlib import PurePath
 
 from phenix_apps.apps.scorch import ComponentBase
 from phenix_apps.common import utils
@@ -64,17 +64,17 @@ class Caldera(ComponentBase):
             logger.info(f"looking up ID for '{adversary}' adversary...")
 
             cmd_file = f"run-{self.extract_run_name()}_{uuid.uuid4()!s}.sh"
-            cmd_src = os.path.join(self.root_dir, self.exp_name, cmd_file)
-            cmd_dst = os.path.join("/tmp/miniccc/files", self.exp_name, cmd_file)
+            cmd_src = self.root_dir / self.exp_name / cmd_file
+            cmd_dst = PurePath("/tmp/miniccc/files") / self.exp_name / cmd_file
 
-            with open(cmd_src, "w") as f:
+            with cmd_src.open("w") as f:
                 utils.mako_serve_template(
                     "api_call.mako", templates, f, model="adversaries"
                 )
 
-            utils.mm_cc_send_wait(mm, server, cmd_src, self.exp_name)
+            utils.mm_cc_send_wait(mm, server, str(cmd_src), self.exp_name)
 
-            os.remove(cmd_src)
+            cmd_src.unlink()
 
             result = utils.mm_exec_wait(mm, server, f"bash {cmd_dst}", once=True)
 
@@ -101,17 +101,17 @@ class Caldera(ComponentBase):
             logger.info(f"looking up ID for '{facts}' fact source...")
 
             cmd_file = f"run-{self.extract_run_name()}_{uuid.uuid4()!s}.sh"
-            cmd_src = os.path.join(self.root_dir, self.exp_name, cmd_file)
-            cmd_dst = os.path.join("/tmp/miniccc/files", self.exp_name, cmd_file)
+            cmd_src = self.root_dir / self.exp_name / cmd_file
+            cmd_dst = PurePath("/tmp/miniccc/files") / self.exp_name / cmd_file
 
-            with open(cmd_src, "w") as f:
+            with cmd_src.open("w") as f:
                 utils.mako_serve_template(
                     "api_call.mako", templates, f, model="sources"
                 )
 
-            utils.mm_cc_send_wait(mm, server, cmd_src, self.exp_name)
+            utils.mm_cc_send_wait(mm, server, str(cmd_src), self.exp_name)
 
-            os.remove(cmd_src)
+            cmd_src.unlink()
 
             result = utils.mm_exec_wait(mm, server, f"bash {cmd_dst}", once=True)
 
@@ -138,17 +138,17 @@ class Caldera(ComponentBase):
             logger.info(f"looking up ID for '{planner}' planner...")
 
             cmd_file = f"run-{self.extract_run_name()}_{uuid.uuid4()!s}.sh"
-            cmd_src = os.path.join(self.root_dir, self.exp_name, cmd_file)
-            cmd_dst = os.path.join("/tmp/miniccc/files", self.exp_name, cmd_file)
+            cmd_src = self.root_dir / self.exp_name / cmd_file
+            cmd_dst = PurePath("/tmp/miniccc/files") / self.exp_name / cmd_file
 
-            with open(cmd_src, "w") as f:
+            with cmd_src.open("w") as f:
                 utils.mako_serve_template(
                     "api_call.mako", templates, f, model="planners"
                 )
 
-            utils.mm_cc_send_wait(mm, server, cmd_src, self.exp_name)
+            utils.mm_cc_send_wait(mm, server, str(cmd_src), self.exp_name)
 
-            os.remove(cmd_src)
+            cmd_src.unlink()
 
             result = utils.mm_exec_wait(mm, server, f"bash {cmd_dst}", once=True)
 
@@ -171,15 +171,15 @@ class Caldera(ComponentBase):
         )
 
         cmd_file = f"run-{self.extract_run_name()}_{uuid.uuid4()!s}.sh"
-        cmd_src = os.path.join(self.root_dir, self.exp_name, cmd_file)
-        cmd_dst = os.path.join("/tmp/miniccc/files", self.exp_name, cmd_file)
+        cmd_src = self.root_dir / self.exp_name / cmd_file
+        cmd_dst = PurePath("/tmp/miniccc/files") / self.exp_name / cmd_file
 
-        with open(cmd_src, "w") as f:
+        with cmd_src.open("w") as f:
             utils.mako_serve_template("new_operation.mako", templates, f, op=op)
 
-        utils.mm_cc_send_wait(mm, server, cmd_src, self.exp_name)
+        utils.mm_cc_send_wait(mm, server, str(cmd_src), self.exp_name)
 
-        os.remove(cmd_src)
+        cmd_src.unlink()
 
         result = utils.mm_exec_wait(mm, server, f"bash {cmd_dst}", once=True)
 
@@ -192,17 +192,17 @@ class Caldera(ComponentBase):
             time.sleep(10)
 
             cmd_file = f"run-{self.extract_run_name()}_{uuid.uuid4()!s}.sh"
-            cmd_src = os.path.join(self.root_dir, self.exp_name, cmd_file)
-            cmd_dst = os.path.join("/tmp/miniccc/files", self.exp_name, cmd_file)
+            cmd_src = self.root_dir / self.exp_name / cmd_file
+            cmd_dst = PurePath("/tmp/miniccc/files") / self.exp_name / cmd_file
 
-            with open(cmd_src, "w") as f:
+            with cmd_src.open("w") as f:
                 utils.mako_serve_template(
                     "get_operation.mako", templates, f, op=op["id"]
                 )
 
-            utils.mm_cc_send_wait(mm, server, cmd_src, self.exp_name)
+            utils.mm_cc_send_wait(mm, server, str(cmd_src), self.exp_name)
 
-            os.remove(cmd_src)
+            cmd_src.unlink()
 
             result = utils.mm_exec_wait(mm, server, f"bash {cmd_dst}", once=True)
 
@@ -218,17 +218,17 @@ class Caldera(ComponentBase):
         logger.info(f"exporting Caldera report for '{self.name}' operation...")
 
         cmd_file = f"run-{self.extract_run_name()}_{uuid.uuid4()!s}.sh"
-        cmd_src = os.path.join(self.root_dir, self.exp_name, cmd_file)
-        cmd_dst = os.path.join("/tmp/miniccc/files", self.exp_name, cmd_file)
+        cmd_src = self.root_dir / self.exp_name / cmd_file
+        cmd_dst = PurePath("/tmp/miniccc/files") / self.exp_name / cmd_file
 
-        with open(cmd_src, "w") as f:
+        with cmd_src.open("w") as f:
             utils.mako_serve_template(
                 "get_operation_report.mako", templates, f, op=op["id"]
             )
 
-        utils.mm_cc_send_wait(mm, server, cmd_src, self.exp_name)
+        utils.mm_cc_send_wait(mm, server, str(cmd_src), self.exp_name)
 
-        os.remove(cmd_src)
+        cmd_src.unlink()
 
         result = utils.mm_exec_wait(mm, server, f"bash {cmd_dst}", once=True)
 
@@ -236,8 +236,8 @@ class Caldera(ComponentBase):
             raise RuntimeError("failed to make API call for operation report")
         report = json.loads(result["stdout"])
 
-        output_file = os.path.join(self.base_dir, "caldera-report.json")
-        with open(output_file, "w") as f:
+        output_file = self.base_dir / "caldera-report.json"
+        with output_file.open("w") as f:
             json.dump(report, f, indent=2)
 
 

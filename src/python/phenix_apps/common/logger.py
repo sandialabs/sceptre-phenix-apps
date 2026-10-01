@@ -1,6 +1,7 @@
 import json
 import sys
 import traceback
+from pathlib import Path
 
 from loguru import logger
 
@@ -132,7 +133,7 @@ class PhenixFileSink:
     """
 
     def __init__(self, path: str):
-        self._file = open(path, "a", encoding="utf-8")
+        self._file = Path(path).open("a", encoding="utf-8")
 
     def __call__(self, message):
         _write_phenix_json_log(self._file, message)

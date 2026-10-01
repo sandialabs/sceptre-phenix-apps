@@ -1,6 +1,7 @@
 import os
 import subprocess
 import uuid
+from pathlib import PurePath
 
 from phenix_apps.apps.scorch import ComponentBase
 from phenix_apps.common import utils
@@ -207,7 +208,7 @@ class CC(ComponentBase):
 
                     if len(args) == 1:
                         src = args[0]
-                        dst = self.base_dir + "/" + os.path.basename(src)
+                        dst = str(self.base_dir / PurePath(src).name)
                     elif len(args) == 2:
                         src = args[0]
                         dst = args[1]

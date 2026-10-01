@@ -7,7 +7,7 @@ Contributors: Klaehn Burkes, cmulk, and some AI friends.
 import json
 import os
 import stat
-from pathlib import Path
+from pathlib import Path, PurePath
 
 import paramiko
 
@@ -96,9 +96,9 @@ class SSH(ComponentBase):
             self._log(f"{stage}_remote", **cmd_out)
 
             if self.files:
-                sftp_path = self.base_dir + f"/{stage}/"
+                sftp_path = self.base_dir / stage
                 for remote_file in self.files:
-                    local_path = os.path.join(sftp_path, os.path.basename(remote_file))
+                    local_path = str(sftp_path / PurePath(remote_file).name)
                     files_out = self._fetch_remote(ssh, remote_file, local_path)
                     self._log(
                         f"{stage}_remote",

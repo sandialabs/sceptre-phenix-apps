@@ -1,5 +1,4 @@
 import json
-import os
 import signal
 import threading
 import time
@@ -63,10 +62,10 @@ class HostStats(ComponentBase):
         if not self.resdata:
             return
 
-        output_file = os.path.join(self.base_dir, "host_stats.jsonl")
+        output_file = self.base_dir / "host_stats.jsonl"
 
         # write jsonl
-        with open(output_file, "a+") as f:
+        with output_file.open("a+") as f:
             for datum in self.resdata:
                 json_record = json.dumps(datum)
                 f.write(json_record + "\n")

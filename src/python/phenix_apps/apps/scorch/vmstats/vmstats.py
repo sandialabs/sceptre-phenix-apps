@@ -46,7 +46,9 @@ class VMStats(ComponentBase):
         for i, vm in enumerate(vms):
             logger.info(f"transferring /vmstat.out from {vm} ({i + 1} of {len(vms)})")
             try:
-                utils.mm_recv(self.mm, vm, "/vmstat.out", f"{self.base_dir}/{vm}.out")
+                utils.mm_recv(
+                    self.mm, vm, "/vmstat.out", str(self.base_dir / f"{vm}.out")
+                )
             except ValueError as ex:
                 raise RuntimeError(f"Failed to get vmstat.out from {vm}: {ex}") from ex
 
@@ -59,7 +61,7 @@ class VMStats(ComponentBase):
 
         logger.info("reading vmstat.out files")
         for vm in vms:
-            with open(f"{self.base_dir}/{vm}.out") as f:
+            with (self.base_dir / f"{vm}.out").open() as f:
                 lines = f.readlines()
 
                 for i, line in enumerate(lines):
@@ -82,9 +84,9 @@ class VMStats(ComponentBase):
 
                     stats.append(stat)
 
-        stats_path = f"{self.base_dir}/vm_stats.jsonl"
+        stats_path = self.base_dir / "vm_stats.jsonl"
         logger.info(f"writing consolidated vmstats to {stats_path}")
-        with open(stats_path, "a+") as f:
+        with stats_path.open("a+") as f:
             for datum in stats:
                 json_record = json.dumps(datum)
                 f.write(json_record + "\n")

@@ -1,7 +1,7 @@
 import csv
 import json
-import os
 import time
+from pathlib import PurePath
 
 from phenix_apps.apps.scorch import ComponentBase
 from phenix_apps.common import utils
@@ -28,24 +28,25 @@ class Snort(ComponentBase):
         if config_snort:
             script = config_snort["script"]
             executor = config_snort["executor"]
+            script_name = PurePath(script).name
 
-            logger.info(f"copying {os.path.basename(script)} to {hostname}")
+            logger.info(f"copying {script_name} to {hostname}")
 
             # Copies script to root directory of VM. For example, if script is
             # /phenix/topologies/snort-test/scripts/configure-snort.sh, then it
             # will be copied to /configure-snort.sh in the VM.
-            utils.mm_send(mm, hostname, script, os.path.basename(script))
+            utils.mm_send(mm, hostname, script, script_name)
 
-            logger.info(f"running {os.path.basename(script)} on {hostname}")
+            logger.info(f"running {script_name} on {hostname}")
 
             mm.cc_filter(f"name={hostname}")
-            mm.cc_exec(f"{executor} /{os.path.basename(script)}")
+            mm.cc_exec(f"{executor} /{script_name}")
 
         for config in configs:
             src = config["src"]
             dst = config["dst"]
 
-            logger.info(f"copying {os.path.basename(src)} to {hostname}")
+            logger.info(f"copying {PurePath(src).name} to {hostname}")
 
             utils.mm_send(mm, hostname, src, dst)
 
@@ -99,17 +100,17 @@ class Snort(ComponentBase):
         logfiles = ["alert", "snort.log", "snort.stats"]
 
         for log in logfiles:
-            logger.info(f"copying /var/log/snort/{log} from {hostname}")
-            utils.mm_recv(
-                mm, hostname, f"/var/log/snort/{log}", f"{self.base_dir}/{log}"
-            )
+            log_path = self.base_dir / log
 
-            if log == "snort.stats" and os.path.exists(f"{self.base_dir}/{log}"):
+            logger.info(f"copying /var/log/snort/{log} from {hostname}")
+            utils.mm_recv(mm, hostname, f"/var/log/snort/{log}", str(log_path))
+
+            if log == "snort.stats" and log_path.is_file():
                 logger.info("converting snort.stats to JSON")
 
                 lines = []
 
-                with open(f"{self.base_dir}/{log}") as f:
+                with log_path.open() as f:
                     lines = f.readlines()
 
                 # get rid of comment in file
@@ -123,7 +124,7 @@ class Snort(ComponentBase):
 
                 data = csv.DictReader(lines)
 
-                with open(f"{self.base_dir}/snort-stats.jsonl", "w") as f:
+                with (self.base_dir / "snort-stats.jsonl").open("w") as f:
                     for row in data:
                         json.dump(row, f)
                         f.write("\n")

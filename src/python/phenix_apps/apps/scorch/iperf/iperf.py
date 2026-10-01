@@ -1,6 +1,5 @@
-import os.path
 from collections import Counter
-from pathlib import Path
+from pathlib import Path, PurePath
 from time import sleep
 
 from box import Box
@@ -162,7 +161,7 @@ class Iperf(ComponentBase):
 
         # Generate iperf mapping and save it to a JSON file
         mapping = self._build_iperf_mapping()
-        mapping_path = Path(self.base_dir, "iperf_mapping.json")
+        mapping_path = self.base_dir / "iperf_mapping.json"
         logger.info(f"Saving iperf mapping to {mapping_path}")
         utils.write_json(mapping_path, mapping)
 
@@ -417,8 +416,8 @@ class Iperf(ComponentBase):
             ss_outputs += f"\n{ss_res['stdout']}\n\n"
 
         logger.info("saving netstat info to files")
-        Path(self.base_dir, "netstat_outputs.txt").write_text(ns_outputs)
-        Path(self.base_dir, "ss_outputs.txt").write_text(ss_outputs)
+        (self.base_dir / "netstat_outputs.txt").write_text(ns_outputs)
+        (self.base_dir / "ss_outputs.txt").write_text(ss_outputs)
 
     def stop(self):
         logger.info(f"Stopping user component: {self.name}")
@@ -463,8 +462,8 @@ class Iperf(ComponentBase):
                         mm=self.mm,
                         vm=client.hostname,
                         src=client["client_log_path"],
-                        dst=os.path.join(
-                            self.base_dir, os.path.basename(client["client_log_path"])
+                        dst=str(
+                            self.base_dir / PurePath(client["client_log_path"]).name
                         ),
                     )
 
@@ -476,8 +475,8 @@ class Iperf(ComponentBase):
                         mm=self.mm,
                         vm=server.hostname,
                         src=client["server_log_path"],
-                        dst=os.path.join(
-                            self.base_dir, os.path.basename(client["server_log_path"])
+                        dst=str(
+                            self.base_dir / PurePath(client["server_log_path"]).name
                         ),
                     )
 
@@ -486,9 +485,9 @@ class Iperf(ComponentBase):
                         mm=self.mm,
                         vm=client.hostname,
                         src=f"/iperf_client-log_client-{client.hostname}_server-{server.hostname}.log",
-                        dst=os.path.join(
-                            self.base_dir,
-                            f"iperf_client-log_client-{client.hostname}_server-{server.hostname}.log",
+                        dst=str(
+                            self.base_dir
+                            / f"iperf_client-log_client-{client.hostname}_server-{server.hostname}.log"
                         ),
                     )
                     if node_info["os_types"][server.hostname] == "linux":
@@ -496,14 +495,14 @@ class Iperf(ComponentBase):
                             mm=self.mm,
                             vm=server.hostname,
                             src=f"/iperf_server-log_client-{client.hostname}_server-{server.hostname}.log",
-                            dst=os.path.join(
-                                self.base_dir,
-                                f"iperf_server-log_client-{client.hostname}_server-{server.hostname}.log",
+                            dst=str(
+                                self.base_dir
+                                / f"iperf_server-log_client-{client.hostname}_server-{server.hostname}.log"
                             ),
                         )
 
             # verify error field isn't set in iperf results
-            for file in Path(self.base_dir).glob("*.json"):
+            for file in self.base_dir.glob("*.json"):
                 try:
                     data = utils.read_json(file)
                 except Exception as ex:
@@ -525,8 +524,8 @@ class Iperf(ComponentBase):
                         logger.info(
                             f"generating RTT histogram for client '{client.hostname}' and server '{server.hostname}'"
                         )
-                        c_path = Path(
-                            self.base_dir, os.path.basename(client["client_log_path"])
+                        c_path = (
+                            self.base_dir / PurePath(client["client_log_path"]).name
                         )
                         results = utils.read_json(c_path)  # type: dict
 
@@ -553,9 +552,7 @@ class Iperf(ComponentBase):
                             .replace("_", "-")
                         )
 
-                        rtt_hist_file = Path(
-                            self.base_dir, f"rtt_histogram_{pair_name}.txt"
-                        )
+                        rtt_hist_file = self.base_dir / f"rtt_histogram_{pair_name}.txt"
                         logger.info(
                             f"Writing RTT histogram to {rtt_hist_file} (client={client.hostname}, server={server.hostname})"
                         )

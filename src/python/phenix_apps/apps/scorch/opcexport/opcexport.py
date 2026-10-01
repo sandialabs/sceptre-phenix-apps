@@ -1,6 +1,6 @@
 import json
-import os
 import time
+from pathlib import Path
 from xml.etree import ElementTree as ET
 
 from phenix_apps.apps.scorch import ComponentBase
@@ -26,15 +26,15 @@ class OPCExport(ComponentBase):
 
         # get opc config file
         logger.info("Looking for OPC XML config file")
-        opc_config_file = f"{self.exp_dir}/sceptre/{host}/opc.xml"
+        opc_config_file = self.exp_dir / "sceptre" / host / "opc.xml"
         try:
             asset_dir = next(
                 app
                 for app in self.experiment.spec.scenario.apps
                 if app["name"] == "sceptre"
             )["assetDir"]
-            override_file = f"{asset_dir}/injects/override/{host}_opc.xml"
-            if os.path.exists(override_file):
+            override_file = Path(asset_dir) / "injects" / "override" / f"{host}_opc.xml"
+            if override_file.is_file():
                 logger.info(
                     f"Using override for OPC variables file from {override_file}"
                 )
@@ -48,19 +48,21 @@ class OPCExport(ComponentBase):
         opc_json = self.create_opc_variables(opc_config_file)
 
         # Output path for the JSON
-        e_dir = os.path.join(self.exp_dir, "opcexport")
-        if not os.path.exists(e_dir):
-            os.mkdir(e_dir)
-        opc_variables_file = os.path.join(e_dir, "opc_variables.json")
+        e_dir = self.exp_dir / "opcexport"
+        if not e_dir.exists():
+            e_dir.mkdir()
+        opc_variables_file = e_dir / "opc_variables.json"
         logger.info(f"Creating opc_variables file: {opc_variables_file}")
 
         # write variables to json
-        with open(opc_variables_file, "w") as f:
+        with opc_variables_file.open("w") as f:
             json.dump(opc_json, f)
 
         # Use miniccc to inject opc variables file
         logger.info(f"Copying opc_variables.json to host '{host}'")
-        utils.mm_send(self.mm, host, opc_variables_file, "opcexport/opc_variables.json")
+        utils.mm_send(
+            self.mm, host, str(opc_variables_file), "opcexport/opc_variables.json"
+        )
 
         # install stuff
         logger.info("Running install script install-python-opc.ps1")
@@ -192,7 +194,7 @@ class OPCExport(ComponentBase):
 
         logger.info(f"Cleaned up user component: {self.name}")
 
-    def create_opc_variables(self, opc_config_file: str) -> dict:
+    def create_opc_variables(self, opc_config_file: Path) -> dict:
         logger.info(f"Generating OPC variables from: {opc_config_file}")
         opc_json = {}
 
