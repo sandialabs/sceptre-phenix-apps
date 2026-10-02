@@ -54,7 +54,6 @@ PROTOCOL_FIELDS: Final[dict[str, str]] = {
     "dnp3": "dnp3",
     "dnp3-serial": "dnp3_serial",
     "modbus": "modbus",
-    "sunspec": "sunspec",
     "iec60870-5-104": "iec104",
 }
 
@@ -115,7 +114,6 @@ class Device(BaseModel):
     Its identity, plus the optional per-device register overrides that replace
     the infrastructure's default fields. Anything else is dropped by
     SceptreMetadataParser, so it is rejected here rather than silently ignored.
-    An inverter's overrides are SunSpec model numbers, hence the ints.
     """
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
@@ -197,7 +195,6 @@ class FdServerMeta(Meta):
     dnp3: list[Device] | None = None
     dnp3_serial: list[Device] | None = Field(None, alias="dnp3-serial")
     modbus: list[Device] | None = None
-    sunspec: list[Device] | None = None
     iec104: list[Device] | None = Field(None, alias="iec60870-5-104")
 
     def check(self, host: "Host", ctx: Context) -> None:
@@ -219,6 +216,13 @@ class FdServerMeta(Meta):
             )
         else:
             self._check_device_types(host, ctx, infrastructure)
+
+        if "sunspec" in (self.model_extra or {}):
+            host.flag(
+                ctx,
+                "metadata.sunspec is no longer supported; SunSpec was removed",
+                "expected one of: " + ", ".join(PROTOCOL_FIELDS),
+            )
 
         server = self.server_hostname
         if server and server not in ctx["hostnames"]:

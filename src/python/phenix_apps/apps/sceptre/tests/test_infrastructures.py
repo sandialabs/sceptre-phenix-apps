@@ -29,7 +29,7 @@ from phenix_apps.apps.sceptre.metadata import FIELD_TYPES, Infrastructure
 
 GOLDEN_FILE = Path(__file__).parent / "infrastructures_golden.txt"
 
-PROTOCOLS = (*Register.TYPE, "sunspec")
+PROTOCOLS = tuple(Register.TYPE)
 
 # The union of every device type any infrastructure accepts, so each one is
 # also asked for the types it does *not* support -- that is what pins which
@@ -85,18 +85,13 @@ def render(infrastructure: str, device_type, protocol: str) -> str:
     fields = " ".join(f"{name}={device.fields[name]}" for name in FIELD_TYPES)
     parts = [f"range={device.range}", f"infrastructure={device.infrastructure}", fields]
 
-    if protocol == "sunspec":
-        # SunSpec register contents include a random serial number; the count is
-        # enough to show the models list above reached the generator.
-        parts.append(f"registers={len(device.registers)}")
-    else:
-        parts.append(
-            "registers="
-            + (
-                "; ".join(f"{r.regtype}:{r.addr} {r.field}" for r in device.registers)
-                or "-"
-            )
+    parts.append(
+        "registers="
+        + (
+            "; ".join(f"{r.regtype}:{r.addr} {r.field}" for r in device.registers)
+            or "-"
         )
+    )
     return " ".join(parts)
 
 

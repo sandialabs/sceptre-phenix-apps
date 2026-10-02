@@ -7,8 +7,6 @@ that file is the table and this one is the logic.
 
 from typing import ClassVar
 
-import phenix_apps.apps.sceptre.protocols.sunspec as sunspec
-
 
 class Device:
     def __init__(
@@ -36,15 +34,6 @@ class Device:
 
     def __generate_register_list(self) -> None:
         for field_type, fields in self.fields.items():
-            if self.protocol == "sunspec":
-                # Only an inverter has a SunSpec map, and its models live in the
-                # analog-read-write list.
-                if self.device_type == "inverter" and field_type == "analog-read-write":
-                    sunspec.SunSpecDevice(
-                        self.infrastructure, self.device_name, self.registers
-                    ).generate_registers(fields)
-                continue
-
             self.registers += [
                 Register(
                     self.device_name,

@@ -3,7 +3,7 @@
 The **SCEPTRE app** builds industrial control system (ICS/SCADA) experiments. A
 simulation *provider* (PowerWorld, PyPower, Simulink, RTDS, ...) models a
 physical process; *field devices* expose that process over real industrial
-protocols (DNP3, Modbus, BACnet, IEC 60870-5-104, SunSpec); and an *OPC server*,
+protocols (DNP3, Modbus, BACnet, IEC 60870-5-104); and an *OPC server*,
 *SCADA server*, *HMIs*, *engineer workstations* and a *historian* sit on top of
 them the way they would in a real plant.
 
@@ -367,5 +367,4 @@ Pre-existing, and pinned by a test rather than silently carried.
 | **The ELK restart script points at one provider** | `sceptre_provider_restart.py` is rendered with the last provider's address, so the others cannot be restarted from ELK. Visible in the golden fixture, which has four providers. |
 | **Inconsistent mgmt-vlan filtering** | The OPC/SCADA/historian code compares `vlan != "mgmt"` case-sensitively; the field device code lowercases first. `MGMT` is therefore excluded in one and not the other. Both now go through `hosts.non_mgmt(case_sensitive=...)`, so the split is visible at each call site and pinned by `test_hosts.py`. |
 | **`Register.addresses` is global state** | Class-level mutable state reset per `FieldDeviceConfig`, so register numbering is order-dependent. Tests reset it via an autouse fixture. |
-| **SunSpec register maps are unreachable** | `SunSpecDevice.Register.mappings` is keyed `PowerDistribution`/`PowerTransmission`, but a device carries the lowercase infrastructure name, so any inverter on the `sunspec` protocol raises `KeyError`. Pinned in `infrastructures_golden.txt`. |
 | **`reg_config` is never populated** | Nothing in the app builds a manual register map, so the `reg_config` branch in `Register.__init__` is unreachable. Only `protocols/*` remains in the ruff per-file-ignores; everything else in the app is fully linted. |

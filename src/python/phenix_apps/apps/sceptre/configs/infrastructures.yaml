@@ -6,8 +6,9 @@
 # range        the register range for the whole infrastructure, which OpcConfig
 #              reads. A device type repeats it only when it differs.
 # devices      device type -> the fields it exposes per field type. An
-#              inverter's analog-read-write list holds SunSpec model numbers
-#              rather than field names.
+#              inverter's analog-read-write list still holds the SunSpec model
+#              numbers it was built from when SunSpec was supported; on other
+#              protocols they become registers named after the numbers.
 #
 # Adding a device type here is enough for validation to accept it and for
 # create_device to build it; tests/test_infrastructures.py pins every

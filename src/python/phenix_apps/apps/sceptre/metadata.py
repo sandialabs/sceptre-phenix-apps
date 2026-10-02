@@ -88,7 +88,6 @@ class SceptreMetadataParser:
         "dnp3",
         "dnp3-serial",
         "modbus",
-        "sunspec",
         "iec60870-5-104",
     ]
 

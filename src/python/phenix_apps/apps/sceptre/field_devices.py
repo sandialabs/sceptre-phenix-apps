@@ -27,7 +27,6 @@ PORTS: Final[dict[str, str]] = {
     "bacnet": "47808-local",
     "goose": "61850",
     "iec60870-5-104": "2404-local",
-    "sunspec": "502-local",
 }
 
 # Reported as 0 when unused: dashboards expect the key to exist.
@@ -139,34 +138,16 @@ class FieldDevices(PreStartState):
 
             config_file = fd_directory / "config.xml"
 
-            sceptre_type = "field-device"
-            if "sunspec" in parsed.devices_by_protocol:
-                sceptre_type = "sunspec"
-
-            if sceptre_type == "sunspec":
-                self.render(
-                    "sunspec.mako",
-                    config_file,
-                    name=fd_config.name,
-                    cycle_time=fd_cycle_time,
-                    infra=fd_config.infrastructure_name,
-                    device=fd_config.protocols[0].devices[0],
-                    ipaddr=fd_config.ipaddr,
-                    publish_endpoint=fd_config.publish_endpoint,
-                    server_endpoint=fd_config.server_endpoint,
-                    devname=fd_config.protocols[0].devices[0].registers[0].devname,
-                )
-            else:
-                self.render(
-                    "fd_server.mako",
-                    config_file,
-                    fd_config=fd_config,
-                    logic=fd_logic,
-                    cycle_time=fd_cycle_time,
-                )
+            self.render(
+                "fd_server.mako",
+                config_file,
+                fd_config=fd_config,
+                logic=fd_logic,
+                cycle_time=fd_cycle_time,
+            )
 
             self.app.render_sceptre_start(
-                fd_, name=sceptre_type, needrestart=needrestart
+                fd_, name="field-device", needrestart=needrestart
             )
 
             # What the ELK dashboards read: which ports this device listens on.

@@ -34,9 +34,6 @@ cd /root/OpenPLC_v2
 ./iec2c st_files/openplc.st
 mv -f POUS.c POUS.h LOCATED_VARIABLES.h VARIABLES.csv Config0.c Config0.h Res0.c ./core/
 ./build_core.sh
-    % elif name.lower() == 'sunspec':
-echo -e "LD_LIBRARY_PATH=/usr/local/lib\nGOBENNU_CONFIG_FILE=/etc/sceptre/config.xml" > /etc/gobennu-environment
-systemctl start gobennu
     % elif name.lower() == 'field-device':
 echo "[Hashes]
 reghash = `sha256sum /usr/bin/bennu-field-deviced | awk '{print $1}'`

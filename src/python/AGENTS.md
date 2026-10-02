@@ -81,12 +81,10 @@ scheduling fields, and write only the resulting JSON to stdout. Extend
 
 ## Bundled Runtime Data
 
-The SCEPTRE app ships configuration tables, SunSpec XML models, and the
-MyDesigner template tree; Ignition ships a Jython 2.7 template tree; SCORCH
-ships scripts and binary payloads. Treat all of it as runtime package data.
+The SCEPTRE app ships configuration tables and the MyDesigner template tree;
+Ignition ships a Jython 2.7 template tree; SCORCH ships scripts and binary
+payloads. Treat all of it as runtime package data.
 
-- Leave `phenix_apps/apps/sceptre/protocols/sunspec/` exactly as-is. It is
-  excluded from Ruff and codespell for that reason.
 - `phenix_apps/apps/ignition/templates/` is Jython 2.7 and is excluded from
   Ruff and vulture. Do not modernize it to Python 3 syntax.
 - Do not reformat, regenerate, or replace bundled third-party or binary assets

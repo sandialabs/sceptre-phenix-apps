@@ -219,6 +219,14 @@ CASES = [
         "declares no protocol",
     ),
     (
+        "fd-server still declares sunspec",
+        lambda e: host(e, "rtu-1").metadata.update(
+            sunspec=[{"type": "inverter", "name": "inverter-1"}]
+        ),
+        True,
+        "SunSpec was removed",
+    ),
+    (
         "provider without a simulator",
         lambda e: host(e, "provider-pp").metadata.pop("simulator"),
         False,

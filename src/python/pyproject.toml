@@ -108,9 +108,8 @@ phenix_apps = [
     "apps/scorch/opcexport/*.ps1",
     "apps/scorch/opcexport/*.zip",
     "apps/scorch/opcexport/*.exe",
-    # sceptre reads all three of these at runtime
+    # sceptre reads both of these at runtime
     "apps/sceptre/configs/*.yaml",
-    "apps/sceptre/protocols/sunspec/models/smdx/*",
     "apps/sceptre/templates/mydesigner/**/*",
     "apps/ignition/templates/**/*"
 ]
@@ -129,7 +128,6 @@ target-version = "py312"
 
 # exclude 'vendored' directories outright
 exclude = [
-    "phenix_apps/apps/sceptre/protocols/sunspec/models/smdx/",
     "phenix_apps/apps/sceptre/templates/mydesigner/",
     "phenix_apps/apps/ignition/templates/", # Jython 2.7 scripts
 ]
@@ -163,7 +161,6 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 [tool.ruff.lint.per-file-ignores]
 "test_*.py" = ["ARG"] # ignore unused-argument in test files
-"phenix_apps/apps/sceptre/protocols/*" = ["RUF012"]
 
 
 [tool.ruff.lint.isort]

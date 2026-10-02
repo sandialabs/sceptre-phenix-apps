@@ -13,59 +13,11 @@ def intercambio(dictionary, string):
         string = string.replace(item, dictionary[item])
     return string
 
-sunspec_register = ''
 %>\
 % for fd_config in server_configs:
     % for protocol in fd_config.protocols:
-        % if protocol.protocol == 'sunspec':
-                <internal-tag>
-                    <!-- Well-known SunSpec device map identifier 'SunS' as 32-bit
-                    integer (0x53756e53). -->
-                    <name>identifier</name>
-                    <value>1400204883</value>
-                </internal-tag>
-                <internal-tag>
-                    <name>end</name>
-                    <value>65535</value>
-                </internal-tag>
-                <internal-tag>
-                    <name>end-length</name>
-                    <value>0</value>
-                </internal-tag>
-        % endif
         % for device in protocol.devices:
             % for register in device.registers:
-                % if device.protocol == 'sunspec':
-                    % if register.static:
-                <%
-                if register.name == 'length':
-                    sunspec_register += '-length'
-                else:
-                    sunspec_register = register.name
-                %>
-                <internal-tag>
-                    <name>${sunspec_register}</name>
-                        % if 'string' in register.fieldtype:
-                    <string>${register.field}</string>
-                        % else:
-                    <value>${register.field}</value>
-                        % endif
-                </internal-tag>
-                    % else:
-                        <%
-                        io_name = fd_config.name + '_' + 'O' + str(register.addr)
-                        %>
-                <external-tag>
-                    <name>${register.name}</name>
-                    <io>${io_name}</io>
-                        % if register.field in ['active']:
-                    <type>binary</type>
-                        % else:
-                    <type>analog</type>
-                        % endif
-                </external-tag>
-                    % endif
-                % else:
                     <%
                     input_regs = ['analog-input', 'binary-input',
                               'input-register', 'discrete-input']
@@ -80,7 +32,6 @@ sunspec_register = ''
                     <io>${io_name}</io>
                     <type>${type_}</type>
                 </external-tag>
-                % endif
             % endfor
         % endfor
     % endfor
@@ -202,15 +153,6 @@ sunspec_register = ''
             <modbus-server>
                 <endpoint>tcp://${fep_config.ipaddr}:502</endpoint>
                 <event-logging>${fep_config.name}-modbus-server.log</event-logging>
-    % elif fep_protocol.protocol == 'sunspec':
-            <sunspec-tcp-server>
-                <port>5502</port>
-                <event-logging>${fep_config.name}-sunspec-tcp-server.log</event-logging>
-                <register>
-                    <address>40000</address>
-            <uint32>identifier</uint32>
-                </register>
-                <ip>${fep_config.ipaddr}</ip>
     % elif fep_protocol.protocol == 'iec60870-5-104':
             <iec60870-5-104-server>
             <rpoll-rate>2</rpoll-rate>
@@ -227,22 +169,6 @@ sunspec_register = ''
 			<% fep_device = next(fep_device_iter) %>
 			    <% fep_register_iter = iter(fep_device.registers) %>
 			% for register in device.registers:
-			    % if protocol.protocol == 'sunspec':
-			      <%
-			      sunspec_reg_addr = next(fep_register_iter).addr
-			      if register.name == 'length':
-				  sunspec_reg_name += '-length'
-			      else:
-				  sunspec_reg_name = register.name
-			      %>
-				<register>
-				    <address>${sunspec_reg_addr}</address>
-				% if register.scaling:
-				    <scaling-factor>${register.scaling}</scaling-factor>
-				% endif
-				    <${register.fieldtype}>${sunspec_reg_name}</${register.fieldtype}>
-				</register>
-			    % else:
 				    <%
 				    input_regs = ['analog-input', 'binary-input',
 						  'input-register', 'discrete-input']
@@ -260,7 +186,6 @@ sunspec_register = ''
 					    % endif
 					<tag>var_${io_name}</tag>
 				    </${register.regtype}>
-			    % endif
 			% endfor
 		    % endfor
 	    % endif
@@ -270,16 +195,6 @@ sunspec_register = ''
             </dnp3-server>
     % elif fep_protocol.protocol == 'modbus' or fep_protocol.protocol == 'modbus-serial':
             </modbus-server>
-    % elif fep_protocol.protocol == 'sunspec':
-                <register>
-                <address>${sunspec_reg_addr + 1}</address>
-            <uint16>end</uint16>
-                </register>
-                <register>
-                <address>${sunspec_reg_addr + 2}</address>
-            <uint16>end-length</uint16>
-                </register>
-            </sunspec-tcp-server>
     % elif fep_protocol.protocol == 'iec60870-5-104':
             </iec60870-5-104-server>
     % else:
@@ -298,25 +213,6 @@ mapa_nombre_entrada = {}
     % for protocol in fd_config.protocols:
         % for device in protocol.devices:
             % for register in device.registers:
-                % if protocol.protocol == 'sunspec':
-                    % if not register.static:
-                        <%
-                        io_name = fd_config.name + '_' + 'I' + str(register.addr)
-                        %>
-                        % if register.field in ['active']:
-                <binary>
-                        % else:
-                <analog>
-                        % endif
-                    <id>${io_name}</id>
-                    <name>${register.devname}.${register.field}</name>
-                        % if register.field in ['active']:
-                </binary>
-                        % else:
-                </analog>
-                        % endif
-                    % endif
-                % else:
                     <%
                     input_regs = ['analog-input', 'binary-input',
                                   'input-register', 'discrete-input']
@@ -340,7 +236,6 @@ mapa_nombre_entrada = {}
                     % else:
             </analog>
                     % endif
-                % endif
             % endfor
         % endfor
     % endfor
@@ -355,25 +250,6 @@ mapa_nombre_salida = {}
     % for protocol in fd_config.protocols:
         % for device in protocol.devices:
             % for register in device.registers:
-                % if protocol.protocol == 'sunspec':
-                    % if not register.static:
-                        <%
-                        io_name = fd_config.name + '_' + 'O' + str(register.addr)
-                        %>
-                        % if register.field in ['active']:
-                <binary>
-                        % else:
-                <analog>
-                        % endif
-                    <id>${io_name}</id>
-                    <name>${register.devname}.${register.field}</name>
-                        % if register.field in ['active']:
-                </binary>
-                        % else:
-                </analog>
-                        % endif
-                    % endif
-                % else:
                     <%
 		    input_regs = ['analog-input', 'binary-input',
 		    'input-register', 'discrete-input']
@@ -398,7 +274,6 @@ mapa_nombre_salida = {}
                     % else:
                 </analog>
                     % endif
-                % endif
             % endfor
         % endfor
     % endfor
