@@ -11,7 +11,7 @@ from pathlib import Path
 import paramiko
 
 from phenix_apps.apps.scorch import ComponentBase
-from phenix_apps.common import utils
+from phenix_apps.common import error, utils
 from phenix_apps.common.logger import logger
 
 
@@ -225,24 +225,32 @@ class ERSPAN(ComponentBase):
                             and password are optional.
         """
         # --- Top-level required ---
-        self.local_bridge = self.metadata.get("local_bridge")
-        if self.local_bridge is None:
-            raise ValueError("No 'local_bridge' provided in metadata")
-
-        self.local_ip = self.metadata.get("local_ip")
-        if self.local_ip is None:
-            raise ValueError("No 'local_ip' provided in metadata")
-
-        self.remote_ip = self.metadata.get("remote_ip")
-        if self.remote_ip is None:
-            raise ValueError("No 'remote_ip' provided in metadata")
+        self.local_bridge = utils.validate_ovs_name(
+            self.metadata.get("local_bridge"), "local_bridge"
+        )
+        self.local_ip = utils.validate_ip(self.metadata.get("local_ip"), "local_ip")
+        self.remote_ip = utils.validate_ip(self.metadata.get("remote_ip"), "remote_ip")
 
         # --- Top-level optional with defaults ---
-        self.local_interface = self.metadata.get("local_interface", "erspan1")
-        self.session_key = self.metadata.get("session_key", 100)
+        self.local_interface = utils.validate_ovs_name(
+            self.metadata.get("local_interface", "erspan1"), "local_interface"
+        )
+
+        try:
+            self.session_key = int(self.metadata.get("session_key", 100))
+        except (TypeError, ValueError) as ex:
+            raise error.AppError(
+                f"invalid 'session_key' value in metadata: {ex}"
+            ) from ex
+
         self.excluded_vlans = self.metadata.get("excluded_vlans", [])
         if isinstance(self.excluded_vlans, str):
             self.excluded_vlans = [self.excluded_vlans]
+        for vlan in self.excluded_vlans:
+            if not isinstance(vlan, str) or not vlan or len(vlan.split()) != 1:
+                raise error.AppError(
+                    f"invalid 'excluded_vlans' value '{vlan}' in metadata"
+                )
 
         # --- Optional remote_config section ---
         self.remote_config = self.metadata.get("remote_config")
@@ -258,6 +266,15 @@ class ERSPAN(ComponentBase):
             # Apply default for optional remote fields
             if not rc.get("remote_interface"):
                 rc.remote_interface = "erspan1"
+
+            rc.remote_interface = utils.validate_ovs_name(
+                rc.remote_interface, "remote_interface"
+            )
+
+            if rc.get("remote_bridge") is not None:
+                rc.remote_bridge = utils.validate_ovs_name(
+                    rc.remote_bridge, "remote_bridge"
+                )
 
     def _get_mirrored_vlans(self) -> list[int]:
         """

@@ -1,9 +1,11 @@
 import csv
 import datetime
+import ipaddress
 import json
 import math
 import random
 import re
+import shlex
 import shutil
 import socket
 import stat
@@ -16,7 +18,7 @@ from io import StringIO
 from pathlib import Path
 from socket import inet_ntoa
 from struct import pack
-from typing import IO
+from typing import IO, Final
 
 import mako.lookup
 import mako.template
@@ -368,12 +370,15 @@ def mm_recv(
     mm: minimega.minimega,
     vm: str,
     src: list[str] | str,
-    dst: str,
+    dst: str | Path,
     grace: float = phenix_settings.CC_CLIENT_GRACE,
 ) -> None:
     """
     Transfer one or more files from a VM to a destination on the host using miniccc mounts.
     """
+
+    # The normalization check below compares the caller's spelling of the path.
+    dst = str(dst)
 
     # Use PHENIX_DIR as base directory to ensure minimega has access to it. This
     # assumes PHENIX_DIR is mounted into the containers if containers are being
@@ -1106,9 +1111,12 @@ def mm_compute_cmd(mm: minimega.minimega, **kwargs) -> list[dict]:
         if param not in kwargs:
             raise ValueError(f"Missing required parameter: {param}")
 
-    experiment = kwargs["experiment"]
+    experiment = _validate_mm_token(kwargs["experiment"])
     computes = kwargs.get("computes", "all")  # 'all' or comma-separated list
     computes_list = computes.split(",")
+
+    for compute in computes_list:
+        _validate_mm_token(compute)
     command = kwargs["command"]
     command_type = kwargs.get("command_type", "shell")
     ignore_error = kwargs.get("ignore_error", False)
@@ -1140,6 +1148,58 @@ def mm_compute_cmd(mm: minimega.minimega, **kwargs) -> list[dict]:
             mm.namespace(original_namespace)
 
     return results
+
+
+def _validate_mm_token(value: str) -> str:
+    """
+    Ensure a value spliced into a raw minimega control-socket command is a
+    single benign token (no whitespace, newlines, or quotes).
+    """
+    if not value or re.search(r"[\s'\"]", value):
+        raise AppError(f"invalid minimega command token '{value}'")
+
+    return value
+
+
+OVS_NAME_REGEX: Final[re.Pattern[str]] = re.compile(r"^[A-Za-z0-9_.-]{1,15}$")
+
+
+def validate_ovs_name(value: object, field: str) -> str:
+    """
+    A required metadata value that names an OVS bridge or interface: a single
+    token of at most 15 characters (IFNAMSIZ), safe to splice into ovs-vsctl
+    and minimega commands.
+    """
+    if value is None:
+        raise AppError(f"no '{field}' provided in metadata")
+    if not isinstance(value, str) or not OVS_NAME_REGEX.fullmatch(value):
+        raise AppError(
+            f"invalid '{field}' value '{value}' in metadata: must match "
+            f"{OVS_NAME_REGEX.pattern}"
+        )
+
+    return value
+
+
+def validate_ip(value: object, field: str) -> str:
+    """A required metadata value that is an IPv4 or IPv6 address."""
+    if value is None:
+        raise AppError(f"no '{field}' provided in metadata")
+    try:
+        return str(ipaddress.ip_address(str(value)))
+    except ValueError as ex:
+        raise AppError(f"invalid '{field}' value '{value}' in metadata") from ex
+
+
+def _validate_mm_filter(cap_filter: str) -> str:
+    """
+    Ensure a capture filter can be wrapped in single quotes in a raw minimega
+    command: it may contain spaces, but no quotes or line breaks.
+    """
+    if any(c in cap_filter for c in "'\"\n\r"):
+        raise AppError(f"invalid characters in capture filter '{cap_filter}'")
+
+    return cap_filter
 
 
 def _mm_socket_cmd(cmd: str, ignore_error: bool = False) -> list[str]:
@@ -1305,8 +1365,10 @@ def mm_delete_file(
         )
 
 
-def run_command(cmd: str, timeout: float | None = None) -> str:
-    result = subprocess.check_output(cmd, shell=True, timeout=timeout)
+def run_command(cmd: str | list[str], timeout: float | None = None) -> str:
+    if isinstance(cmd, str):
+        cmd = shlex.split(cmd)
+    result = subprocess.check_output(cmd, timeout=timeout)
     if isinstance(result, bytes):
         result = result.decode()
     return result
@@ -1393,7 +1455,17 @@ def trim_pcap(
     # YYYY-MM-DDThh:mm:ss.nnnnnnnnn[Z|+-hh:mm]
     # editcap -A start-time -B stop-time <infile> <outfile>
     run_command(
-        f"editcap -F {cap_type} -A {start_time.isoformat()} -B {end_time.isoformat()} {src.as_posix()} {edited.as_posix()}"
+        [
+            "editcap",
+            "-F",
+            cap_type,
+            "-A",
+            start_time.isoformat(),
+            "-B",
+            end_time.isoformat(),
+            src.as_posix(),
+            edited.as_posix(),
+        ]
     )
 
     trimmed_size = edited.stat().st_size
@@ -1420,7 +1492,7 @@ def pcap_capinfos(pcap_path: str | Path) -> dict:
 
     {'File name': './br14-0.pcap', 'File type': 'pcap', 'File encapsulation': 'ether', 'File time precision': 'microseconds', 'Packet size limit': '1600', 'Packet size limit min (inferred)': 'n/a', 'Packet size limit max (inferred)': 'n/a', 'Number of packets': '37', 'File size (bytes)': '3862', 'Data size (bytes)': '3246', 'Capture duration (seconds)': '28.975097', 'Start time': '2024-02-21 22:27:36.592584', 'End time': '2024-02-21 22:28:05.567681', 'Data byte rate (bytes/sec)': '112.03', 'Data bit rate (bits/sec)': '896.22', 'Average packet size (bytes)': '87.73', 'Average packet rate (packets/sec)': '1.28', 'SHA256': '2b07c65ec9f00c6ea3334ccd1f49074c4f643c68776a3a8cae990e824cbbf72a', 'SHA1': 'dcc7cb3f070b8757693a30a6e75ddc5542686072', 'Strict time order': 'True', 'Capture hardware': '', 'Capture oper-sys': '', 'Capture application': '', 'Capture comment': ''}
     """
-    capinfo_output = run_command(f"capinfos -T -M {pcap_path}")
+    capinfo_output = run_command(["capinfos", "-T", "-M", str(pcap_path)])
 
     io_obj = StringIO(capinfo_output)
     reader = csv.DictReader(io_obj, delimiter="\t")  # tab-delimited

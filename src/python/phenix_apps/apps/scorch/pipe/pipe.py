@@ -1,5 +1,7 @@
 from phenix_apps.apps.scorch import ComponentBase
+from phenix_apps.common import error, utils
 from phenix_apps.common.logger import logger
+from phenix_apps.common.settings import SCORCH_HOST_VALIDATORS
 
 
 class Pipe(ComponentBase):
@@ -23,7 +25,14 @@ class Pipe(ComponentBase):
         if not pipe:
             raise ValueError("pipe not specified but is required")
 
+        utils._validate_mm_token(pipe)
+
         if via:
+            if not SCORCH_HOST_VALIDATORS:
+                raise error.AppError(
+                    f"pipe 'via' runs '{via}' as a command on the host, and "
+                    "host-side commands are disabled by PHENIX_SCORCH_HOST_VALIDATORS=0"
+                )
             logger.info(f"setting via '{via}' for pipe '{pipe}'")
             self.mm.pipe_via(pipe, via)
 
@@ -46,6 +55,10 @@ class Pipe(ComponentBase):
 
         if data:
             logger.info(f"writing data '{data}' to pipe '{pipe}'")
+            if any(c in str(data) for c in "'\n\r"):
+                raise error.AppError(
+                    "pipe data may not contain single quotes or line breaks"
+                )
             self.mm.pipe(pipe, f"'{data}'")
 
         logger.info(f"Started user component: {self.name}")
@@ -59,7 +72,7 @@ class Pipe(ComponentBase):
             raise ValueError("pipe not specified but is required")
 
         logger.info(f"clearing pipe '{pipe}'")
-        self.mm.clear_pipe(pipe)
+        self.mm.clear_pipe(utils._validate_mm_token(pipe))
 
         logger.info(f"Cleaned up user component: {self.name}")
 

@@ -83,6 +83,11 @@ If exit non-zero and `abortOnError` is true, then the component exits as failed.
 If no validator is provided then it is assumed the test succeeded if the atomic
 executor exits cleanly.
 
+> [!IMPORTANT]
+> Validators run as shell scripts on the phenix host, not in the VM. To lock
+> this down, set `PHENIX_SCORCH_HOST_VALIDATORS=0` in the phenix environment;
+> each validator is then skipped with a warning and the result is not validated.
+
 `vms` is a list of settings per VM to execute the test on.
 
 ## VM Settings

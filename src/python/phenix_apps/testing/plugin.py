@@ -69,7 +69,9 @@ def pytest_configure(config):
 @pytest.fixture(scope="session", autouse=True)
 def _silence_phenix_log():
     """Disable file logging across the test session."""
-    settings.PHENIX_LOG_FILE = None
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(settings, "PHENIX_LOG_FILE", None)
+        yield
 
 
 @pytest.fixture

@@ -42,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Common**: New `validate_hostname()` (phenix v2026.10.02 rules) and `safe_join()` guard hostnames and paths built from metadata; `mm_send()`/`mm_recv()` stay inside the miniccc mount. **Breaking:** rejects `_`, 1-char, all-digit, `all` and `phenix` hostnames.
 - **Apps**: Scale, wind turbine and Ignition names are restricted; protonuke and wireguard reject embedded newlines; wireguard configs are `0600`, sceptre startup scripts `0755`.
 - **SCORCH**: `cc`, `ssh` and `providerdata` transfers stay inside the run directory.
+- **Common**: `run_command()` no longer uses a shell; `mm_compute_cmd()` rejects multi-token names.
+- **Mirror, mgmt_tap, SCORCH**: Metadata is validated before reaching `ovs-vsctl`, minimega or `tshark`; commands run as argument vectors, not `bash -c`.
+- **SCORCH**: kafka's PID file moves from `/tmp` to the experiment's `files_dir/scorch/`; ssh takes optional `known_hosts`.
+- **SCORCH art/cc/pipe**: `PHENIX_SCORCH_HOST_VALIDATORS=0` stops validators and `via` from running scenario-supplied commands on the host; validator scripts are written with `tempfile`.
 
 ## [2.0.0] - 2026-03-04
 

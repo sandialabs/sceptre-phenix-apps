@@ -63,9 +63,15 @@ class Collector(ComponentBase):
         sceptre_topo = self.experiment.metadata.annotations.topology
         sceptre_scenario = self.experiment.metadata.annotations.scenario
 
-        topo_data = utils.run_command(f"phenix config get topology/{sceptre_topo}")
-        sc_data = utils.run_command(f"phenix config get scenario/{sceptre_scenario}")
-        exp_data = utils.run_command(f"phenix config get experiment/{self.exp_name}")
+        topo_data = utils.run_command(
+            ["phenix", "config", "get", f"topology/{sceptre_topo}"]
+        )
+        sc_data = utils.run_command(
+            ["phenix", "config", "get", f"scenario/{sceptre_scenario}"]
+        )
+        exp_data = utils.run_command(
+            ["phenix", "config", "get", f"experiment/{self.exp_name}"]
+        )
         assert topo_data
         assert sc_data
         assert exp_data

@@ -132,7 +132,17 @@ class SSH(ComponentBase):
             paramiko.SSHException: If the connection or authentication fails.
         """
         ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        known_hosts = self.metadata.get("known_hosts") if self.metadata else None
+        if known_hosts:
+            ssh.load_host_keys(known_hosts)
+            ssh.set_missing_host_key_policy(paramiko.RejectPolicy())
+        else:
+            logger.warning(
+                f"no 'known_hosts' file provided in metadata; automatically "
+                f"trusting host key presented by {self.ip}"
+            )
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
         connect_kwargs = {
             "hostname": self.ip,

@@ -19,16 +19,28 @@ class Kafka(ComponentBase):
             uuid.NAMESPACE_DNS, f"{self.exp_name}-{self.name}-{config_str}"
         )
 
+        # Not under base_dir: that is per loop and count, and configure must see
+        # the PID file a previous loop wrote. Not /tmp, which is world-writable.
         self.pid_file = (
-            f"/tmp/phenix-scorch-kafka-{self.exp_name}-{component_uuid.hex}.pid"
+            Path(self.files_dir)
+            / "scorch"
+            / f"phenix-scorch-kafka-{self.exp_name}-{component_uuid.hex}.pid"
         )
         self.execute_stage()
 
     def configure(self):
-        # if the deterministic PID file already exists, don't configure the component again
-        if os.path.exists(self.pid_file):
-            logger.info(f"User component {self.name} already configured, skipping")
-            return
+        # if the deterministic PID file names a running listener, don't configure
+        # the component again; a stale file (crash, reboot) is discarded
+        if self.pid_file.exists():
+            try:
+                pid = int(self.pid_file.read_text().strip())
+            except (OSError, ValueError):
+                pid = 0
+            if pid and self._is_listener(pid):
+                logger.info(f"User component {self.name} already configured, skipping")
+                return
+            logger.warning(f"Removing stale PID file {self.pid_file}")
+            self.pid_file.unlink(missing_ok=True)
 
         logger.info(f"Configuring user component: {self.name}")
 
@@ -49,13 +61,13 @@ class Kafka(ComponentBase):
         csv_bool = self.metadata.get("csv", True)  # if false output a JSON
 
         # get and output the output directory to the logger
-        output_dir = self.base_dir
+        output_dir: Path = self.base_dir
         logger.info(f"Output Directory: {output_dir}")
-        os.makedirs(output_dir, exist_ok=True)
+        output_dir.mkdir(parents=True, exist_ok=True)
         if csv_bool:
-            self.path = os.path.join(output_dir, f"{self.name}_output.csv")
+            self.path = output_dir / f"{self.name}_output.csv"
         else:
-            self.path = os.path.join(output_dir, f"{self.name}_output.ndjson")
+            self.path = output_dir / f"{self.name}_output.ndjson"
 
         kafka_ips_str = ",".join(kafka_ips)
         topics_str = json.dumps(topics)
@@ -89,9 +101,9 @@ class Kafka(ComponentBase):
             logger.error(f"Error running listener executable. See: {e}")
 
     def _create_pid_file(self, pid):
-        # writes PID to unique .pid file under /tmp directory
+        # writes PID to the unique .pid file
         try:
-            with open(self.pid_file, "w+") as f:
+            with self.pid_file.open("w+") as f:
                 f.write(str(pid))
         except Exception as e:
             logger.error(
@@ -104,9 +116,9 @@ class Kafka(ComponentBase):
         # reads and deletes PID file, returns PID
         pid = 0
         try:
-            with open(self.pid_file) as f:
+            with self.pid_file.open() as f:
                 pid = int(f.readline().rstrip())
-            os.remove(self.pid_file)
+            self.pid_file.unlink()
             return pid
         except Exception as e:
             logger.error(
@@ -122,11 +134,25 @@ class Kafka(ComponentBase):
             logger.info("No PID, component already cleaned up")
             exit()
 
+        if not self._is_listener(pid):
+            logger.error(
+                f"PID {pid} does not appear to be a kafka listener process, not killing"
+            )
+            return
+
         try:
             os.kill(pid, 9)
             logger.info(f"Cleaned up user component: {self.name}")
         except Exception as e:
             logger.error(f"Error terminating listener at PID {pid}. See: {e}")
+
+    @staticmethod
+    def _is_listener(pid: int) -> bool:
+        try:
+            cmdline = Path(f"/proc/{pid}/cmdline").read_bytes()
+        except OSError:
+            return False
+        return b"kafka_listener.py" in cmdline
 
 
 def main():
