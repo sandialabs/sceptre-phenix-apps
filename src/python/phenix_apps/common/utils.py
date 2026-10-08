@@ -235,27 +235,15 @@ def expand_shorthand(short: str) -> list:
     return [short]
 
 
-# `cc commands` columns, in order (minimega cmd/minimega/cc_cli.go)
-CC_CMD_COLUMNS = (
-    "id",
-    "prefix",
-    "command",
-    "responses",
-    "background",
-    "once",
-    "sent",
-    "received",
-    "connectivity",
-    "level",
-    "filter",
-)
+def _cc_cmd_rows(resp: dict) -> list[dict[str, str]]:
+    """Rows of one host's ``cc commands`` response, keyed by its own header.
 
+    Column order varies across minimega versions, so never index by position.
+    A truncated row simply lacks the missing keys.
+    """
+    header = resp.get("Header") or []
 
-def _cc_cmd_field(row: list, column: str) -> str | None:
-    """Value of ``column`` in a ``cc commands`` row, or None if truncated."""
-    idx = CC_CMD_COLUMNS.index(column)
-
-    return row[idx] if idx < len(row) else None
+    return [dict(zip(header, row, strict=False)) for row in resp.get("Tabular") or []]
 
 
 class _WaitLog:
@@ -768,27 +756,21 @@ def mm_wait_for_cmd(
     seen = host is None
 
     while True:
-        # >>> mm.cc_commands()
-        # 'Header': ['id', 'prefix', 'command', 'responses', 'background', 'once', 'sent', 'received', 'connectivity', 'level', 'filter']
-        # 'Tabular': [['1', 'testing', '[/usr/bin/iperf3 --version]', '15', 'false', 'true', '[]', '[]', '', '', 'os=linux && iperf=1']]
         for resp in mm_cc_all_hosts(mm, mm.cc_commands):
             if host is not None and resp.get("Host") != host:
                 continue
 
-            for row in resp.get("Tabular") or []:
-                if not row or row[0] != cmd_id:
+            for row in _cc_cmd_rows(resp):
+                if row.get("id") != cmd_id:
                     continue
 
                 # Same id, different payload: not ours.
-                if (
-                    match_value is not None
-                    and _cc_cmd_field(row, match_column) != match_value
-                ):
+                if match_value is not None and row.get(match_column) != match_value:
                     continue
 
                 seen = True
 
-                if int(_cc_cmd_field(row, "responses") or 0) > 0:
+                if int(row.get("responses") or 0) > 0:
                     return
 
         now = time.monotonic()
@@ -849,16 +831,14 @@ def mm_wait_for_prefix(
     wait_log = _WaitLog()
 
     while True:
-        # 'Header': ['id', 'prefix', 'command', 'responses', 'background', 'once', 'sent', 'received', 'connectivity', 'level', 'filter']
-        # 'Tabular': [['1', 'testing', '[/usr/bin/iperf3 --version]', '15', 'false', 'true', '[]', '[]', '', '', 'os=linux && iperf=1']]
         seen = 0
 
         for resp in mm_cc_all_hosts(mm, mm.cc_commands):
-            for row in resp.get("Tabular") or []:
-                if _cc_cmd_field(row, "prefix") != prefix:
+            for row in _cc_cmd_rows(resp):
+                if row.get("prefix") != prefix:
                     continue
 
-                seen += int(_cc_cmd_field(row, "responses") or 0)
+                seen += int(row.get("responses") or 0)
 
         if seen >= num_responses:
             return

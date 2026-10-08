@@ -447,16 +447,34 @@ def test_mm_vm_uuid_returns_none_when_header_lacks_name_or_uuid():
     assert utils.mm_vm_uuid(mm, "foo") is None
 
 
-# `cc commands` per-host rows: [id, prefix, command, responses, ...].
-def _cc_cmd_row(host="gibson1336", **cols):
+# `cc commands` header, from minimega cmd/minimega/cc_cli.go (cliCCCommand).
+_CC_CMD_HEADER = (
+    "id",
+    "prefix",
+    "command",
+    "responses",
+    "issued",
+    "background",
+    "once",
+    "sent",
+    "received",
+    "connectivity",
+    "level",
+    "filter",
+)
+# Before minimega 3.3.0 there was no `issued` column.
+_CC_CMD_HEADER_LEGACY = tuple(c for c in _CC_CMD_HEADER if c != "issued")
+
+
+def _cc_cmd_row(host="gibson1336", header=_CC_CMD_HEADER, **cols):
     """One `cc commands` per-host response. Pass any subset of columns by name."""
     values = {"id": "7", "prefix": "", "command": "[whoami]", "responses": "0"}
     values.update(cols)
 
     return {
         "Host": host,
-        "Header": list(utils.CC_CMD_COLUMNS),
-        "Tabular": [[values.get(col, "") for col in utils.CC_CMD_COLUMNS]],
+        "Header": list(header),
+        "Tabular": [[values.get(col, "") for col in header]],
         "Error": "",
     }
 
@@ -730,18 +748,30 @@ def test_mm_wait_for_prefix_ignores_other_prefixes(monkeypatch):
     assert clock.now >= 5.0
 
 
-def test_cc_cmd_columns_match_minimega_cc_cli():
-    # Source of truth: cmd/minimega/cc_cli.go, cliCCCommand's resp.Header.
-    assert utils.CC_CMD_COLUMNS == (
-        "id",
-        "prefix",
-        "command",
-        "responses",
-        "background",
-        "once",
-        "sent",
-        "received",
-        "connectivity",
-        "level",
-        "filter",
+@pytest.mark.parametrize("header", [_CC_CMD_HEADER, _CC_CMD_HEADER_LEGACY])
+def test_mm_wait_for_cmd_reads_columns_by_header(monkeypatch, header):
+    # Columns are located by name, so a minimega that adds or reorders
+    # columns must not break the content match.
+    _install_fake_clock(monkeypatch)
+    row = _cc_cmd_row(
+        "gibson1337", header=header, id="20", responses="1", sent="[exp/ours.sh]"
     )
+    mm = _StubMM(cc_commands_rows=[row])
+
+    utils.mm_wait_for_cmd(
+        mm,
+        "20",
+        host="gibson1337",
+        match_column="sent",
+        match_value="[exp/ours.sh]",
+        appear_grace=30.0,
+    )
+
+
+@pytest.mark.parametrize("header", [_CC_CMD_HEADER, _CC_CMD_HEADER_LEGACY])
+def test_mm_wait_for_prefix_reads_columns_by_header(header):
+    mm = _StubMM(
+        cc_commands_rows=[_cc_cmd_row(header=header, prefix="testing", responses="2")]
+    )
+
+    utils.mm_wait_for_prefix(mm, "testing", 2, poll_rate=0.0)
