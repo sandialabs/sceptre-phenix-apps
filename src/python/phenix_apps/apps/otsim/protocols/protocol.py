@@ -25,7 +25,7 @@ def resolve_endpoint(node, protocol: str, default_port: int) -> tuple[str, int]:
     settings = node.metadata.get(protocol)
     interfaces = node.topology.network.interfaces
     ip = None
-    port = default_port
+    port: int | str = default_port
 
     if isinstance(settings, dict) and "interface" in settings:
         addr, _, given = str(settings["interface"]).partition(":")

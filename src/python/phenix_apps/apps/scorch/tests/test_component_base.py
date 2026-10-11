@@ -1,6 +1,7 @@
 import io
 import json
 import sys
+from collections.abc import Callable
 
 import pytest
 from box import Box
@@ -41,7 +42,7 @@ def run_component(monkeypatch, tmp_path):
     def run(
         metadata: object,
         ctype: str | None = "test",
-        cls: type[ComponentBase] = Component,
+        cls: Callable[[], ComponentBase] = Component,
     ) -> ComponentBase:
         experiment = {
             "spec": {

@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **OT-sim App**: DNP3 address assignment is a module function (`protocols.dnp3.assign_addresses`)
+- **Build System**: mypy runs in `make check` and CI; modules with existing errors are listed in pyproject.toml.
 - **Build System**: `Mako>=1.3.10`, `requests>=2.32.4` (security advisories).
 - **Build System**: `lxml>=6.0.2`, the first release with wheels for Python 3.12 to 3.14.
 - **SCEPTRE App**: Register numbering state is per `FieldDeviceConfig` instead of class-level mutable state on `Register`; numbering is no longer order-dependent across configs and the test suite runs safely in parallel. Output is unchanged.
