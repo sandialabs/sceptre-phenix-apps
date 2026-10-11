@@ -13,6 +13,7 @@ import minimega
 from box import Box
 from elasticsearch import Elasticsearch
 
+from phenix_apps.apps.scorch.control import ScopedCC
 from phenix_apps.common import utils
 from phenix_apps.common.logger import logger, phenix_stderr_sink
 from phenix_apps.common.settings import PHENIX_DIR
@@ -36,6 +37,10 @@ class ComponentBase:
         Validates command line arguments.
         Expects 5 arguments: <run_stage> <component_name> <run_id> <current_loop> <current_loop_count>
         """
+
+        if sys.argv[1:] == ["--scorch-capabilities"]:
+            print(json.dumps({"scorchConcurrencyProtocol": 1}))
+            raise SystemExit(0)
 
         if len(sys.argv) != 6:
             raise ValueError(
@@ -235,6 +240,15 @@ class ComponentBase:
         sys.stdout.close()
         sys.stdout = saved_stdout
 
+        execution = os.getenv("PHENIX_SCORCH_EXECUTION_ID")
+        if execution:
+            directory = os.getenv(
+                "PHENIX_SCORCH_CONTROL_DIR", str(Path(PHENIX_DIR) / ".scorch-control")
+            )
+            owner = f"{execution}-{self.run}-{self.name}-{self.loop}-{self.count}"
+            mm = ScopedCC(
+                mm, self.exp_name if namespaced else "default", owner, directory
+            )
         return mm
 
     @property

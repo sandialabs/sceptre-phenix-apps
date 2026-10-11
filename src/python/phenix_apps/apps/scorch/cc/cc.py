@@ -269,6 +269,9 @@ class CC(ComponentBase):
         self.mm.clear_cc_commands()
         self.mm.clear_cc_responses()
 
+        if os.getenv("PHENIX_SCORCH_EXECUTION_ID"):
+            return  # Other executions intentionally retain their responses.
+
         # ensure miniccc_responses directory is empty
         miniccc_dir = utils.mm_get_cc_path(self.mm)
         if miniccc_dir and any(p.exists() for p in miniccc_dir.iterdir()):
