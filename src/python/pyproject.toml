@@ -92,10 +92,14 @@ phenix_apps_testing = "phenix_apps.testing.plugin"
 [project.optional-dependencies]
 dev = [
     "codespell>=2.2.4",  # spelling
+    "mypy>=1.11",  # static type checking
     "pytest",  # testing framework
     "pytest-cov",  # coverage reporting
     "pytest-mock",  # mocking framework
     "ruff",  # powerful linter
+    "types-python-dateutil",  # mypy stubs
+    "types-PyYAML",  # mypy stubs
+    "types-requests",  # mypy stubs
     "vulture",  # checks for unused code
 ]
 
@@ -189,3 +193,50 @@ exclude = [
     "phenix_apps/apps/sceptre/templates/mydesigner/",
     "phenix_apps/apps/ignition/templates/"
 ]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["phenix_apps"]
+exclude = ["phenix_apps/apps/ignition/templates/"]  # Jython 2.7 scripts
+warn_unused_ignores = true
+# Untyped function bodies are not checked yet (check_untyped_defs is off);
+# hide the per-function reminder until the baseline below is burned down.
+disable_error_code = ["annotation-unchecked"]
+
+# Third-party libraries that ship no type information (and have no stubs).
+[[tool.mypy.overrides]]
+module = ["asyncua.*", "kafka.*", "lxml.*", "mako.*", "minimega.*", "myscada.*", "paramiko.*"]
+ignore_missing_imports = true
+
+# DEBT: modules with pre-existing type errors. Burn this list down; it must
+# only shrink. Never add a module here, fix the new error instead.
+[[tool.mypy.overrides]]
+module = [
+    "phenix_apps.apps",
+    "phenix_apps.apps.ignition.app",
+    "phenix_apps.apps.scale.app",
+    "phenix_apps.apps.scale.plugins.wind_turbine.plugin",
+    "phenix_apps.apps.scale.registry",
+    "phenix_apps.apps.sceptre.app",
+    "phenix_apps.apps.sceptre.configs.configs",
+    "phenix_apps.apps.sceptre.configs.registers",
+    "phenix_apps.apps.sceptre.configure",
+    "phenix_apps.apps.sceptre.field_devices",
+    "phenix_apps.apps.sceptre.prestart",
+    "phenix_apps.apps.sceptre.stages",
+    "phenix_apps.apps.sceptre.tests.test_infrastructures",
+    "phenix_apps.apps.sceptre.validation",
+    "phenix_apps.apps.scorch.app",
+    "phenix_apps.apps.scorch.cc.cc",
+    "phenix_apps.apps.scorch.collector.collector",
+    "phenix_apps.apps.scorch.collector.csv_gen",
+    "phenix_apps.apps.scorch.disruption.disruption",
+    "phenix_apps.apps.scorch.iperf.iperf",
+    "phenix_apps.apps.scorch.mm.mm",
+    "phenix_apps.apps.scorch.opcexport.opcexport",
+    "phenix_apps.apps.scorch.opcexport.scada_to_elastic",
+    "phenix_apps.apps.scorch.rtds.rtds",
+    "phenix_apps.apps.scorch.vmstats.vmstats",
+    "phenix_apps.common.utils",
+]
+ignore_errors = true
