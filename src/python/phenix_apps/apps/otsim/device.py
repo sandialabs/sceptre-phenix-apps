@@ -4,6 +4,8 @@ from phenix_apps.apps.otsim.infrastructure import merge_infrastructure_with_defa
 from phenix_apps.apps.otsim.protocols.dnp3 import DNP3
 from phenix_apps.apps.otsim.protocols.modbus import Modbus
 
+from phenix_apps.common.logger import logger
+
 
 class Register:
     def __init__(self, typ, tag, md=None):
@@ -20,7 +22,7 @@ class Device:
             configs = {}
         self.node = node
         self.md = node.get("metadata", {})
-        self.infra = self.md.get("infrastructure", default_infra)
+        self.infra = self.md.get("infrastructures", default_infra)
 
         self.registers = {}
         self.processed = False
@@ -135,12 +137,12 @@ class FieldDeviceServer(Device):
     def process(self, mappings):
         if self.processed:
             return
-
+        logger.info(f"DEVICE Mapping was {mappings}, self.infra is {self.infra} in FieldDeviceServer process")
         # merge provided mappings (if any) with default mappings (if any)
         mapping = merge_infrastructure_with_default(
             self.infra, mappings.get(self.infra, {})
         )
-
+        logger.info(f"DEVICE Merged Mapping is {mapping} in FieldDeviceServer process")
         if "dnp3" in self.md:
             if "dnp3" not in self.registers:
                 self.registers["dnp3"] = []
@@ -167,13 +169,24 @@ class FieldDeviceServer(Device):
                     # module, so if the variable type is a string convert it to a
                     # dictionary so the rest of the code can be the same when checking to
                     # see if variable types were provided.
+                    phases = None
+                    if isinstance(var_type, dict):
+                        phases = var_type.get("phases")
+                        var_type = var_type["type"]
                     if isinstance(var_type, str):
                         var_type = {"type": var_type}
 
-                    reg = Register(
-                        var_type["type"], f"{name}.{var}", var_type.get("dnp3", {})
-                    )
-                    self.registers["dnp3"].append(reg)
+                    if phases:
+                        for index in range(phases):
+                            reg = Register(
+                                var_type["type"], f"{name}.{var}_{index}", var_type.get("dnp3", {})
+                            )
+                            self.registers["dnp3"].append(reg)
+                    else:
+                        reg = Register(
+                            var_type["type"], f"{name}.{var}", var_type.get("dnp3", {})
+                        )
+                        self.registers["dnp3"].append(reg)
 
         if "modbus" in self.md:
             if "modbus" not in self.registers:
