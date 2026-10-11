@@ -83,9 +83,7 @@ def iface(name, address, vlan="field", kind="ethernet", **extra):
     Args:
         name: Interface name. The fep handler looks for "upstream" in it.
         address: IPv4 address.
-        vlan: VLAN name. Note the app filters mgmt interfaces case-sensitively
-            in some blocks and case-insensitively in others, so "mgmt" and
-            "MGMT" are not interchangeable here.
+        vlan: VLAN name. "mgmt" matches the mgmt vlan in any case.
         kind: Interface type, "ethernet" or "serial". Named `kind` because
             `type` shadows the builtin.
         **extra: Extra keys merged in last, e.g. device="/dev/ttyS0".

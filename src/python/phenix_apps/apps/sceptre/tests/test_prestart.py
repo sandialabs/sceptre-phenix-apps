@@ -96,7 +96,7 @@ class TestFdServerInterfaceSelection:
                     iface("IF1", "10.2.0.1"),
                 ],
                 "10.2.0.1",
-                id="uppercase-MGMT-skipped-too-this-block-lowercases",
+                id="uppercase-MGMT-skipped",
             ),
             pytest.param(
                 [
@@ -338,12 +338,8 @@ class TestWritePowerObjects:
 
 
 class TestCollectScadaHistorianIps:
-    def test_lowercase_mgmt_is_excluded_but_uppercase_is_not(self, sceptre_app):
-        """The opc/scada/historian blocks compare vlan case-sensitively.
-
-        fd-server code uses .lower() != "mgmt"; this code does not. Pinned
-        because the inconsistency is load-bearing for which IPs end up here.
-        """
+    def test_mgmt_is_excluded_in_any_case(self, sceptre_app):
+        """Both "mgmt" and the phenix-convention "MGMT" are left out."""
         ctx = PreStart(sceptre_app)
         sceptre_app.extract_nodes_type.side_effect = [
             [  # scada-server
@@ -369,7 +365,7 @@ class TestCollectScadaHistorianIps:
         ctx.collect_ips()
 
         assert ctx.scada_ips == ["10.1.0.1"]
-        assert ctx.historian_ips == ["172.16.0.2", "10.1.0.2"]
+        assert ctx.historian_ips == ["10.1.0.2"]
 
 
 class TestOpcs:

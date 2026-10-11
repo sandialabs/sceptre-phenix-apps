@@ -17,10 +17,8 @@
 #   - an RTDS provider, whose YAML config is the one file configure declares
 #     and pre-start renders from the provider's own metadata
 #
-# opc-1 and hist-1 use a lowercase "mgmt" vlan on purpose. The opc/scada/historian
-# blocks filter with `iface.vlan != "mgmt"` (case-sensitive) while the fd-server
-# block uses `.lower() != "mgmt"`, so lowercase is the only way to exercise the
-# branch where that filter actually drops an interface.
+# opc-1 and hist-1 use a lowercase "mgmt" vlan and the other hosts "MGMT", so
+# both spellings go through the mgmt filter.
 #
 # Provider case/oneline/solver paths are only ever used as injection "src"
 # strings, so they do not need to exist on disk.
