@@ -19,7 +19,7 @@ dist
 # ==========================================
 # AI coding assistants and editors
 # ==========================================
-# AGENTS.md and CLAUDE.md are tracked on purpose; do not add them here.
+# AGENTS.md files are tracked on purpose; do not add them here.
 
 # Aider
 .aider*
