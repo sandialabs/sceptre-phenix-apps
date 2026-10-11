@@ -13,7 +13,7 @@ help:
 	@echo ""
 	@echo "Development:"
 	@echo "  all         - Run all tools (format and lint)"
-	@echo "  check       - Run all checks without fixing (ruff, codespell, vulture)"
+	@echo "  check       - Run all checks without fixing (ruff, codespell, vulture, mypy)"
 	@echo "  coverage    - Run unit tests with coverage report"
 	@echo "  dry-run     - Run scale app in dry-run mode (use INPUT=... for file, STAGE=... for stage)"
 	@echo "  format      - Format code (ruff)"
@@ -38,10 +38,12 @@ check:
 	$(call check-command,ruff)
 	$(call check-command,codespell)
 	$(call check-command,vulture)
+	$(call check-command,mypy)
 	ruff check .
 	ruff format --check .
 	codespell --config ../../.codespellrc .
 	vulture
+	mypy
 
 # Clean artifacts
 clean:
