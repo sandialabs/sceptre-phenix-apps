@@ -6,7 +6,7 @@ contracts. These rules apply to all work under `src/python/`.
 ## Source Map
 
 - `pyproject.toml`: the source of truth for metadata, dependencies, console
-  scripts, Scale plugin entry points, pytest plugin registration, Ruff, vulture,
+  scripts, Scale plugin entry points, pytest plugin registration, Ruff, vulture, mypy,
   and package data.
 - `phenix_apps/apps/__init__.py`: `AppBase`, the lifecycle, and the experiment,
   topology-mutation, and template-rendering helpers.
@@ -101,7 +101,7 @@ Run from `src/python/`:
 | All tests | `make test` |
 | One test file or node | `make test TEST=phenix_apps/apps/scale/tests/test_registry.py` |
 | Coverage | `make coverage` |
-| Non-fixing lint (ruff, codespell, vulture) | `make check` |
+| Non-fixing lint (ruff, codespell, vulture, mypy) | `make check` |
 | Format or fixing lint | `make format`, `make lint` |
 | Editable install, with dev extras | `make install`, `make install-dev` |
 
@@ -138,6 +138,7 @@ input file.
   first-party imports under `phenix_apps`. `E501` is ignored, so the formatter,
   not the linter, enforces line length.
 - Target Python 3.12; the phēnix image ships `ubuntu:24.04`.
+- `mypy` baselines legacy modules in `pyproject.toml` (`ignore_errors`); that list only shrinks. Use `typing.Final` for constants.
 - `vulture` runs at `min_confidence = 80`. Delete dead code rather than adding a
   suppression, unless the symbol is a public entry point. It does not scan
   `phenix_apps/apps/__init__.py`, `phenix_apps/common/`, or the vendored template
