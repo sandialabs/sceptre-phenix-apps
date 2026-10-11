@@ -148,7 +148,7 @@ it is the fastest way to see whether a reordering is safe:
 
 ```python
     Reads: provider_map
-    Writes: fd_server_configs, fdlist, power_object_list, reg_config
+    Writes: fd_server_configs, fdlist, power_object_list
 ```
 
 ## Device fields
@@ -351,11 +351,8 @@ cannot exercise them. `conftest` ships the awkward mutations: `host()`,
 **`node()` / `iface()`** build the Box shape `extract_nodes_*` returns, so a
 handler test states its input in three lines instead of twenty.
 
-Two autouse fixtures work around global state: `caplog_loguru_sink` routes
-loguru into stdlib logging so `caplog` sees anything at all, and
-`_reset_register_addresses` resets `Register.addresses` around every test, since
-a test that raises part-way through would otherwise leave the next one numbering
-registers from wherever it stopped.
+One autouse fixture works around global state: `caplog_loguru_sink` routes
+loguru into stdlib logging so `caplog` sees anything at all.
 
 ## Known issues
 
@@ -363,8 +360,4 @@ Pre-existing, and pinned by a test rather than silently carried.
 
 | | issue |
 | --- | --- |
-| **`hil_tags` overwritten per provider** | With more than one PowerWorld provider only the last one's tags reach `objects.txt`. |
 | **The ELK restart script points at one provider** | `sceptre_provider_restart.py` is rendered with the last provider's address, so the others cannot be restarted from ELK. Visible in the golden fixture, which has four providers. |
-| **Inconsistent mgmt-vlan filtering** | The OPC/SCADA/historian code compares `vlan != "mgmt"` case-sensitively; the field device code lowercases first. `MGMT` is therefore excluded in one and not the other. Both now go through `hosts.non_mgmt(case_sensitive=...)`, so the split is visible at each call site and pinned by `test_hosts.py`. |
-| **`Register.addresses` is global state** | Class-level mutable state reset per `FieldDeviceConfig`, so register numbering is order-dependent. Tests reset it via an autouse fixture. |
-| **`reg_config` is never populated** | Nothing in the app builds a manual register map, so the `reg_config` branch in `Register.__init__` is unreachable. Only `protocols/*` remains in the ruff per-file-ignores; everything else in the app is fully linted. |

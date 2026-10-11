@@ -14,22 +14,14 @@ def test_a_host_with_no_topology_node_has_no_interfaces():
 
 
 class TestNonMgmt:
-    """The case-sensitivity split is a documented bug, so it is pinned here."""
-
     @pytest.mark.parametrize(
-        ("vlan", "case_sensitive", "kept"),
-        [
-            ("mgmt", True, False),
-            ("mgmt", False, False),
-            ("MGMT", True, True),  # the phenix convention, kept by this branch
-            ("MGMT", False, False),
-            ("field", True, True),
-        ],
+        ("vlan", "kept"),
+        [("mgmt", False), ("MGMT", False), ("Mgmt", False), ("field", True)],
     )
-    def test_vlan_matching(self, vlan, case_sensitive, kept):
+    def test_vlan_matching(self, vlan, kept):
         host = node("rtu-1", interfaces=[iface("IF0", "10.0.0.1", vlan=vlan)])
 
-        found = hosts.non_mgmt(host, case_sensitive=case_sensitive)
+        found = hosts.non_mgmt(host)
 
         assert bool(found) is kept
 
