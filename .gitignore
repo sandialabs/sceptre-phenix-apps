@@ -24,6 +24,9 @@ dist
 # Aider
 .aider*
 
+# Beads (bd) task tracker, kept local
+.beads/
+
 # Claude Code
 .claude/
 .claudecode/
