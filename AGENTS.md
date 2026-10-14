@@ -117,6 +117,17 @@ a broader test already covers the path. Report any check you could not run.
   while making targeted mutations.
 - Validate configuration early. Name the app, component, host, or field in error
   messages. Never silently recover from invalid configuration or a failure.
+- Type configuration strictly: `bool` for flags, URL and IP types for URLs and
+  addresses, constrained strings for names and paths. A wrong type or malformed
+  value fails, even in a field that is not used yet. Do not coerce it or fall
+  back with a warning; only an unknown key, a likely typo, may warn.
+- Remove a deprecated option outright; do not keep aliases or fallbacks for it.
+- Make fixed tunables (timeouts, offsets, margins, poll intervals) configuration
+  fields with the old value as the default, instead of module constants.
+- Use a parsed configuration object directly; do not copy its fields onto
+  attributes.
+- When a change touches code next to a TODO, address the TODO or say in the pull
+  request why not.
 - Keep comments on non-obvious protocol, lifecycle, or domain logic only.
 
 ## Runtime Configuration and Security
@@ -188,7 +199,13 @@ or create releases.
   Merging that pull request tags a `vYYYY.MM.DD` release. Write each commit
   subject for the changelog reader.
 - Update the app or component `README.md` when configuration, lifecycle
-  behavior, dependencies, or examples change.
+  behavior, dependencies, or examples change. Write it for the person
+  configuring an experiment, and keep it short: what it does, what it produces,
+  what it needs first, a field table with real defaults, examples,
+  troubleshooting rows with the exact error text, and Limitations. Prefer an
+  example to a paragraph, do not explain validation internals or repeat what a
+  table or example already shows, and keep the existing title. Check every claim
+  against the code, and cover the examples with a test.
 - Update `src/python/app_migration_guide.md` when the `AppBase` authoring
   pattern changes.
 - When adding or renaming an implementation, update console scripts, entry
