@@ -1,0 +1,15 @@
+# Code owners request review on pull requests that touch their paths.
+# The last matching pattern wins, so the default comes first.
+# Owners need write access to this repository.
+
+*                                       @activeshadow @cmulk
+
+# Go module (phenix-app-mirror and shared helpers)
+/src/go/                                @activeshadow
+
+# SCEPTRE app and SCORCH components
+/src/python/phenix_apps/apps/sceptre/   @activeshadow @cmulk @adamsrnmsu @mgaliar
+/src/python/phenix_apps/apps/scorch/    @activeshadow @cmulk @adamsrnmsu
+
+# Scale app and plugins
+/src/python/phenix_apps/apps/scale/     @activeshadow @cmulk @mgaliar
