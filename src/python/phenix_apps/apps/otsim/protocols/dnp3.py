@@ -49,7 +49,7 @@ class DNP3(Protocol):
 
         endpoint.text = f"{ip}:{port}"
 
-    def init_master_xml(self, scan_rate_value, name="dnp3-master"):
+    def init_master_xml(self, scan_rate=None, name="dnp3-master"):
         self.master = ET.SubElement(self.root, "master", {"name": name})
 
         local = ET.SubElement(self.master, "local-address")
@@ -58,8 +58,10 @@ class DNP3(Protocol):
         remote = ET.SubElement(self.master, "remote-address")
         remote.text = str(1024)
 
-        scan_rate = ET.SubElement(self.master, "scan-rate")
-        scan_rate.text = str(scan_rate_value)
+        # Leave unset to fall back to the ot-sim DNP3 module default.
+        if scan_rate is not None:
+            rate = ET.SubElement(self.master, "scan-rate")
+            rate.text = str(scan_rate)
 
     def init_outstation_xml(self, name="dnp3-outstation"):
         self.outstn = ET.SubElement(self.root, "outstation", {"name": name})
