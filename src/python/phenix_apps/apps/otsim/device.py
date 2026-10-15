@@ -128,7 +128,7 @@ class FEP(Device):
 
 class FieldDeviceServer(Device):
     def __init__(self, node, default_infra="power-distribution"):
-        Device.__init__(self, node, default_infra)
+        Device.__init__(self, node, default_infra=default_infra)
 
     def process(self, mappings):
         if self.processed:
