@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **SCEPTRE App**: SunSpec has been burned away by the SCORCHing heat of 3000 Suns and thus no longer exists in this repo.
 
 ### Fixed
+- **OT-sim App**: A DNP3 master without a configured `scan-rate` (FEPs without app-level `helics` metadata, and every `fd-client`) raised `AttributeError`. The `<scan-rate>` element is now omitted, so ot-sim uses its own default ([#72](https://github.com/sandialabs/sceptre-phenix-apps/issues/72)).
 - **SCEPTRE App**: With more than one PowerWorld provider, only the last one's `hil_tags` reached the object list, and only the last one's `objects.txt` was written. Tags now aggregate across providers and every PowerWorld provider gets the combined `objects.txt`.
 - **SCEPTRE App**: `fep` hosts raised `TypeError`, built without the required `device_subtype`.
 - **SCEPTRE App**: Per-device register overrides raised `RuntimeError` in `SceptreMetadataParser`, which popped keys while iterating a live dict view.
