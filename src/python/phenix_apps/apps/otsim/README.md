@@ -41,6 +41,9 @@ spec:
           endpoint: updates # default endpoint to send updates to on default federate
                             # this is the default; set it to false to disable using
                             # endpoints for updates
+          scan-rate: 5      # DNP3 master scan rate in seconds; FEPs default to 5 when
+                            # `helics` is set, fd-clients only use it if set explicitly,
+                            # otherwise the ot-sim default (30) applies
         message-bus:
           pull-endpoint: tcp://127.0.0.1:1234 # this is the default
           pub-endpoint: tcp://127.0.0.1:5678  # this is the default
