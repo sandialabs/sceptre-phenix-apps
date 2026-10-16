@@ -87,7 +87,7 @@ def test_profile_generates_real_artifacts(tmp_path, monkeypatch, turbines, densi
         assert sum(name.endswith("/node-red.json") for name in names) == turbines
     for node in nodes:
         injections = {item.dst: item.src for item in node.injections}
-        assert injections["/scale/shared/otsimfs.tgz"] == str(rootfs)
+        assert injections["/scale/rootfs/otsimfs.tgz"] == str(rootfs)
         assert injections["/scale/shared/weather.csv"] == str(weather)
         assert "/wind-configs.tgz" in injections
 
@@ -104,8 +104,9 @@ def test_profile_generates_real_artifacts(tmp_path, monkeypatch, turbines, densi
     )
     for script in scripts:
         assert "namespace wind" in script
-        assert "vm config filesystem tar:/scale/shared/otsimfs.tgz" in script
+        assert "vm config filesystem tar:/scale/rootfs/otsimfs.tgz" in script
         assert "vm config volume /shared/ /scale/shared/" in script
+        assert "/scale/shared/otsimfs.tgz" not in script
         assert "vm config net wind-turbine-scale,200 wtg-" in script
         assert "vm config volume /etc/ot-sim/ /scale/wtg-" in script
     joined = "\n".join(scripts)

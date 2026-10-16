@@ -139,7 +139,7 @@ The default plugin for generic infrastructure scaling.
 ### Wind Turbine Plugin (`wind_turbine`)
 A domain-specific plugin for simulating wind farms.
 
-See the [complete wind-turbine example in sceptre-phenix-topologies](https://github.com/sandialabs/sceptre-phenix-topologies/tree/main/renewables/wind/turbine)
+See the [complete wind-turbine example in sceptre-phenix-topologies](https://github.com/sandialabs/sceptre-phenix-topologies/tree/main/renewables/wind/wind-scale)
 for a runnable Scale scenario, public weather data, Grafana provisioning,
 Node-RED flow, and image-building instructions.
 
