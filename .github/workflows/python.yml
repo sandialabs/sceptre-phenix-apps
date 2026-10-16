@@ -7,7 +7,7 @@ on:
   pull_request:
     branches: [ "**" ]
     paths:
-      - 'src/python/**.py'
+      - 'src/python/**'
       - '.github/workflows/python.yml'
 
 permissions:

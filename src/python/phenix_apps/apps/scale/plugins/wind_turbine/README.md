@@ -37,7 +37,7 @@ graph TD
 | :--- | :--- | :--- | :--- |
 | `name` | String | `"wind-turbine"` | The prefix used for generating VM hostnames (e.g., `wind-turbine-1`). Letters, digits and `-`, starting with a letter or digit, at most 58 characters. |
 | `count` | Integer | `1` | The number of **Wind Turbines** to simulate (not VMs). |
-| `containers_per_node` | Integer | `6` | The number of containers to run per VM. Since one turbine = 6 containers, set this to multiples of 6 (e.g., 18 for 3 turbines/VM). |
+| `containers_per_node` | Integer | `6` | Containers per VM; must be at least 6 and a multiple of 6 (e.g., 18 for 3 turbines/VM). A turbine's private network cannot span VMs. |
 | `node_template` | Dict | `{}` | VM hardware specifications (CPU, RAM, Network). |
 | `container_template` | Dict | `{}` | Configuration for the turbine containers (e.g. `external_network`, `cpu`, `memory`). |
 
@@ -46,6 +46,28 @@ graph TD
 *   **`templates`**: Defines the OT-Sim configuration for the turbine components (logic, physics, protocols).
 *   **`helics`**: Configures the HELICS co-simulation federation (Broker, Endpoint, Topic).
 *   **`ground-truth-module`**: Configures Elasticsearch exfiltration for simulation data.
+
+### Container assets
+
+`container_template.rootfs` names an existing filesystem on the **nested VM**
+(default `otsimfs.tgz`). Alternatively, set `container_template.rootfs_source`
+to a head-node `.tgz` file: the plugin injects it into each VM as
+`/scale/shared/otsimfs.tgz` and uses that path in the generated minimega script.
+The rootfs must provide `/init`, miniccc on `/cc`, and the configured OT-sim
+modules; a plain OT-sim Docker export without an init/agent is insufficient.
+
+`templates.default.anemometer.weather.replayData` is a head-node CSV path,
+injected into each VM and mounted at `/shared/weather.csv` in containers.
+Column names must match the CSV exactly.
+
+Optional `templates.default.main-controller.node-red.flow` (singular) names a
+head-node JSON flow. It is copied into the main controller's config directory
+and loaded from `/etc/ot-sim/node-red.json`. Node-RED is not required for the
+turbine's control logic.
+
+For all assets, a migrated Scenario/Topology, verified public weather data,
+image recipes, Grafana provisioning, and deployment/verification commands, see
+the [complete example in sceptre-phenix-topologies](https://github.com/sandialabs/sceptre-phenix-topologies/tree/main/renewables/wind/turbine).
 
 ## Networking
 
@@ -103,17 +125,21 @@ For each node, the plugin generates:
 ## Testing
 
 ### Unit Tests
-The plugin logic is tested in `phenix_apps/apps/scale/tests/test_wind_turbine.py`. This covers configuration parsing, IP calculation, and container detail generation.
+The plugin tests cover configuration parsing, IP calculation, container details,
+and real configure/post-start artifact generation using local test fixtures.
+The companion topology repository tests its deployable resources separately.
 
 To run the tests:
 ```bash
-pytest phenix_apps/apps/scale/tests/test_wind_turbine.py
+pytest phenix_apps/apps/scale/plugins/wind_turbine/tests
 ```
 
 ### Dry-Run
-A comprehensive example input is provided in `phenix_apps/apps/scale/tests/test_wind_turbine_input.yaml`. This file defines a scenario with 30 wind turbines.
+A dry-run input is provided in `tests/test_wind_turbine_input.yaml` beside this
+README. This file defines a scenario with 30 wind turbines; replace its external
+asset paths before running configure.
 
 To execute a dry-run:
 ```bash
-phenix-app-scale configure --dry-run < phenix_apps/apps/scale/tests/test_wind_turbine_input.yaml
+PHENIX_LOG_FILE="" phenix-app-scale configure --dry-run < phenix_apps/apps/scale/plugins/wind_turbine/tests/test_wind_turbine_input.yaml
 ```

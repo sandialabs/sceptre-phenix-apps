@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Ignition App**: New app that configures an Inductive Automation Ignition Gateway 8.3 SCADA master
 
 ### Added
+- **Wind Turbine Scale Plugin**: Artifact-generation regression tests and documentation linking to the companion [complete example in sceptre-phenix-topologies](https://github.com/sandialabs/sceptre-phenix-topologies/tree/main/renewables/wind/turbine) (sandialabs/sceptre-phenix-apps#95).
 - **SCEPTRE App**: Pre-flight scenario validation: one pydantic model, run before either stage, reporting every problem at once with the host and field.
 - **SCEPTRE App**: Stage accounting in the logs: a scenario inventory by device type, and what each handler produced.
 - **SCEPTRE App**: Files in `<assetDir>/injects/override/` that match no injection are reported as probable typos.
@@ -31,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **SCEPTRE App**: SunSpec has been burned away by the SCORCHing heat of 3000 Suns and thus no longer exists in this repo.
 
 ### Fixed
+- **Wind Turbine Scale Plugin**: Stage an optional `container_template.rootfs_source` on each generated VM; mount Node-RED flows at their configured container path. Reject densities that split a turbine's private network across VMs.
 - **SCEPTRE App**: With more than one PowerWorld provider, only the last one's `hil_tags` reached the object list, and only the last one's `objects.txt` was written. Tags now aggregate across providers and every PowerWorld provider gets the combined `objects.txt`.
 - **SCEPTRE App**: `fep` hosts raised `TypeError`, built without the required `device_subtype`.
 - **SCEPTRE App**: Per-device register overrides raised `RuntimeError` in `SceptreMetadataParser`, which popped keys while iterating a live dict view.

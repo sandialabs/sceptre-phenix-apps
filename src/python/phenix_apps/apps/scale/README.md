@@ -139,6 +139,10 @@ The default plugin for generic infrastructure scaling.
 ### Wind Turbine Plugin (`wind_turbine`)
 A domain-specific plugin for simulating wind farms.
 
+See the [complete wind-turbine example in sceptre-phenix-topologies](https://github.com/sandialabs/sceptre-phenix-topologies/tree/main/renewables/wind/turbine)
+for a runnable Scale scenario, public weather data, Grafana provisioning,
+Node-RED flow, and image-building instructions.
+
 *   **`count`**: Number of Wind Turbines (not VMs).
 *   **`containers_per_node`**: Number of containers per VM.
 *   **Logic**: Each turbine consists of 6 containers.
