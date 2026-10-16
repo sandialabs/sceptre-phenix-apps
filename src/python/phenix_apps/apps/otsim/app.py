@@ -335,6 +335,7 @@ class OTSim(AppBase):
         # Field device client, acting as a protocol client via one or more protocol
         # modules. Also assumed to **not** include an I/O module.
         clients = self.extract_nodes_type("fd-client", False)
+        client_scan_rate = self.metadata.get("helics", {}).get("scan-rate")
 
         # By this point, all the FEPs each client will potentially talk to should
         # have already been configured.
@@ -346,7 +347,7 @@ class OTSim(AppBase):
             for inject in injects:  # will at least be an empty list
                 self.add_inject(hostname=client.hostname, inject=inject)
 
-            device = FieldDeviceClient(client)
+            device = FieldDeviceClient(client, {"scan-rate": client_scan_rate})
             device.process(ot_devices)
             device.configure(config, ot_devices)
 
