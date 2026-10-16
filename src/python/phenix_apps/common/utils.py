@@ -13,6 +13,7 @@ import tempfile
 import time
 import warnings
 from io import StringIO
+from itertools import pairwise
 from pathlib import Path
 from socket import inet_ntoa
 from struct import pack
@@ -281,6 +282,27 @@ def _cc_cmd_rows(resp: dict) -> list[dict[str, str]]:
     header = resp.get("Header") or []
 
     return [dict(zip(header, row, strict=False)) for row in resp.get("Tabular") or []]
+
+
+# A `cc responses` file header: `<id>/<uuid>/<file>:` on a line of its own.
+_CC_RESP_HEADER = re.compile(r"^(\d+)/(\w+(?:-\w+){4})/(.+):$", re.MULTILINE)
+
+
+def _cc_response_files(text: str) -> dict[tuple[str, str], dict[str, str]]:
+    """Split ``cc responses`` text into ``{(id, uuid): {file: contents}}``.
+
+    minimega prints each response file as a header line followed by its contents,
+    so split on whole header lines only; output may contain ``/`` or ``:``.
+    """
+    files: dict[tuple[str, str], dict[str, str]] = {}
+    headers = list(_CC_RESP_HEADER.finditer(text))
+
+    for header, nxt in pairwise([*headers, None]):
+        cmd_id, uuid, name = header.groups()
+        end = nxt.start() if nxt else len(text)
+        files.setdefault((cmd_id, uuid), {})[name] = text[header.end() : end].strip()
+
+    return files
 
 
 class _WaitLog:
@@ -758,18 +780,17 @@ def mm_exec_wait(
         if not row["Response"]:
             continue
 
-        resp = row["Response"]
+        files = _cc_response_files(row["Response"]).get((cmd_id, uuid))
 
-        if uuid not in resp:
-            eprint(f"UUID '{uuid}' not in response: {resp!r}")
+        if files is None:
+            eprint(f"UUID '{uuid}' not in response: {row['Response']!r}")
             continue
 
-        if "/stderr:\n" in resp:
-            result["stderr"] = resp.partition("/stderr:\n")[2].strip()
-        if "/stdout:\n" in resp:
-            result["stdout"] = resp.partition("/stdout:\n")[2].strip()
-        if "/stderr:\n" not in resp and "/stdout:\n" not in resp:
-            eprint(f"no stderr or stdout in response: {resp!r}")
+        result["stderr"] = files.get("stderr", result["stderr"])
+        result["stdout"] = files.get("stdout", result["stdout"])
+
+        if "stderr" not in files and "stdout" not in files:
+            eprint(f"no stderr or stdout in response: {row['Response']!r}")
 
     return result
 
@@ -925,28 +946,17 @@ def mm_get_cc_responses(mm: minimega.minimega, id_or_prefix_or_all: str) -> list
         if not row["Response"]:
             continue
 
-        # \d+, not \d: a single digit truncates ids >= 10.
-        cmd_resps = re.findall(
-            r"(\d+)/(\w+-\w+-\w+-\w+-\w+)/(.*?)/", row["Response"], re.DOTALL
-        )
-
-        for cmd_resp in cmd_resps:
-            # ('1', '096b4042-9166-402c-895e-dd39fe0f83cd', 'stdout: ...')
-            output = cmd_resp[2]
+        for (cmd_id, uuid), files in _cc_response_files(row["Response"]).items():
             cmd_result = {
-                "id": cmd_resp[0],
-                "uuid": cmd_resp[1],
-                "all_output": output,
-                "stderr": "",
-                "stdout": "",
+                "id": cmd_id,
+                "uuid": uuid,
+                "all_output": "\n".join(f"{k}:\n{v}" for k, v in files.items()),
+                "stderr": files.get("stderr", ""),
+                "stdout": files.get("stdout", ""),
             }
 
-            if "stderr:\n" in output:
-                cmd_result["stderr"] = output.partition("stderr:\n")[2].strip()
-            if "stdout:\n" in output:
-                cmd_result["stdout"] = output.partition("stdout:\n")[2].strip()
-            if "stderr:\n" not in output and "stdout:\n" not in output:
-                print_msg(f"WARNING: no stderr or stdout in response: {output!r}")
+            if "stderr" not in files and "stdout" not in files:
+                print_msg(f"WARNING: no stderr or stdout in response: {files!r}")
 
             # The id came from this host's response, so scope the lookup to it.
             exit_resp = mm_cc_exitcode_wait(
