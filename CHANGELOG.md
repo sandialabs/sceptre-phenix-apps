@@ -9,7 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Ignition App**: New app that configures an Inductive Automation Ignition Gateway 8.3 SCADA master
 
 ### Added
+- **Ignition App**: Tags can pick up the ot-sim devices and variables behind each DNP3 point (ex: `rtu/cap1/voltage`).
+- **Ignition APp**: DNP3 poll rate is configurable per class and outstation.
+- **Ignition APp**: DNP3 Analog Output setpoint control commands can be sent from the perspective GUI.
+- **OT-sim App**: `points.Outstations` exposes the DNP3 points and listen endpoint of any outstation host for other apps; `Register` records its device, type, variable and protocol section.
 - **Wind Turbine Scale Plugin**: Artifact-generation regression tests and documentation linking to the companion [complete example in sceptre-phenix-topologies](https://github.com/sandialabs/sceptre-phenix-topologies/tree/main/renewables/wind/wind-scale) (sandialabs/sceptre-phenix-apps#95).
+
+### Changed
+- **OT-sim App**: DNP3 address assignment is a module function (`protocols.dnp3.assign_addresses`)
 - **SCEPTRE App**: Pre-flight scenario validation: one pydantic model, run before either stage, reporting every problem at once with the host and field.
 - **SCEPTRE App**: Stage accounting in the logs: a scenario inventory by device type, and what each handler produced.
 - **SCEPTRE App**: Files in `<assetDir>/injects/override/` that match no injection are reported as probable typos.

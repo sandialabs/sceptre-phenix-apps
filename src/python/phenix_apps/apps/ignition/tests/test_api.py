@@ -44,8 +44,9 @@ def browse_element(path, element_type="DATAVARIABLE"):
 def qualified_value(value, quality, timestamp):
     qualified = Mock(spec=["getValue", "getQuality", "getTimestamp"])
     qualified.getValue.return_value = value
-    quality_code = MagicMock(spec=["__str__"])
+    quality_code = MagicMock(spec=["__str__", "isGood"])
     quality_code.__str__.return_value = quality
+    quality_code.isGood.return_value = quality == "Good"
     qualified.getQuality.return_value = quality_code
     qualified.getTimestamp.return_value.getTime.return_value = timestamp
     return qualified
@@ -62,7 +63,9 @@ def system():
     ignition.opc = Mock(spec=["browse", "readValues"])
     ignition.opc.browse.return_value = []
     ignition.opc.readValues.return_value = []
-    ignition.tag = Mock()
+    ignition.tag = Mock(spec=["browse", "readBlocking"])
+    ignition.tag.browse.return_value = SimpleNamespace(getResults=lambda: [])
+    ignition.tag.readBlocking.return_value = []
     return ignition
 
 
@@ -112,43 +115,73 @@ def post_body(request):
 
 @pytest.fixture
 def readings(system):
+    """Tags below each device folder in [default]: path -> (value, quality,
+    timestamp, OPC address). rtu-1 was mapped from ot-sim, RTU 2 discovered."""
     values = {
         DEVICE: {
-            f"ns=1;s=[{DEVICE}]AnalogInput/0": (1.025, "Good", 1700000000123),
-            f"ns=1;s=[{DEVICE}]BinaryInput/1": (False, "Good", 0),
+            "cap1/voltage": (
+                1.025,
+                "Good",
+                1700000000123,
+                f"ns=1;s=[{DEVICE}]AnalogInput0",
+            ),
+            "cap1/setpt": (
+                1.0,
+                "Good",
+                1700000000124,
+                f"ns=1;s=[{DEVICE}]AnalogOutput0",
+            ),
+            "671692/status": (False, "Good", 0, f"ns=1;s=[{DEVICE}]BinaryInput1"),
+            "671692/controls": (
+                False,
+                "Good",
+                0,
+                f"ns=1;s=[{DEVICE}]BinaryOutput1",
+            ),
         },
         OTHER_DEVICE: {
-            f"ns=1;s=[{OTHER_DEVICE}]AnalogInput/0": (
+            "AnalogInput0": (
                 None,
                 "Bad_NotConnected",
                 1700000000456,
+                f"ns=1;s=[{OTHER_DEVICE}]AnalogInput0",
             ),
-            f"ns=1;s=[{OTHER_DEVICE}]AnalogInput/1": (
+            "AnalogInput1": (
                 -12.5,
                 "Bad_Stale",
                 1700000000789,
+                f"ns=1;s=[{OTHER_DEVICE}]AnalogInput1",
             ),
         },
     }
-    qualified = {
-        path: qualified_value(*reading)
-        for points in values.values()
-        for path, reading in points.items()
-    }
-    elements = {
-        device: [
-            browse_element(f"[{device}]folder", "FOLDER"),
-            browse_element(f"[{device}]object", "OBJECT"),
-            browse_element(f"[{device}]method", "METHOD"),
-            *(browse_element(path) for path in points),
-        ]
-        for device, points in values.items()
-    }
-    system.opc.browse.side_effect = lambda **kwargs: elements[kwargs["device"]]
-    system.opc.readValues.side_effect = lambda server, paths: [
-        qualified[path] for path in paths
+    qualified = {}
+    lookup = {}
+    rows = {}
+    for device, points in values.items():
+        folder = f"[default]{device}"
+        rows[folder] = []
+        for path, (value, quality, timestamp, address) in points.items():
+            full = f"{folder}/{path}"
+            qualified[full] = qualified_value(value, quality, timestamp)
+            lookup[full] = qualified[full]
+            lookup[full + ".OpcItemPath"] = qualified_value(address, "Good", 0)
+            lookup[full + ".Documentation"] = qualified_value("", "Good", 0)
+            parent = path.rsplit("/", 1)[0] if "/" in path else None
+            if parent and not any(
+                r["fullPath"] == f"{folder}/{parent}" for r in rows[folder]
+            ):
+                rows[folder].append(
+                    {"fullPath": f"{folder}/{parent}", "hasChildren": True}
+                )
+            rows[folder].append({"fullPath": full, "hasChildren": False})
+    missing = qualified_value(None, "Bad_NotFound", 0)
+    system.tag.browse.side_effect = lambda folder, options: SimpleNamespace(
+        getResults=lambda: rows.get(folder, [])
+    )
+    system.tag.readBlocking.side_effect = lambda paths: [
+        lookup.get(path, missing) for path in paths
     ]
-    return SimpleNamespace(values=values, qualified=qualified, elements=elements)
+    return SimpleNamespace(values=values, qualified=qualified, rows=rows)
 
 
 def assert_error(result, request, status):
@@ -208,24 +241,28 @@ def assert_sent(result, request, system, body):
     assert_success_status(request)
 
 
-def assert_get_reads(system, readings, devices):
+def assert_get_reads(system, readings, devices, details=False):
     system.device.listDevices.assert_called_once_with()
-    assert system.opc.browse.call_count == len(devices)
-    system.opc.browse.assert_has_calls(
-        [call(opcServer=OPC_SERVER, device=device) for device in devices],
+    system.tag.browse.assert_has_calls(
+        [call(f"[default]{device}", {"recursive": True}) for device in devices],
         any_order=True,
     )
+    assert system.tag.browse.call_count == len(devices)
     paths_read = []
-    for read_call in system.opc.readValues.call_args_list:
-        server, paths = read_call.args
-        assert server == OPC_SERVER
+    for read_call in system.tag.readBlocking.call_args_list:
+        (paths,) = read_call.args
         assert paths
         paths_read.extend(paths)
-    assert Counter(paths_read) == Counter(
-        path for device in devices for path in readings.values[device]
-    )
+    expected = [
+        f"[default]{device}/{path}"
+        for device in devices
+        for path in readings.values[device]
+    ]
+    if details:
+        expected += [path + ".OpcItemPath" for path in expected]
+    assert Counter(paths_read) == Counter(expected)
     assert system.dnp.mock_calls == []
-    assert system.tag.mock_calls == []
+    assert system.opc.mock_calls == []
 
 
 @pytest.mark.parametrize(
@@ -631,7 +668,7 @@ def test_post_device_listing_exception_propagates(
 
 @pytest.mark.parametrize("details", [MISSING, "false"])
 @pytest.mark.parametrize("device", [MISSING, "", DEVICE, OTHER_DEVICE])
-def test_get_values_only_preserves_shape_and_device_filter(
+def test_get_values_only_keys_by_tag_path_and_filters_device(
     handlers, system, request_factory, readings, details, device
 ):
     params = {}
@@ -655,7 +692,7 @@ def test_get_values_only_preserves_shape_and_device_filter(
 
 
 @pytest.mark.parametrize("device", [MISSING, "", DEVICE, OTHER_DEVICE])
-def test_get_details_preserves_keys_quality_null_and_epoch_milliseconds(
+def test_get_details_adds_quality_timestamp_and_address(
     handlers, system, request_factory, readings, device
 ):
     params = {"details": "true"}
@@ -666,13 +703,20 @@ def test_get_details_preserves_keys_quality_null_and_epoch_milliseconds(
     assert handlers.doGet(request, {}) == {
         "json": {
             name: {
-                path: {"value": value, "quality": quality, "timestamp": timestamp}
-                for path, (value, quality, timestamp) in readings.values[name].items()
+                path: {
+                    "value": value,
+                    "quality": quality,
+                    "timestamp": timestamp,
+                    "address": address,
+                }
+                for path, (value, quality, timestamp, address) in readings.values[
+                    name
+                ].items()
             }
             for name in devices
         }
     }
-    assert_get_reads(system, readings, devices)
+    assert_get_reads(system, readings, devices, details=True)
     assert_success_status(request)
 
 
@@ -724,26 +768,18 @@ def test_get_unknown_device_in_empty_dataset(handlers, system, request_factory):
 
 
 @pytest.mark.parametrize("details", ["false", "true"])
-@pytest.mark.parametrize("element_types", [[], ["FOLDER"], ["OBJECT", "METHOD"]])
-def test_get_no_data_variables_keeps_empty_devices_without_reading(
-    handlers, system, request_factory, details, element_types
+def test_get_device_without_tags_is_empty_without_reading(
+    handlers, system, request_factory, details
 ):
-    system.opc.browse.return_value = [
-        browse_element(f"ignored/{kind}", kind) for kind in element_types
-    ]
+    system.tag.browse.return_value = SimpleNamespace(
+        getResults=lambda: [{"fullPath": "[default]x/folder", "hasChildren": True}]
+    )
     request = request_factory(params={"details": details})
     assert handlers.doGet(request, {}) == {"json": {DEVICE: {}, OTHER_DEVICE: {}}}
     system.device.listDevices.assert_called_once_with()
-    system.opc.browse.assert_has_calls(
-        [
-            call(opcServer=OPC_SERVER, device=DEVICE),
-            call(opcServer=OPC_SERVER, device=OTHER_DEVICE),
-        ],
-        any_order=True,
-    )
-    assert system.opc.browse.call_count == 2
-    system.opc.readValues.assert_not_called()
-    assert system.tag.mock_calls == []
+    assert system.tag.browse.call_count == 2
+    system.tag.readBlocking.assert_not_called()
+    assert system.opc.mock_calls == []
     assert system.dnp.mock_calls == []
     assert_success_status(request)
 
@@ -752,7 +788,7 @@ def test_get_empty_device_does_not_hide_other_devices(
     handlers, system, request_factory, readings
 ):
     readings.values[DEVICE] = {}
-    readings.elements[DEVICE] = [browse_element("folder", "FOLDER")]
+    readings.rows[f"[default]{DEVICE}"] = []
     request = request_factory()
     assert handlers.doGet(request, {}) == {
         "json": {
@@ -764,17 +800,17 @@ def test_get_empty_device_does_not_hide_other_devices(
         }
     }
     assert_get_reads(system, readings, [DEVICE, OTHER_DEVICE])
-    system.opc.readValues.assert_called_once()
+    system.tag.readBlocking.assert_called_once()
     assert_success_status(request)
 
 
 @pytest.mark.parametrize("details", ["false", "true"])
-@pytest.mark.parametrize("operation", ["listDevices", "browse", "readValues"])
+@pytest.mark.parametrize("operation", ["listDevices", "browse", "readBlocking"])
 def test_get_backend_exceptions_propagate(
     handlers, system, request_factory, readings, details, operation
 ):
     error = RuntimeError(f"{operation} failed")
-    backend = system.device if operation == "listDevices" else system.opc
+    backend = system.device if operation == "listDevices" else system.tag
     getattr(backend, operation).side_effect = error
     request = request_factory(params={"device": DEVICE, "details": details})
     with pytest.raises(RuntimeError, match=f"{operation} failed") as caught:
@@ -782,10 +818,10 @@ def test_get_backend_exceptions_propagate(
     assert caught.value is error
     getattr(backend, operation).assert_called_once()
     if operation == "listDevices":
-        assert system.opc.mock_calls == []
+        assert system.tag.mock_calls == []
     elif operation == "browse":
-        system.opc.readValues.assert_not_called()
-    assert system.tag.mock_calls == []
+        system.tag.readBlocking.assert_not_called()
+    assert system.opc.mock_calls == []
     assert system.dnp.mock_calls == []
     request["servletResponse"].setStatus.assert_not_called()
 
@@ -803,7 +839,7 @@ def test_get_backend_exceptions_propagate(
 def test_get_qualified_value_exceptions_propagate(
     handlers, system, request_factory, readings, details, accessor
 ):
-    qualified = readings.qualified[next(iter(readings.values[DEVICE]))]
+    qualified = readings.qualified[f"[default]{DEVICE}/cap1/voltage"]
     error = RuntimeError(f"{accessor} failed")
     target = (
         qualified.getTimestamp.return_value.getTime
@@ -816,6 +852,60 @@ def test_get_qualified_value_exceptions_propagate(
         handlers.doGet(request, {})
     assert caught.value is error
     target.assert_called_once()
-    assert system.tag.mock_calls == []
+    assert system.opc.mock_calls == []
     assert system.dnp.mock_calls == []
     request["servletResponse"].setStatus.assert_not_called()
+
+
+# --- POST by tag path ---------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("tag", "index", "expected"),
+    [
+        ("cap1/setpt", 0, call.directOperateAnalog(DEVICE, 3, 0, 1.5)),
+        (
+            "671692/controls",
+            1,
+            call.directOperateBinary(DEVICE, 1, 1, 3, 1, 1000, 1000),
+        ),
+    ],
+)
+def test_post_by_tag_resolves_device_type_and_index(
+    handlers, system, request_factory, readings, tag, index, expected
+):
+    body = {"tag": f"{DEVICE}/{tag}"}
+    if "setpt" in tag:
+        body["value"] = 1.5
+    request = request_factory(body=body)
+    result = handlers.doPost(request, {})
+    assert result["json"]["status"] == "sent"
+    assert result["json"]["device"] == DEVICE
+    assert result["json"]["index"] == index
+    assert system.dnp.mock_calls == [expected]
+    system.tag.readBlocking.assert_called_once_with(
+        [f"[default]{DEVICE}/{tag}.OpcItemPath"]
+    )
+    assert_success_status(request)
+
+
+@pytest.mark.parametrize(
+    ("body", "status"),
+    [
+        ({"tag": f"{DEVICE}/cap1/voltage"}, 400),
+        ({"tag": f"{DEVICE}/nope/setpt", "value": 1}, 404),
+        ({"tag": "", "value": 1}, 400),
+        ({"tag": "no-slash", "value": 1}, 400),
+        ({"tag": 7, "value": 1}, 400),
+        ({"tag": f"{DEVICE}/cap1/setpt", "deviceName": DEVICE, "value": 1}, 400),
+        ({"tag": f"{DEVICE}/cap1/setpt", "index": 0, "value": 1}, 400),
+        ({"tag": f"{DEVICE}/cap1/setpt", "value": 1, "tcc": 1}, 400),
+        ({"tag": f"{DEVICE}/671692/controls", "value": 1}, 400),
+    ],
+)
+def test_post_by_tag_rejects_non_outputs_unknown_and_mixed_addressing(
+    handlers, system, request_factory, readings, body, status
+):
+    request = request_factory(body=body)
+    assert_error(handlers.doPost(request, {}), request, status)
+    assert system.dnp.mock_calls == []

@@ -33,10 +33,10 @@
       "sourceAddress": ${device["source_address"]}
     },
     "dataAcquisition": {
-      "class1PollPeriod": 5000,
-      "class2PollPeriod": 5000,
-      "class3PollPeriod": 5000,
-      "integrityPollPeriod": 300000,
+      "class1PollPeriod": ${device["polling"]["class1"]},
+      "class2PollPeriod": ${device["polling"]["class2"]},
+      "class3PollPeriod": ${device["polling"]["class3"]},
+      "integrityPollPeriod": ${device["polling"]["integrity"]},
       "unsolicitedEventClasses": {
         "class1": false,
         "class2": false,
