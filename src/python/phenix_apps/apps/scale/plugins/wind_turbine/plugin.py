@@ -31,7 +31,7 @@ class WindTurbineConfig(BaseModel):
         default="wind-turbine", pattern=r"^[a-zA-Z0-9][a-zA-Z0-9-]{0,57}$"
     )
     count: int = Field(default=1, ge=1)
-    containers_per_node: int = 6
+    containers_per_node: int = Field(default=6, ge=6, multiple_of=6)
     node_template: dict[str, Any] = Field(default_factory=dict)
     container_template: dict[str, Any] = Field(default_factory=dict)
     templates: dict[str, Any] = Field(default_factory=dict)
@@ -74,7 +74,7 @@ class WindTurbine(ScalePlugin):
     The plugin calculates the number of VMs required to host the requested number of turbines
     based on the `containers_per_node` density setting.
 
-    See `phenix_apps/apps/scale/plugins/wind_turbine.md` for full documentation.
+    See the adjacent README.md for full documentation.
     """
 
     # Defines the components of a single wind turbine, their private IPs, and their order.
@@ -285,6 +285,13 @@ class WindTurbine(ScalePlugin):
                 inject={"src": src_data, "dst": "/scale/shared/weather.csv"},
             )
 
+        rootfs_source = self.config.container_template.get("rootfs_source")
+        if rootfs_source:
+            self.app.add_inject(
+                hostname=hostname,
+                inject={"src": rootfs_source, "dst": "/scale/shared/otsimfs.tgz"},
+            )
+
         for i, d in enumerate(container_details):
             cnt_num = i + 1
             comp_type = d["type"]
@@ -478,6 +485,8 @@ class WindTurbine(ScalePlugin):
             nodered = NodeRed()
             nodered.init_xml_root(nr_md, "main-controller")
             nodered.to_xml()
+            # The config directory is the container's /etc/ot-sim bind mount.
+            nodered.root.find("flow-path").text = "/etc/ot-sim/node-red.json"
 
             module = ET.Element("module", {"name": "node-red"})
             module.text = "ot-sim-node-red-module {{config_file}}"
@@ -722,6 +731,8 @@ class WindTurbine(ScalePlugin):
         # Source (VM): /scale/<hostname>/<i>/ -> Dest (Container): /etc/ot-sim/
         cfg["PER_CONTAINER_VOLUMES"] = [("/scale/{HOSTNAME}/{i}/", "/etc/ot-sim/")]
         cfg["SHARED_VOLUMES"] = []
+        if self.config.container_template.get("rootfs_source"):
+            cfg["FILESYSTEM"] = "/scale/shared/otsimfs.tgz"
 
         # Add shared volume for weather data if configured
         anemo_tmpl = self.config.templates.get("default", {}).get("anemometer", {})

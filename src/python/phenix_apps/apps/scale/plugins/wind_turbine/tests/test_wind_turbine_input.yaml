@@ -35,8 +35,6 @@ spec:
                       speedTag: speed.high
                       directionTag: dir.high
                       directionError: 0.04
-                    node-red:
-                      flows: /phenix/injects/flows.json
                     weather:
                       columns:
                         - name: wind_speed

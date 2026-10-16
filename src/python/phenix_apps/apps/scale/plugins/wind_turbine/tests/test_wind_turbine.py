@@ -90,6 +90,33 @@ def test_config_validation(wind_turbine):
         plugin.pre_configure(mock_app, profile_empty_tmpl)
 
 
+@pytest.mark.parametrize("density", [0, -6, 1, 5, 7, 9])
+def test_density_keeps_turbines_on_one_vm(density):
+    with pytest.raises(ValidationError, match="containers_per_node"):
+        WindTurbineConfig(
+            containers_per_node=density,
+            container_template={"external_network": {"name": "ot"}},
+        )
+
+
+@pytest.mark.parametrize(
+    ("density", "counts"), [(6, [6, 6, 6]), (12, [12, 6]), (18, [18])]
+)
+def test_complete_turbine_density(wind_turbine, density, counts):
+    plugin, app = wind_turbine
+    plugin.pre_configure(
+        app,
+        {
+            "count": 3,
+            "containers_per_node": density,
+            "container_template": {"external_network": {"name": "ot"}},
+        },
+    )
+    assert [
+        plugin.get_container_count(i) for i in range(1, plugin.get_node_count() + 1)
+    ] == counts
+
+
 def test_config_alias_parsing(wind_turbine):
     """Test that Pydantic aliases (ground-truth-module) are parsed correctly."""
     plugin, mock_app = wind_turbine
@@ -134,6 +161,23 @@ def test_get_container_count(wind_turbine):
     }
     plugin.pre_configure(mock_app, profile)
     assert plugin.get_container_count(1) == 6
+
+
+def test_existing_nested_filesystem_is_preserved(wind_turbine):
+    plugin, app = wind_turbine
+    plugin.pre_post_start(
+        app,
+        {
+            "container_template": {
+                "rootfs": "preinstalled.tgz",
+                "external_network": {"name": "ot", "network": "192.168.100.0/24"},
+            }
+        },
+    )
+    cfg = {"HOSTNAME": "wind-turbine-1", "FILESYSTEM": "preinstalled.tgz"}
+    plugin.update_template_config(cfg)
+    assert cfg["FILESYSTEM"] == "preinstalled.tgz"
+    assert cfg["SHARED_VOLUMES"] == []
 
 
 def test_ip_assignment_cidr_only(wind_turbine):
