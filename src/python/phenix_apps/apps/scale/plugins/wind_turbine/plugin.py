@@ -289,7 +289,7 @@ class WindTurbine(ScalePlugin):
         if rootfs_source:
             self.app.add_inject(
                 hostname=hostname,
-                inject={"src": rootfs_source, "dst": "/scale/shared/otsimfs.tgz"},
+                inject={"src": rootfs_source, "dst": "/scale/rootfs/otsimfs.tgz"},
             )
 
         for i, d in enumerate(container_details):
@@ -732,7 +732,7 @@ class WindTurbine(ScalePlugin):
         cfg["PER_CONTAINER_VOLUMES"] = [("/scale/{HOSTNAME}/{i}/", "/etc/ot-sim/")]
         cfg["SHARED_VOLUMES"] = []
         if self.config.container_template.get("rootfs_source"):
-            cfg["FILESYSTEM"] = "/scale/shared/otsimfs.tgz"
+            cfg["FILESYSTEM"] = "/scale/rootfs/otsimfs.tgz"
 
         # Add shared volume for weather data if configured
         anemo_tmpl = self.config.templates.get("default", {}).get("anemometer", {})

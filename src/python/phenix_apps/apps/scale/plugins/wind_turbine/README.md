@@ -52,7 +52,8 @@ graph TD
 `container_template.rootfs` names an existing filesystem on the **nested VM**
 (default `otsimfs.tgz`). Alternatively, set `container_template.rootfs_source`
 to a head-node `.tgz` file: the plugin injects it into each VM as
-`/scale/shared/otsimfs.tgz` and uses that path in the generated minimega script.
+`/scale/rootfs/otsimfs.tgz`, outside the shared weather volume, and uses that
+path in the generated minimega script.
 The rootfs must provide `/init`, miniccc on `/cc`, and the configured OT-sim
 modules; a plain OT-sim Docker export without an init/agent is insufficient.
 
@@ -65,9 +66,9 @@ head-node JSON flow. It is copied into the main controller's config directory
 and loaded from `/etc/ot-sim/node-red.json`. Node-RED is not required for the
 turbine's control logic.
 
-For all assets, a migrated Scenario/Topology, verified public weather data,
+For all assets, a Scale Scenario/Topology, verified public weather data,
 image recipes, Grafana provisioning, and deployment/verification commands, see
-the [complete example in sceptre-phenix-topologies](https://github.com/sandialabs/sceptre-phenix-topologies/tree/main/renewables/wind/turbine).
+the [complete example in sceptre-phenix-topologies](https://github.com/sandialabs/sceptre-phenix-topologies/tree/main/renewables/wind/wind-scale).
 
 ## Networking
 
