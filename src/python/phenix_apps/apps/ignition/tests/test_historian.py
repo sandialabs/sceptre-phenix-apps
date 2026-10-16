@@ -232,9 +232,9 @@ def test_historian_combinations_seed_tags_once(
 
 
 @pytest.mark.parametrize("api", [False, True])
-def test_without_historian_or_perspective_does_not_seed_tags(mock_app, mocker, api):
+def test_tags_are_seeded_only_for_perspective_historian_or_api(mock_app, mocker, api):
     seed = mocker.spy(mock_app, "_write_tag_tree")
     _nodes(mock_app, gateways=[_gateway(connected_rtus=["rtu-1"], api=api)])
     mock_app.extract_node_interface_ip.return_value = "10.68.30.201"
     mock_app.pre_start()
-    seed.assert_not_called()
+    assert seed.call_count == int(api)

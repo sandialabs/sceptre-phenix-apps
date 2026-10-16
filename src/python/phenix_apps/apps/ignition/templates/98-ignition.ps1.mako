@@ -1,17 +1,21 @@
 ## phenix ignition app (gwbk restore)
 $ErrorActionPreference = 'Stop'
 
+Write-Host "[ IGNITION ] Configuring static .gwbk"
+echo "[ IGNITION ] Configuring static .gwbk"
+
 $staged = 'C:\phenix\ignition\restore.gwbk'
 
 if (-not (Test-Path $staged)) {
-    Write-Output "[ IGNITION ] nothing staged; already configured."
+    Write-Host "[ IGNITION ] nothing staged; already configured."
+    echo "[ IGNITION ] nothing staged; already configured."
     exit 0
 }
 
 Get-Service -Name Ignition | Out-Null
 
 try {
-    $deadline = (Get-Date).AddMinutes(2)
+    $deadline = (Get-Date).AddMinutes(5)
     while ($true) {
         try {
             Stop-Service -Name Ignition -Force
@@ -30,7 +34,8 @@ try {
             throw "gwcmd failed restoring $staged (exit code $LASTEXITCODE)"
         }
         Remove-Item -Path $staged -Force
-        Write-Output "[ IGNITION ] restored $staged"
+        Write-Host "[ IGNITION ] restored $staged"
+        echo "[ IGNITION ] restored $staged"
     }
     finally {
         Start-Service -Name Ignition
@@ -38,7 +43,9 @@ try {
 }
 catch {
     Write-Error "[ IGNITION ] $_"
+    echo "[ IGNITION ] $_"
     exit 1
 }
 
-Write-Output "[ IGNITION ] configured!"
+Write-Host "[ IGNITION ] configured!"
+echo "[ IGNITION ] configured!"

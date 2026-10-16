@@ -1,5 +1,6 @@
 def doPost(request, session):
     import math
+    import re
     import struct
 
     def error(status, message):
@@ -45,19 +46,38 @@ def doPost(request, session):
                 raise ValueError('value cannot be represented as float32')
         return number
 
+    def resolve_tag(tag):
+        """Device, point type and index behind a [default] tag path."""
+        if not isinstance(tag, basestring) or not tag.strip() or '/' not in tag:
+            raise ValueError('tag must be a device/point path below [default]')
+        (qualified,) = system.tag.readBlocking(['[default]' + tag + '.OpcItemPath'])
+        address = qualified.getValue()
+        if not qualified.getQuality().isGood() or not address:
+            raise LookupError('Unknown tag: %s' % tag)
+        m = re.match(r'^(?:ns=\d+;s=)?\[(.+?)\](?:.*/)?(Binary|Analog)Output/?(\d+)$', str(address))
+        if not m:
+            raise ValueError('tag %s is not a DNP3 output point (%s)' % (tag, address))
+        return m.group(1), m.group(2).lower(), int(m.group(3))
+
     data = request.get('postData')
     try:
         if not isinstance(data, dict):
             raise ValueError('body must be a JSON object')
-        deviceName = data.get('deviceName')
-        if not isinstance(deviceName, basestring) or not deviceName.strip():
-            raise ValueError('deviceName must be a nonblank string')
-        pointType = data.get('pointType')
-        if not isinstance(pointType, basestring) or pointType not in ('analog', 'binary'):
-            raise ValueError('pointType must be analog or binary')
-        index = integer('index', data.get('index'), 0, 65535)
-
         allowed = {'deviceName', 'pointType', 'index'}
+        if 'tag' in data:
+            if allowed & set(data):
+                raise ValueError('tag cannot be combined with deviceName, pointType or index')
+            deviceName, pointType, index = resolve_tag(data.get('tag'))
+            allowed = {'tag'}
+        else:
+            deviceName = data.get('deviceName')
+            if not isinstance(deviceName, basestring) or not deviceName.strip():
+                raise ValueError('deviceName must be a nonblank string')
+            pointType = data.get('pointType')
+            if not isinstance(pointType, basestring) or pointType not in ('analog', 'binary'):
+                raise ValueError('pointType must be analog or binary')
+            index = integer('index', data.get('index'), 0, 65535)
+
         if pointType == 'analog':
             allowed.update(('value', 'variation'))
         else:
@@ -76,6 +96,8 @@ def doPost(request, session):
             offTime = integer('offTime', data.get('offTime', 1000), 0, 2147483647)
     except ValueError as exc:
         return error(400, str(exc))
+    except LookupError as exc:
+        return error(404, str(exc))
 
     devices = system.device.listDevices()
     if not any(
