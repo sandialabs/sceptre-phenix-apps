@@ -744,3 +744,86 @@ def test_cc_cmd_columns_match_minimega_cc_cli():
         "level",
         "filter",
     )
+
+
+_UUID = "0ab5dbc3-8ca6-4b75-a503-b5a191995dae"
+
+
+def _cc_responses_text(cmd_id="3", uuid=_UUID, **files):
+    """`cc responses` text as minimega prints it: files in lexical order, each a
+    `<id>/<uuid>/<file>:` header line followed by the contents."""
+    return "".join(
+        f"{cmd_id}/{uuid}/{name}:\n{body}\n" for name, body in sorted(files.items())
+    )
+
+
+class _StubCCResponses:
+    def __init__(self, rows):
+        self._rows = rows
+        self._raise_errors = True
+
+    def cc_exec_once(self, _cmd):
+        return [{"Host": "gibson1336", "Data": 3}]
+
+    def cc_responses(self, *_args):
+        return self._rows
+
+
+def test_cc_response_files_splits_stdout_and_stderr():
+    text = _cc_responses_text(stderr="warn: x\n", stdout='{"path": "/etc/hosts"}\n')
+
+    assert utils._cc_response_files(text) == {
+        ("3", _UUID): {"stderr": "warn: x", "stdout": '{"path": "/etc/hosts"}'}
+    }
+
+
+def test_cc_response_files_keeps_multiple_ids_and_clients():
+    other = "11111111-2222-3333-4444-555555555555"
+    text = _cc_responses_text("3", stdout="a/b") + _cc_responses_text(
+        "12", other, stdout="c: d"
+    )
+
+    assert utils._cc_response_files(text) == {
+        ("3", _UUID): {"stdout": "a/b"},
+        ("12", other): {"stdout": "c: d"},
+    }
+
+
+def test_mm_get_cc_responses_skips_response_without_files(monkeypatch):
+    # A prefix whose commands only recorded an exit code: minimega returns "\n".
+    mm = _StubCCResponses([{"Host": "h", "Response": "\n", "Error": ""}])
+
+    assert utils.mm_get_cc_responses(mm, "silent") == []
+
+
+def test_mm_exec_wait_separates_stdout_and_stderr(monkeypatch):
+    monkeypatch.setattr(utils, "mm_cc_filter_vm", lambda *_a, **_k: (_UUID, "h"))
+    monkeypatch.setattr(utils, "mm_command_id_for_host", lambda *_: "3")
+    monkeypatch.setattr(utils, "mm_wait_for_cmd", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        utils, "mm_cc_exitcode_wait", lambda *_a, **_k: {"Response": "0"}
+    )
+    text = _cc_responses_text(stderr="warn: x", stdout="/usr/bin/ls")
+    mm = _StubCCResponses([{"Host": "h", "Response": text, "Error": ""}])
+
+    result = utils.mm_exec_wait(mm, "foo", "which ls")
+
+    assert result["stderr"] == "warn: x"
+    assert result["stdout"] == "/usr/bin/ls"
+    assert result["exitcode"] == 0
+
+
+def test_mm_get_cc_responses_one_result_per_client(monkeypatch):
+    monkeypatch.setattr(
+        utils, "mm_cc_exitcode_wait", lambda *_a, **_k: {"Response": "0"}
+    )
+    text = _cc_responses_text(stderr="warn: x", stdout="tcp 0.0.0.0:22 sshd/1")
+    mm = _StubCCResponses([{"Host": "h", "Response": text, "Error": ""}])
+
+    (result,) = utils.mm_get_cc_responses(mm, "netstat_linux")
+
+    assert result["id"] == "3"
+    assert result["uuid"] == _UUID
+    assert result["stderr"] == "warn: x"
+    assert result["stdout"] == "tcp 0.0.0.0:22 sshd/1"
+    assert result["exitcode"] == 0
