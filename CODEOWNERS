@@ -1,0 +1,97 @@
+# Owners from git history, blame, pull requests, and reviews (October 2026).
+# The last matching pattern wins and replaces every earlier owner of a path.
+# Owners are listed primary first. Keep this file current (see AGENTS.md).
+# Authors without write access are listed too; GitHub does not request them.
+
+# Default owners
+*                       @GhostofGoes @mgaliar @cmulk @nblair2 @glattercj @activeshadow
+
+# Repository files
+/.codespellrc           @nblair2 @GhostofGoes
+/.editorconfig          @GhostofGoes
+/.gitignore             @GhostofGoes
+/AGENTS.md              @GhostofGoes
+/CHANGELOG.md           @glattercj @adamsrnmsu @GhostofGoes
+# CLAUDE.md is a symlink to AGENTS.md, so it needs its own entry.
+/CLAUDE.md              @GhostofGoes
+/CODEOWNERS             @GhostofGoes
+/LICENSE                @activeshadow @cmulk @mgaliar
+/Makefile               @glattercj @nblair2 @GhostofGoes
+/README.md              @glattercj @GhostofGoes @cmulk @activeshadow
+
+# Repository configuration
+/.github/               @mgaliar @GhostofGoes
+/.github/workflows/     @nblair2 @GhostofGoes @glattercj @activeshadow
+
+# Go module
+/src/go/                @activeshadow @glattercj @nblair2 @cmulk
+/src/go/.golangci.yml   @glattercj @nblair2
+/src/go/AGENTS.md       @GhostofGoes
+/src/go/Makefile        @glattercj @nblair2 @GhostofGoes
+
+# Debian packaging; must follow /src/go/ so these lines take precedence.
+/debian/                @activeshadow
+/src/go/build.sh        @activeshadow
+/src/go/debian/         @activeshadow
+/src/go/docker-build.sh @activeshadow
+
+# Python project
+/src/python/.gitignore              @activeshadow @GhostofGoes
+/src/python/AGENTS.md               @GhostofGoes
+/src/python/LICENSE                 @activeshadow @cmulk @mgaliar
+/src/python/Makefile                @glattercj @GhostofGoes
+/src/python/README.md               @glattercj @activeshadow @GhostofGoes
+/src/python/app_migration_guide.md  @glattercj @activeshadow
+/src/python/pyproject.toml          @GhostofGoes @nblair2 @glattercj
+
+# Shared Python code
+/src/python/phenix_apps/__init__.py         @glattercj @activeshadow @GhostofGoes
+# AppBase, the base class of every Python app.
+/src/python/phenix_apps/apps/__init__.py    @activeshadow @GhostofGoes @glattercj
+/src/python/phenix_apps/common/             @nblair2 @GhostofGoes @activeshadow @glattercj
+/src/python/phenix_apps/common/error.py     @activeshadow @GhostofGoes
+/src/python/phenix_apps/common/logger.py    @glattercj @nblair2 @GhostofGoes
+/src/python/phenix_apps/common/settings.py  @nblair2 @activeshadow @GhostofGoes
+/src/python/phenix_apps/common/utils.py     @nblair2 @GhostofGoes @activeshadow @mgaliar
+/src/python/phenix_apps/common/tests/       @nblair2 @adamsrnmsu
+/src/python/phenix_apps/schedulers/         @activeshadow @glattercj
+/src/python/phenix_apps/testing/            @nblair2
+
+# Apps
+/src/python/phenix_apps/apps/caldera/       @activeshadow
+/src/python/phenix_apps/apps/helics/        @activeshadow @glattercj @Astarry
+/src/python/phenix_apps/apps/ignition/      @nblair2
+/src/python/phenix_apps/apps/mgmt_tap/      @mgaliar @cmulk
+/src/python/phenix_apps/apps/otsim/         @activeshadow @cmulk @glattercj
+/src/python/phenix_apps/apps/protonuke/     @activeshadow @GhostofGoes
+/src/python/phenix_apps/apps/scale/         @glattercj @GhostofGoes
+/src/python/phenix_apps/apps/sceptre/       @mgaliar @adamsrnmsu @GhostofGoes @cmulk
+/src/python/phenix_apps/apps/wind_turbine/  @activeshadow
+/src/python/phenix_apps/apps/wireguard/     @activeshadow @glattercj
+
+# SCORCH; the directory line covers components that have no line of their own.
+/src/python/phenix_apps/apps/scorch/                @GhostofGoes @activeshadow @glattercj
+# ComponentBase and the stage runner; *.py does not match subdirectories.
+/src/python/phenix_apps/apps/scorch/*.py            @glattercj @GhostofGoes @activeshadow @htoohey22
+/src/python/phenix_apps/apps/scorch/art/            @usarmyjoe @activeshadow @GhostofGoes
+/src/python/phenix_apps/apps/scorch/caldera/        @activeshadow
+/src/python/phenix_apps/apps/scorch/cc/             @GhostofGoes @activeshadow @glattercj
+/src/python/phenix_apps/apps/scorch/collector/      @GhostofGoes
+/src/python/phenix_apps/apps/scorch/disruption/     @GhostofGoes @CoderOfTheLight
+/src/python/phenix_apps/apps/scorch/erspan/         @cmulk @mgaliar
+/src/python/phenix_apps/apps/scorch/ettercap/       @activeshadow
+/src/python/phenix_apps/apps/scorch/hoststats/      @activeshadow @GhostofGoes
+/src/python/phenix_apps/apps/scorch/iperf/          @GhostofGoes
+/src/python/phenix_apps/apps/scorch/kafka/          @htoohey22 @GhostofGoes @glattercj @nblair2
+/src/python/phenix_apps/apps/scorch/mm/             @activeshadow @GhostofGoes
+/src/python/phenix_apps/apps/scorch/opcexport/      @GhostofGoes
+/src/python/phenix_apps/apps/scorch/pcap/           @GhostofGoes
+/src/python/phenix_apps/apps/scorch/pipe/           @glattercj
+/src/python/phenix_apps/apps/scorch/providerdata/   @GhostofGoes
+/src/python/phenix_apps/apps/scorch/qos/            @GhostofGoes
+/src/python/phenix_apps/apps/scorch/rtds/           @GhostofGoes
+/src/python/phenix_apps/apps/scorch/snort/          @activeshadow
+/src/python/phenix_apps/apps/scorch/ssh/            @cmulk @mgaliar
+/src/python/phenix_apps/apps/scorch/tcpdump/        @activeshadow @GhostofGoes @nblair2
+/src/python/phenix_apps/apps/scorch/trafficgen/     @activeshadow
+/src/python/phenix_apps/apps/scorch/vmstats/        @GhostofGoes @activeshadow
