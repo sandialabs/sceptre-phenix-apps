@@ -6,19 +6,92 @@ Contributors: Klaehn Burkes, cmulk, and some AI friends.
 
 import json
 import stat
-from pathlib import Path, PurePath
+from pathlib import Path, PurePath, PurePosixPath
+from typing import Annotated, Final
 
 import paramiko
+from pydantic import (
+    AfterValidator,
+    Field,
+    IPvAnyAddress,
+    StringConstraints,
+    model_validator,
+)
 
 from phenix_apps.apps.scorch import ComponentBase
+from phenix_apps.apps.scorch.app import FilePath, MetadataBlock, Seconds
 from phenix_apps.common import utils
 from phenix_apps.common.logger import logger
+
+# Linux user names are limited to 32 characters by useradd (shadow-utils).
+MAX_USER_LENGTH: Final[int] = 32
+
+# paramiko cannot be told "no timeout" for the banner and login (None keeps its
+# 15 and 30 second defaults), so 0 becomes a timeout nobody will reach.
+# ponytail: ~68 years; a custom Transport would allow a true None
+NO_TIMEOUT: Final[float] = 2**31
+
+
+def _check_remote_path(value: str) -> str:
+    # Remote paths are POSIX paths, whatever system phenix runs on.
+    path = PurePosixPath(value)
+    if not path.name or path.name == "..":
+        raise ValueError("path must name a file or directory, not '/' or end in '..'")
+    return value
+
+
+Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+RemotePath = Annotated[
+    FilePath,
+    StringConstraints(strip_whitespace=True),
+    AfterValidator(_check_remote_path),
+]
+
+
+class SSHMetadata(MetadataBlock):
+    """Metadata for the ssh component; see README.md for each field."""
+
+    ip: IPvAnyAddress
+    port: int = Field(default=22, ge=1, le=65535, strict=True)
+    user: Annotated[
+        str,
+        StringConstraints(
+            strip_whitespace=True, min_length=1, max_length=MAX_USER_LENGTH
+        ),
+    ]
+    password: (
+        Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None
+    ) = None
+    # a known_hosts file; without it the server's host key is trusted blindly
+    known_hosts: Text | None = None
+    connect_timeout: Seconds = 10
+    banner_timeout: Seconds = 0
+    login_timeout: Seconds = 0
+    cmds: Annotated[list[Text], Field(min_length=1)]
+    files: list[RemotePath] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _unique_file_names(self):
+        # each file lands in <stage>/<last path component>
+        seen: set[str] = set()
+        for file in self.files:
+            name = PurePosixPath(file).name
+            if name in seen:
+                raise ValueError(
+                    f"files: more than one entry ends in '{name}'; "
+                    "they would overwrite each other"
+                )
+            seen.add(name)
+        return self
 
 
 class SSH(ComponentBase):
     """
     Sets up ssh connection between phenix server and a remote collection server as a Scorch component.
     """
+
+    metadata_model = SSHMetadata
+    config: SSHMetadata
 
     def __init__(self):
         ComponentBase.__init__(self, "ssh")
@@ -76,27 +149,26 @@ class SSH(ComponentBase):
             f"{stage}_component", f"{stage.capitalize()} user component: {self.name}"
         )
 
-        self._get_args()
-
         self._log(
             f"{stage}_remote",
-            f"{stage.capitalize()} SSH on remote server {self.ip} with user {self.user}.",
-            host=self.ip,
-            user=self.user,
+            f"{stage.capitalize()} SSH on remote server {self.config.ip} "
+            f"with user {self.config.user}.",
+            host=str(self.config.ip),
+            user=self.config.user,
         )
 
         ssh = None
         try:
             ssh = self._connect()
 
-            remote_cmd = " && ".join(self.cmds)
+            remote_cmd = " && ".join(self.config.cmds)
             self._log(f"{stage}_remote", "Running Remotely", cmd=remote_cmd)
             cmd_out = self._run_remote_command(ssh, remote_cmd)
             self._log(f"{stage}_remote", **cmd_out)
 
-            if self.files:
+            if self.config.files:
                 sftp_path = self.base_dir / stage
-                for remote_file in self.files:
+                for remote_file in self.config.files:
                     local_path = str(sftp_path / PurePath(remote_file).name)
                     files_out = self._fetch_remote(ssh, remote_file, local_path)
                     self._log(
@@ -133,25 +205,28 @@ class SSH(ComponentBase):
         """
         ssh = paramiko.SSHClient()
 
-        known_hosts = self.metadata.get("known_hosts") if self.metadata else None
-        if known_hosts:
-            ssh.load_host_keys(known_hosts)
+        if self.config.known_hosts:
+            ssh.load_host_keys(self.config.known_hosts)
             ssh.set_missing_host_key_policy(paramiko.RejectPolicy())
         else:
             logger.warning(
                 f"no 'known_hosts' file provided in metadata; automatically "
-                f"trusting host key presented by {self.ip}"
+                f"trusting host key presented by {self.config.ip}"
             )
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-        connect_kwargs = {
-            "hostname": self.ip,
-            "port": 22,
-            "username": self.user,
+        connect_kwargs: dict = {
+            "hostname": str(self.config.ip),
+            "port": self.config.port,
+            "username": self.config.user,
+            # 0 means no timeout
+            "timeout": self.config.connect_timeout or None,
+            "banner_timeout": self.config.banner_timeout or NO_TIMEOUT,
+            "auth_timeout": self.config.login_timeout or NO_TIMEOUT,
         }
 
-        if self.password:
-            connect_kwargs["password"] = self.password
+        if self.config.password:
+            connect_kwargs["password"] = self.config.password
 
         ssh.connect(**connect_kwargs)
         return ssh
@@ -176,10 +251,28 @@ class SSH(ComponentBase):
             _stdin, stdout, stderr = ssh.exec_command(command)
             output = stdout.read().decode().strip()
             error = stderr.read().decode().strip()
+            # after reading, so a chatty command cannot fill the window and hang;
+            # paramiko reports -1 when the server sends no status
+            exit_status: int | None
+            try:
+                exit_status = stdout.channel.recv_exit_status()
+            except Exception as ex:
+                logger.warning(
+                    f"no exit status for remote command on {self.config.ip}: {ex}"
+                )
+                exit_status = None
+
+            # a failing command has never failed the stage; say so loudly
+            if exit_status != 0:
+                logger.warning(
+                    f"remote command exited with status {exit_status} on "
+                    f"{self.config.ip}: {command}"
+                )
 
             return {
-                "host": self.ip,
+                "host": str(self.config.ip),
                 "cmd": command,
+                "exit_status": exit_status,
                 "stdout": output,
                 "stderr": error,
             }
@@ -187,8 +280,9 @@ class SSH(ComponentBase):
         except Exception as e:
             logger.error(f"Failed to execute remote command: {command}. Error: {e}")
             return {
-                "host": self.ip,
+                "host": str(self.config.ip),
                 "cmd": command,
+                "exit_status": None,
                 "stdout": "",
                 "stderr": str(e),
             }
@@ -217,7 +311,7 @@ class SSH(ComponentBase):
             }
         """
         result = {
-            "host": self.ip,
+            "host": str(self.config.ip),
             "src": remote_path,
             "dst": local_path,
             "status": "ok",
@@ -275,29 +369,6 @@ class SSH(ComponentBase):
                 self._sftp_get_dir(sftp, remote_path, local_path)
             else:
                 sftp.get(remote_path, local_path)
-
-    def _get_args(self):
-        """
-        Parses and validates metadata fields required for SSH operations,
-        setting instance attributes for ip, user, password, cmds, and files.
-
-        Raises:
-            ValueError: If ip, user, or cmds are missing from metadata.
-        """
-        self.ip = self.metadata.get("ip")
-        if self.ip is None:
-            logger.error("No IP Provided")
-            raise ValueError("No IP Provided")
-        self.user = self.metadata.get("user")
-        if self.user is None:
-            logger.error("No User Provided")
-            raise ValueError("No User Provided")
-        self.password = self.metadata.get("password")
-        self.cmds = self.metadata.get("cmds")
-        if self.cmds is None:
-            logger.error("No Command Provided")
-            raise ValueError("No Command Provided")
-        self.files = self.metadata.get("files")
 
     def _log(self, event_type: str, message: str | None = None, **data) -> None:
         """
