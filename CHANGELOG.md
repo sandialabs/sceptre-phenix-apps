@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **SCEPTRE App**: Test suite (128 tests), two of them characterization tests over both stages and all 310 infrastructure/device-type/protocol combinations, plus `apps/sceptre/README.md`.
 - **SCORCH**: Pydantic metadata models for components (#160).
 - **SCORCH**: `phenix-scorch-validate` checks component metadata.
+- **SCORCH rtds**: Strict URL and case name checks; wait and timeout fields.
 
 ### Changed
 - **Build System**: `Mako>=1.3.10`, `requests>=2.32.4` (security advisories).
@@ -46,6 +47,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Common**: New `validate_hostname()` (phenix v2026.10.02 rules) and `safe_join()` guard hostnames and paths built from metadata; `mm_send()`/`mm_recv()` stay inside the miniccc mount. **Breaking:** rejects `_`, 1-char, all-digit, `all` and `phenix` hostnames.
 - **Apps**: Scale, wind turbine and Ignition names are restricted; protonuke and wireguard reject embedded newlines; wireguard configs are `0600`, sceptre startup scripts `0755`.
 - **SCORCH**: `cc`, `ssh` and `providerdata` transfers stay inside the run directory.
+- **SCORCH rtds**: `rscad_automation.case_name` check now runs.
+- **SCORCH rtds**: `_stop_case(allow_failure=True)` no longer raises `KeyError`.
+- **SCORCH rtds**: RSCAD requests time out instead of hanging.
+- **SCORCH rtds**: Time-drift check fails clearly without documents.
 
 ## [2.0.0] - 2026-03-04
 
