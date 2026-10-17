@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **SCEPTRE App**: Stage accounting in the logs: a scenario inventory by device type, and what each handler produced.
 - **SCEPTRE App**: Files in `<assetDir>/injects/override/` that match no injection are reported as probable typos.
 - **SCEPTRE App**: Test suite (128 tests), two of them characterization tests over both stages and all 310 infrastructure/device-type/protocol combinations, plus `apps/sceptre/README.md`.
+- **SCORCH**: Pydantic metadata models for components (#160).
+- **SCORCH**: `phenix-scorch-validate` checks component metadata.
+- **SCORCH collector**: `pcap_duration_margin`; empty iperf logs removed.
 
 ### Changed
 - **Build System**: `Mako>=1.3.10`, `requests>=2.32.4` (security advisories).
@@ -44,6 +47,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Common**: New `validate_hostname()` (phenix v2026.10.02 rules) and `safe_join()` guard hostnames and paths built from metadata; `mm_send()`/`mm_recv()` stay inside the miniccc mount. **Breaking:** rejects `_`, 1-char, all-digit, `all` and `phenix` hostnames.
 - **Apps**: Scale, wind turbine and Ignition names are restricted; protonuke and wireguard reject embedded newlines; wireguard configs are `0600`, sceptre startup scripts `0755`.
 - **SCORCH**: `cc`, `ssh` and `providerdata` transfers stay inside the run directory.
+- **SCORCH collector**: `configure`-stage output now found.
+- **SCORCH collector**: PMU count logging raised `TypeError`.
+- **SCORCH collector**: Missing or empty provider `config.ini` is reported.
+- **SCORCH collector**: The disruption listed in the run is used.
+- **SCORCH collector**: `generate_csv` reads PMUs from `provider`.
+- **SCORCH collector**: `pcap` without merged capture no longer fails.
+- **SCORCH collector**: Timestamp checks no longer use `assert`.
 
 ## [2.0.0] - 2026-03-04
 
