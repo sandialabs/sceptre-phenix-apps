@@ -72,6 +72,7 @@ phenix-scorch-component-opcexport = "phenix_apps.apps.scorch.opcexport.opcexport
 phenix-scorch-component-kafka = "phenix_apps.apps.scorch.kafka.kafka_component:main"
 phenix-scorch-component-erspan = "phenix_apps.apps.scorch.erspan.erspan:main"
 phenix-scorch-component-ssh = "phenix_apps.apps.scorch.ssh.ssh:main"
+phenix-scorch-validate = "phenix_apps.apps.scorch.validate:main"
 
 [project.entry-points."phenix.scale.plugins"]
 builtin = "phenix_apps.apps.scale.plugins.builtin:BuiltinV1"
