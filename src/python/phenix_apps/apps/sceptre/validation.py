@@ -242,7 +242,7 @@ class FdServerMeta(Meta):
                 fatal=False,
             )
 
-        if not non_mgmt(host, case_sensitive=False):
+        if not non_mgmt(host):
             host.flag(
                 ctx,
                 "no non-mgmt interface; this device will bind to an empty address",
@@ -273,7 +273,7 @@ class FdClientMeta(Meta):
     def check(self, host: "Host", ctx: Context) -> None:
         super().check(host, ctx)
 
-        if not non_mgmt(host, case_sensitive=False):
+        if not non_mgmt(host):
             host.flag(
                 ctx,
                 "fd-client needs a non-mgmt, non-serial interface to bind to",
@@ -305,8 +305,7 @@ class OpcMeta(Meta):
             host.flag(
                 ctx,
                 'OPC needs an interface on a vlan other than "mgmt"',
-                describe_interfaces(host)
-                + '; note this check is case-sensitive, "MGMT" does not count',
+                describe_interfaces(host),
             )
         host.flag_refs(ctx, "connected_rtus", self.connected_rtus, "fd_servers")
 

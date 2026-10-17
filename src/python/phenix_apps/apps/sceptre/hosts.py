@@ -43,20 +43,10 @@ def vlan_of(iface: Any) -> str:
     return getattr(iface, "vlan", "") or ""
 
 
-def non_mgmt(host: Any, *, case_sensitive: bool = True) -> list[Any]:
-    """Interfaces the app treats as non-management.
+def non_mgmt(host: Any) -> list[Any]:
+    """Interfaces not on the mgmt vlan, matched case-insensitively."""
 
-    OPC/SCADA/historian compare exactly, field devices lowercase first; callers
-    pass what their handler uses. See "Known issues" in the README.
-    """
-
-    def is_mgmt(iface: Any) -> bool:
-        vlan = vlan_of(iface)
-        if not case_sensitive:
-            vlan = vlan.lower()
-        return vlan == "mgmt"
-
-    return [iface for iface in interfaces(host) if not is_mgmt(iface)]
+    return [iface for iface in interfaces(host) if vlan_of(iface).lower() != "mgmt"]
 
 
 def mgmt(host: Any) -> list[Any]:
