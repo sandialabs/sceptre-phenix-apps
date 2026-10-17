@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **SCORCH**: `phenix-scorch-validate` checks component metadata.
 - **SCORCH pipe**: Metadata model.
 - **SCORCH disruption**: Metadata model with new margin, args, OS fields.
+- **SCORCH hoststats**: Metadata model; failed samples are retried.
 
 ### Changed
 - **OT-sim App**: DNP3 address assignment is a module function (`protocols.dnp3.assign_addresses`)
@@ -56,6 +57,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **SCEPTRE App**: Per-device register overrides raised `RuntimeError` in `SceptreMetadataParser`, which popped keys while iterating a live dict view.
 - **SCEPTRE App**: A `power-transmission` inverter raised `TypeError`, passing `infrastructure` twice into `Device()`.
 - **SCEPTRE App**: A `fep` without a mgmt interface raised `UnboundLocalError`, or reused the previous fep's endpoints.
+- **SCORCH hoststats**: Stopping no longer loses final samples.
+- **SCORCH hoststats**: Logs a one-line summary per sample, not full records.
 - **SCEPTRE App**: A historian on a subnet with no OPC server was configured with an unrelated OPC's tag list and no address to collect from. It now gets no tags and a warning naming the subnet.
 - **SCEPTRE App**: OPC, SCADA and historian configs now use case-insensitive matching of MGMT VLAN.
 - **SCORCH pipe**: Unquoted mapping `data` broke the command; now rejected.

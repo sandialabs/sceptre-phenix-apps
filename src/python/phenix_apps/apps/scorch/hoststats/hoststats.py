@@ -2,30 +2,45 @@ import json
 import signal
 import threading
 import time
+from typing import Any
+
+from pydantic import Field
 
 from phenix_apps.apps.scorch import ComponentBase
+from phenix_apps.apps.scorch.app import MetadataBlock, PositiveSeconds
 from phenix_apps.common.logger import logger
 
 
+class HostStatsMetadata(MetadataBlock):
+    """Metadata for the hoststats component; see README.md for each field."""
+
+    pollPeriod: PositiveSeconds = 5.0
+    # None, or anything shorter than pollPeriod (even 0), means "every poll"
+    flushPeriod: float | None = Field(None, allow_inf_nan=False)
+    # read by phenix, not by this component
+    filebeat_inputs: list[dict[str, Any]] | None = Field(None, alias="filebeat.inputs")
+
+    @property
+    def flush_every(self) -> int:
+        """Polls between flushes to host_stats.jsonl (at least 1)."""
+        flush = max(self.flushPeriod or self.pollPeriod, self.pollPeriod)
+        return int(flush / self.pollPeriod)
+
+
 class HostStats(ComponentBase):
+    metadata_model = HostStatsMetadata
+    config: HostStatsMetadata
+
     def __init__(self):
         ComponentBase.__init__(self, "hoststats")
 
-        self.poll_period = self.metadata.get("pollPeriod", 5)
-        self.flush_period = self.metadata.get("flushPeriod", None)
-
-        if self.flush_period is None or self.flush_period < self.poll_period:
-            self.flush_period = self.poll_period
-
         self.resdata = []
-        self.monitor = False
+        self.stopped = threading.Event()
 
         self.execute_stage()
 
     def start(self):
         logger.info(f"Starting user component: {self.name}")
-
-        self.monitor = True
 
         thread = threading.Thread(target=self.__run_monitor)
         thread.start()
@@ -34,7 +49,9 @@ class HostStats(ComponentBase):
 
         # wait for calling process to send SIGTERM
         signal.pause()
-        self.monitor = False
+        # phenix kills the process 10 s after SIGTERM, so the monitor must wake
+        # now rather than finish a long pollPeriod sleep before the last flush
+        self.stopped.set()
 
         logger.info(f"Stopping user component: {self.name}")
 
@@ -46,16 +63,22 @@ class HostStats(ComponentBase):
     def __run_monitor(self):
         count = 0
 
-        while self.monitor:
-            data = self.__get_resdata()
+        while not self.stopped.is_set():
+            # one failed poll (minimega busy or restarting) must not end the
+            # collection for the rest of the run
+            try:
+                data = self.__get_resdata()
+            except Exception as ex:
+                logger.warning(f"host stats poll failed, will retry: {ex}")
+                data = []
 
             if data:
                 self.resdata.extend(data)
 
-            if count % int(self.flush_period / self.poll_period) == 0:
+            if count % self.config.flush_every == 0:
                 self.__flush_buffer()
 
-            time.sleep(self.poll_period)
+            self.stopped.wait(self.config.pollPeriod)
             count += 1
 
     def __flush_buffer(self):
@@ -113,8 +136,14 @@ class HostStats(ComponentBase):
         except TypeError:
             return []
 
-        # print current data so users can see it in UI modal in real-time
-        logger.info(resdata)
+        # A one-line summary per sample for the UI modal; the full records go to
+        # host_stats.jsonl. Logging them whole made multi-KB lines every poll.
+        logger.info(
+            "; ".join(
+                f"{h['compute_name']}: load {h['Load_1']}, {len(h['vm_list'])} VMs"
+                for h in resdata
+            )
+        )
         return resdata
 
 
