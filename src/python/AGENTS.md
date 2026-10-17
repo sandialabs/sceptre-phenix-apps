@@ -62,6 +62,28 @@ SCORCH run directory. Raise exceptions from component logic so
 report the failure. Use the shared logger and do not replace streams outside the
 base class. Register each component's console script in `pyproject.toml`.
 
+Describe new or reworked component metadata as a pydantic model and set it as
+the class's `metadata_model`; `execute_stage()` then parses it into
+`self.config` and reports every bad field at once. Use `self.config` directly
+rather than copying its fields onto the component. Shared field types (`Name`,
+`Token`, `Args`, `Seconds`, `Hostname`, `Interface`, `FilePath`) live in
+`scorch/app.py` (#160); use them for every hostname, interface and path.
+
+Type metadata strictly: `bool` for flags, `AnyHttpUrl` for URLs, IP types for
+addresses, constrained strings for names and paths. A wrong type or malformed
+value fails, even in a field that is not used yet; do not coerce or fall back
+with a warning. Nested blocks subclass `MetadataBlock`, so only an unknown key
+(a likely typo) warns. Make fixed numbers (timeouts, offsets) fields with the
+old value as the default instead of module constants.
+
+A component README is for the person configuring an experiment, and short:
+what it does, what it produces, what it needs first, a field table with real
+defaults, examples, troubleshooting (real error text and the fix), and
+Limitations. Do not explain the validation mechanics or repeat what a table or
+example shows; point to `phenix-scorch-validate` for checking a config. Keep
+the README's existing title. Test the examples with
+`phenix_apps.testing.readme`. CHANGELOG entries are at most 10 words.
+
 ### Scale Plugins
 
 Plugins subclass `ScalePlugin` from `phenix_apps/apps/scale/interface.py`,
