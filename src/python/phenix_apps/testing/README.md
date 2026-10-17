@@ -51,3 +51,18 @@ them in the test if needed.
 
 For non-marker flows, call `build_mock_app(cls, mocker, tmp_path, ...)`
 directly.
+
+## README examples
+
+`phenix_apps.testing.readme` parses the YAML examples in a component README so
+a test can validate them:
+
+```python
+from phenix_apps.testing.readme import readme_components
+
+for component in readme_components(README, "qos"):
+    parse_metadata(QoSMetadata, component["metadata"], component["name"])
+```
+
+`readme_yaml(readme, heading)` returns every parsed ```yaml block in a
+`## heading` section; `readme_section(readme, heading)` returns its text.

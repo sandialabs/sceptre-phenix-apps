@@ -1,0 +1,200 @@
+import io
+import json
+import sys
+
+import pytest
+from pydantic import BaseModel
+
+from phenix_apps.apps.scorch import ComponentBase
+from phenix_apps.apps.scorch.app import (
+    FilePath,
+    Hostname,
+    Interface,
+    MetadataBlock,
+    Token,
+    validate_metadata,
+)
+
+
+class Meta(BaseModel):
+    count: int
+    password: str = ""
+
+
+class Component(ComponentBase):
+    metadata_model = Meta
+
+    def __init__(self):
+        ComponentBase.__init__(self, "test")
+
+    def configure(self):
+        return f"count={self.config.count}"
+
+
+@pytest.fixture
+def run_component(monkeypatch, tmp_path):
+    """Build a component the way phenix calls it, with the given metadata."""
+
+    monkeypatch.setenv("PHENIX_FILES_DIR", str(tmp_path))
+
+    def run(metadata: object, ctype: str | None = "test") -> Component:
+        experiment = {
+            "spec": {
+                "experimentName": "exp",
+                "baseDir": str(tmp_path),
+                "scenario": {
+                    "apps": [
+                        {
+                            "name": "scorch",
+                            "metadata": {
+                                "components": [
+                                    {"name": "c", "type": ctype, "metadata": metadata}
+                                ]
+                            },
+                        }
+                    ]
+                },
+            }
+        }
+        monkeypatch.setattr(sys, "argv", ["x", "configure", "c", "0", "0", "0"])
+        monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(experiment)))
+        return Component()
+
+    return run
+
+
+def status(component: Component) -> dict:
+    (path,) = component.base_dir.glob("configure-*.json")
+    return json.loads(path.read_text())
+
+
+def test_valid_metadata_reaches_the_stage(run_component):
+    component = run_component({"count": 3})
+    component.execute_stage()
+
+    assert status(component)["return"] == "count=3"
+
+
+def test_invalid_metadata_fails_the_stage_with_a_status_file(run_component):
+    component = run_component({"count": "many"})
+
+    with pytest.raises(RuntimeError, match="invalid metadata for component 'c'"):
+        component.execute_stage()
+
+    assert "count: Input should be a valid integer" in status(component)["return"]
+
+
+class Block(MetadataBlock):
+    port: int = 1
+
+
+class Outer(BaseModel):
+    flag: bool = True
+    blocks: list[Block] = []
+    single: Block = Block()
+
+
+def test_unknown_keys_warn_with_the_full_path_and_a_hint():
+    md = {"blocks": [{}, {"prot": 2}], "single": {"other": 1}}
+    _, warnings = validate_metadata(Outer, md, "c")
+
+    assert warnings == [
+        "blocks.1.prot: unknown key, ignored. Fix: remove it (did you mean 'port'?)",
+        "single.other: unknown key, ignored. Fix: remove it (known: port)",
+    ]
+
+
+@pytest.mark.parametrize("value", [None, "maybe", "false", 2, [1]])
+def test_values_are_typed_strictly(value):
+    with pytest.raises(ValueError, match="flag"):
+        validate_metadata(Outer, {"flag": value}, "c")
+
+
+def test_numeric_strings_are_not_coerced():
+    with pytest.raises(ValueError, match="port"):
+        validate_metadata(Outer, {"single": {"port": "6"}}, "c")
+
+
+@pytest.mark.parametrize("metadata", [False, [], 0, ""])
+def test_only_missing_metadata_defaults_to_empty(metadata):
+    with pytest.raises(ValueError, match="invalid metadata"):
+        validate_metadata(Outer, metadata, "c")
+
+
+def test_omitted_type_defaults_to_the_name(run_component):
+    # phenix core treats a component with no type as type == name
+    component = run_component({"count": 3}, ctype=None)
+    component.name = component.type = "c"
+
+    assert component.extract_metadata() == {"count": 3}
+
+
+def test_a_traceback_does_not_leak_metadata_values(run_component, capsys):
+    component = run_component({"count": "many", "password": "hunter2-secret"})
+
+    with pytest.raises(RuntimeError):
+        component.execute_stage()
+
+    assert "hunter2-secret" not in capsys.readouterr().out
+    assert "hunter2-secret" not in json.dumps(status(component))
+
+
+class Fields(BaseModel):
+    host: Hostname | None = None
+    iface: Interface | None = None
+    path: FilePath | None = None
+    token: Token | None = None
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("host", "rtu-1"),
+        ("host", "AD"),
+        ("iface", "eth0"),
+        ("iface", "ens3.100"),
+        ("iface", "br_mgmt"),
+        ("path", "/tmp/out.json"),
+        ("path", "C:/phenix/results.json"),
+        ("path", "relative/dir/file-1.txt"),
+        ("token", "--opt=value"),
+    ],
+)
+def test_shared_field_types_accept(field, value):
+    validate_metadata(Fields, {field: value}, "c")
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("host", "a"),
+        ("host", "x" * 64),
+        ("host", "-rtu"),
+        ("host", "rtu_1"),
+        ("host", "123"),
+        ("host", "phenix"),
+        ("iface", "eth 0"),
+        ("iface", "a" * 16),
+        ("iface", "eth0:1"),
+        ("iface", "../eth0"),
+        ("path", "/out.json&whoami"),
+        ("path", "C:\\phenix\\out.json"),
+        ("path", "/tmp/$(id)"),
+        ("path", "/tmp/*.json"),
+        ("path", "/tmp/a b"),
+        ("token", "rtu#ignored"),
+        ("token", "a\\tb"),
+    ],
+)
+def test_shared_field_types_reject(field, value):
+    with pytest.raises(ValueError, match=field):
+        validate_metadata(Fields, {field: value}, "c")
+
+
+def test_stage_the_component_does_not_implement_skips_metadata(run_component):
+    component = run_component({"count": "many"})
+    component.stage = "cleanup"
+
+    component.execute_stage()  # Component has no cleanup(), so no error
+
+    assert component.config is None
