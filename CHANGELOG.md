@@ -14,8 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **SCEPTRE App**: Stage accounting in the logs: a scenario inventory by device type, and what each handler produced.
 - **SCEPTRE App**: Files in `<assetDir>/injects/override/` that match no injection are reported as probable typos.
 - **SCEPTRE App**: Test suite (128 tests), two of them characterization tests over both stages and all 310 infrastructure/device-type/protocol combinations, plus `apps/sceptre/README.md`.
+- **SCORCH**: Pydantic metadata models for components (#160).
+- **SCORCH**: `phenix-scorch-validate` checks component metadata.
+- **SCORCH erspan**: Pydantic metadata model, `remote_config.port`, `remote_config.ssh_timeout`.
 
 ### Changed
+- **SCORCH erspan**: `ssh_ip` must be an IP; `session_key` an integer.
+- **SCORCH erspan**: Own mirror is named, added, and removed alone.
+- **SCORCH erspan**: `cleanup` reports every failed remote command.
 - **Build System**: `Mako>=1.3.10`, `requests>=2.32.4` (security advisories).
 - **SCEPTRE App**: Register numbering state is per `FieldDeviceConfig` instead of class-level mutable state on `Register`; numbering is no longer order-dependent across configs and the test suite runs safely in parallel. Output is unchanged.
 - **SCEPTRE App**: `configure()` and `pre_start()` are stage classes, `ConfigureStage` and `PreStart`, sharing pre-start state through `PreStartState`.
@@ -32,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **SCEPTRE App**: SunSpec has been burned away by the SCORCHing heat of 3000 Suns and thus no longer exists in this repo.
 
 ### Fixed
+- **SCORCH erspan**: Excluding every VLAN mirrored everything; now an error.
 - **Wind Turbine Scale Plugin**: Stage an optional `container_template.rootfs_source` on each generated VM outside the containers' shared weather volume; mount Node-RED flows at their configured container path. Reject densities that split a turbine's private network across VMs.
 - **SCEPTRE App**: With more than one PowerWorld provider, only the last one's `hil_tags` reached the object list, and only the last one's `objects.txt` was written. Tags now aggregate across providers and every PowerWorld provider gets the combined `objects.txt`.
 - **SCEPTRE App**: `fep` hosts raised `TypeError`, built without the required `device_subtype`.
