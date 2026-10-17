@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **SCEPTRE App**: Stage accounting in the logs: a scenario inventory by device type, and what each handler produced.
 - **SCEPTRE App**: Files in `<assetDir>/injects/override/` that match no injection are reported as probable typos.
 - **SCEPTRE App**: Test suite (128 tests), two of them characterization tests over both stages and all 310 infrastructure/device-type/protocol combinations, plus `apps/sceptre/README.md`.
+- **SCORCH**: Pydantic metadata models for components (#160).
+- **SCORCH**: `phenix-scorch-validate` checks component metadata.
 
 ### Changed
 - **Build System**: `Mako>=1.3.10`, `requests>=2.32.4` (security advisories).
