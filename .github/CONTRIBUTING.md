@@ -78,6 +78,8 @@ We welcome suggestions for improvements! Please open an issue to discuss your id
 
 2. **Make Your Changes**: Implement your changes.
 
+    **Update CODEOWNERS**: The root [`CODEOWNERS`](https://github.com/sandialabs/sceptre-phenix-apps/blob/main/CODEOWNERS) file records who authored each part of the repository, and GitHub uses it to request reviews automatically. If you add an app, SCORCH component, or other new path, add an entry for it with yourself as an owner. If you become a main author of an existing path, add yourself to its entry. If you move, rename, or delete a path, update its entry.
+
 3. **Stage Your Changes**: Use the `git add` command to stage the changes you want to commit. You can stage specific files or all changes:
     To stage specific files:
     ```bash
@@ -132,7 +134,7 @@ We welcome suggestions for improvements! Please open an issue to discuss your id
     git push origin feat/add-user-authentication --force
     ```
     
-6. **Open a Pull Request**: Go to the original repository and open a [pull request](https://github.com/sandialabs/sceptre-phenix-apps/pulls). Provide a clear description of your changes and reference any related issues. Once your pull request is submitted, github actions will run automated tests based on the files that are changed. Ensure that the CI checks pass before assigning a reviewer, or clearly explain why the failures are expected.
+6. **Open a Pull Request**: Go to the original repository and open a [pull request](https://github.com/sandialabs/sceptre-phenix-apps/pulls). Provide a clear description of your changes and reference any related issues. Once your pull request is submitted, github actions will run automated tests based on the files that are changed, and GitHub will request reviews from the code owners of those files. Ensure that the CI checks pass before assigning a reviewer, or clearly explain why the failures are expected.
 
 ## License
 By contributing to this project, you agree that your contributions will be licensed under the [GNU](https://github.com/sandialabs/sceptre-phenix-apps/blob/main/LICENSE) License.
