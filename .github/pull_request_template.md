@@ -23,6 +23,7 @@ Please select the type of change your pull request introduces:
 - [ ] I have included no proprietary/sensitive information in my code or the PR.
 - [ ] I have commented my code, particularly in hard-to-understand areas.
 - [ ] I have made corresponding changes to the documentation.
+- [ ] I have updated `CODEOWNERS` for any new, moved, or deleted paths, and added myself to paths I authored.
 - [ ] I have tested my code (describe below).
 
 ## Testing
