@@ -6,6 +6,7 @@ from pathlib import Path
 import yaml
 
 from phenix_apps.apps.scorch import ComponentBase
+from phenix_apps.apps.scorch.app import MetadataBlock, Seconds
 from phenix_apps.common import utils
 from phenix_apps.common.logger import logger
 
@@ -14,10 +15,23 @@ from .csv_gen import gen_csv
 # TODO: make what's saved configurable (like the experiment)
 # TODO: migrate CSV generation functionality to harmonize (csv_gen.py)
 # TODO: configuration option to specify what components to collect from explicitly
-# TODO: add check to ensure collector is run after all other components it's collecting from in the stop stage
+# TODO: extend the stop-order check to the other components it collects from
+
+
+class CollectorMetadata(MetadataBlock):
+    """Metadata for the collector component; see README.md for each field."""
+
+    collect_iperf: bool = False
+    collect_miniccc: bool = False
+    generate_csv: bool = False
+    # tolerated shortfall of the merged capture against the disruption duration
+    pcap_duration_margin: Seconds = 6.0
 
 
 class Collector(ComponentBase):
+    metadata_model = CollectorMetadata
+    config: CollectorMetadata
+
     def __init__(self):
         ComponentBase.__init__(self, "collector")
 
@@ -29,25 +43,12 @@ class Collector(ComponentBase):
 
         # Determine what scorch components are enabled, and enable lookups
         # by component type (for cases when name and type differ).
-        self.all_components = {
-            c.type: c for c in self.extract_app("scorch").metadata.components
-        }
+        components = self.extract_app("scorch").metadata.components
+        self.all_components = {c.type: c for c in components}
         self.run_config = self.extract_app("scorch").metadata.runs[self.run]
-        self.enabled_components = {}
-
-        # TODO: this doesn't handle multiple instances of same component with different name
-        # However, for the components being collected, there should only be one instance usually.
-        for comp in self.all_components.values():
-            if any(
-                comp.name in run_stage
-                for run_stage in self.run_config.values()
-                if isinstance(run_stage, list)
-            ) or any(
-                comp.name in loop_stage
-                for loop_stage in self.run_config.get("loop", {}).values()
-                if isinstance(loop_stage, list)
-            ):
-                self.enabled_components[comp.type] = comp
+        self.enabled_components = enabled_by_type(components, self.run_config)
+        if self.config.collect_iperf:
+            check_iperf_before_collector(components, self.run_config)
 
         self.execute_stage()
 
@@ -55,6 +56,10 @@ class Collector(ComponentBase):
         logger.info(f"Stopping user component: {self.name}")
 
         record = {}
+
+        # Check what the record needs from the disruption component before
+        # copying anything, so a missing piece fails in seconds, not at the end.
+        disruption_metadata = self._disruption_metadata()
 
         self.results_dir.mkdir()
         self.meta_dir.mkdir()
@@ -84,7 +89,7 @@ class Collector(ComponentBase):
         self._collect_hoststats()
 
         # miniccc logs
-        if self.metadata.get("collect_miniccc", False):
+        if self.config.collect_miniccc:
             logger.info("collecting miniccc data")
             mc_dir = Path(self.base_dir, "miniccc")
             vm_names = self.extract_node_names()
@@ -98,22 +103,19 @@ class Collector(ComponentBase):
 
         # iperf: client, server, histograms
         iperf_dest = None
-        if self.metadata.get("collect_iperf", False):
+        if self.config.collect_iperf:
             if self._check_component("iperf"):
                 iperf_src = self._comp_dir("iperf")
                 iperf_dest = Path(self.results_dir, "iperf")
                 logger.info("copying iperf data")
                 shutil.copytree(iperf_src, iperf_dest)
-                # TODO: remove *.log files if they're empty (no output)?
+                for log in iperf_dest.rglob("*.log"):
+                    if log.stat().st_size == 0:
+                        log.unlink()
             else:
                 logger.error(
                     f"'collect_iperf' is set but 'iperf' component isn't enabled in run/loop stages for run {self.run}"
                 )
-
-        if not self.enabled_components.get("disruption"):
-            raise ValueError(
-                "'disruption' component isn't enabled but is required for collector!"
-            )
 
         # disruption: attack_results, scenario_results, scenario_*
         s_src = self._comp_dir("disruption")
@@ -122,13 +124,11 @@ class Collector(ComponentBase):
         shutil.copytree(s_src, s_dest)
 
         # Use duration for the configured disruption
-        disruption_metadata = self.enabled_components["disruption"].metadata
         configured_duration = float(disruption_metadata.run_duration)
 
         # disruption start time
         start_time_fmt = Path(s_src, "disruption_start_time.txt").read_text()
-        start_time = datetime.fromisoformat(start_time_fmt)
-        assert start_time.tzinfo.tzname(start_time) == "UTC"
+        start_time = _utc_time(start_time_fmt, "disruption_start_time.txt")
         start_time_kibana = utils.kibana_format_time(start_time)
         logger.info(
             f"disruption start time: {start_time_fmt} (kibana format: '{start_time_kibana}')"
@@ -136,24 +136,22 @@ class Collector(ComponentBase):
 
         # disruption stop time
         actual_stop_time_fmt = Path(s_src, "disruption_stop_time.txt").read_text()
-        actual_stop_time = datetime.fromisoformat(actual_stop_time_fmt)
-        assert actual_stop_time.tzinfo.tzname(actual_stop_time) == "UTC"
+        actual_stop_time = _utc_time(actual_stop_time_fmt, "disruption_stop_time.txt")
         actual_stop_time_kibana = utils.kibana_format_time(actual_stop_time)
         logger.info(
             f"disruption stop time (actual): {actual_stop_time_fmt} (kibana format: '{actual_stop_time_kibana}')"
         )
 
         # clamp the stop time to be start_time + configured duration
-        stop_time_modified = start_time + timedelta(seconds=configured_duration)  # type: datetime
-        assert stop_time_modified <= actual_stop_time
-        assert stop_time_modified.tzinfo.tzname(actual_stop_time) == "UTC"
+        stop_time_modified = start_time + timedelta(seconds=configured_duration)
         stop_time_modified_fmt = stop_time_modified.isoformat()
         stop_time_modified_kibana = utils.kibana_format_time(stop_time_modified)
         logger.info(
             f"disruption stop time (modified): {stop_time_modified_fmt} (kibana format: '{stop_time_modified_kibana}')"
         )
 
-        # duration of the disruption (stop - start)
+        # duration of the disruption (stop - start); the check below also
+        # covers a stop time earlier than start + run_duration
         duration_actual = (actual_stop_time - start_time).total_seconds()
         logger.info(f"disruption duration (actual)     : {duration_actual}")
         logger.info(f"disruption duration (configured) : {configured_duration}")
@@ -261,7 +259,7 @@ class Collector(ComponentBase):
         # Uses Elasticsearch configuration from the 'rtds' component metadata
         # TODO: move to harmonize, just do basic validation of data here
         # TODO: run count query to verify number of expected docs
-        if self.metadata.get("generate_csv", False):
+        if self.config.generate_csv:
             if not self._check_component("rtds"):
                 raise ValueError(
                     "'generate_csv' is true but 'rtds' component not enabled (CSV generation only works for RTDS)"
@@ -315,7 +313,7 @@ class Collector(ComponentBase):
 
         # Read Provider config
         ini_path = self.meta_dir / "config.ini"
-        if not ini_path.is_file() and ini_path.read_text():
+        if not ini_path.is_file() or not ini_path.read_text().strip():
             raise RuntimeError("Non-existent or empty config.ini from provider")
 
         pconf = configparser.ConfigParser()
@@ -341,7 +339,7 @@ class Collector(ComponentBase):
             # {PMU1: BUS7, ...}
             for p in yaml_conf["pmu"]["pmus"]:
                 data["pmus"][p["name"]] = p["label"]
-            logger.info(f"{len({data['pmus']})} PMUs")
+            logger.info(f"{len(data['pmus'])} PMUs")
         else:
             logger.info(
                 f"WARNING: No PMUs defined for {data['simulator']} Provider, skipping adding PMU names to record..."
@@ -426,14 +424,21 @@ class Collector(ComponentBase):
             dis_configured_duration = float(
                 self.enabled_components["disruption"].metadata.run_duration
             )
-            expected_cap_duration = float(
-                pcap_metadata["merged.pcap"]["Capture duration (seconds)"]
-            )
+            merged = pcap_metadata.get("merged.pcap")
+            if merged is None:
+                logger.warning(
+                    "no merged.pcap (pcap's create_merged_pcap is off), "
+                    "skipping the capture duration check"
+                )
+                return pcap_metadata
+            expected_cap_duration = float(merged["Capture duration (seconds)"])
 
-            if (expected_cap_duration + 6.0) < dis_configured_duration:
+            if (
+                expected_cap_duration + self.config.pcap_duration_margin
+            ) < dis_configured_duration:
                 raise RuntimeError(
                     f"Capture duration {expected_cap_duration} seconds is "
-                    f"more than 6.0 seconds less than configured disruption "
+                    f"more than {self.config.pcap_duration_margin} seconds less than configured disruption "
                     f"duration of {dis_configured_duration} seconds"
                 )
 
@@ -444,20 +449,48 @@ class Collector(ComponentBase):
         NOTE: the output dir is the components *name*, not the *type*.
         Have to lookup name from the type.
         """
-        component_name = self.all_components[component_type].name
-
-        # TODO: this won't work for things run in configure stage before loops start
-        #   workaround this by determining where each component is configured.
-        pth = Path(
-            self.files_dir,
-            f"scorch/run-{self.run}/{component_name}/loop-{self.loop}-count-{self.count}",
+        # the enabled instance, when there is one: a scenario often defines
+        # several components of a type (one disruption per permutation)
+        component = self.enabled_components.get(
+            component_type, self.all_components[component_type]
         )
+        component_name = component.name
+
+        # Components run in configure, before any loop starts, write to the
+        # run-level folder (loop-0-count-0), so fall back to it.
+        run_dir = Path(self.files_dir, f"scorch/run-{self.run}/{component_name}")
+        pth = run_dir / f"loop-{self.loop}-count-{self.count}"
+        if not pth.is_dir():
+            pth = run_dir / "loop-0-count-0"
         if not pth.is_dir():
             raise RuntimeError(
-                f"Output directory doesn't exist for scorch component '{component_type}' (name={component_name}): {pth}"
+                f"Output directory doesn't exist for scorch component '{component_type}' (name={component_name}): {run_dir}/loop-{self.loop}-count-{self.count}"
             )
 
         return pth
+
+    def _disruption_metadata(self):
+        """The enabled disruption component's metadata, checked for what the
+        experiment record reads from it."""
+
+        disruption = self.enabled_components.get("disruption")
+        if not disruption:
+            raise ValueError(
+                "the collector needs a 'disruption' component in this run's "
+                "stages, but none is enabled"
+            )
+        md = disruption.get("metadata") or {}
+        missing = [
+            k
+            for k in ("current_disruption", "permutation", "run_duration")
+            if md.get(k) is None
+        ]
+        if missing:
+            raise ValueError(
+                f"disruption component '{disruption.name}' is missing "
+                f"{', '.join(missing)}, which the collector's experiment record needs"
+            )
+        return md
 
     def _check_component(self, component_type: str) -> bool:
         """Check if component is enabled for this run, and if not, log the fact."""
@@ -467,6 +500,53 @@ class Collector(ComponentBase):
             )
             return False
         return True
+
+
+def enabled_by_type(components: list, run_config) -> dict:
+    """The component of each type that this run uses, keyed by type.
+
+    A component is used if its name is in one of the run's stage lists,
+    including the loop's. A scenario often defines several of a type (one
+    disruption per permutation) and enables one per run; if a run enables
+    several, the first listed in the scenario wins.
+    """
+
+    stages = [s for s in run_config.values() if isinstance(s, list)]
+    stages += [s for s in run_config.get("loop", {}).values() if isinstance(s, list)]
+    used = {name for stage in stages for name in stage}
+
+    enabled: dict = {}
+    for comp in components:
+        if comp.name in used:
+            enabled.setdefault(comp.type, comp)
+    return enabled
+
+
+def check_iperf_before_collector(components: list, run_config) -> None:
+    """iperf writes its results in `stop`, so with `collect_iperf` it must be
+    listed before the collector in every `stop` list that has both."""
+
+    types = {c.name: c.type for c in components}
+    stops = [run_config.get("stop") or [], run_config.get("loop", {}).get("stop") or []]
+    for stop in stops:
+        kinds = [types.get(n) for n in stop]
+        if "collector" in kinds and "iperf" in kinds:
+            last_iperf = len(kinds) - 1 - kinds[::-1].index("iperf")
+            if last_iperf > kinds.index("collector"):
+                raise ValueError(
+                    "'collect_iperf' is set but 'iperf' is listed after "
+                    f"'collector' in the stop stage {stop}: the collector would "
+                    "copy iperf's results before they are written; list iperf first"
+                )
+
+
+def _utc_time(text: str, source: str) -> datetime:
+    """Parse a disruption timestamp file, which must hold a UTC ISO time."""
+
+    when = datetime.fromisoformat(text.strip())
+    if when.utcoffset() != timedelta(0):
+        raise RuntimeError(f"{source} is not a UTC time: {text!r}")
+    return when
 
 
 def main():

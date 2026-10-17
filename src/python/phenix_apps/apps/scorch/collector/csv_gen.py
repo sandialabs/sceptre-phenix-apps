@@ -1,7 +1,6 @@
 import argparse
 import csv
 import math
-import sys
 import timeit
 from collections import defaultdict
 from operator import itemgetter
@@ -44,10 +43,9 @@ def gen_csv(
             try:
                 iperf_raw[pair_name] = utils.read_json(iperf_file)
             except Exception as ex:
-                utils.eprint(
+                raise RuntimeError(
                     f"failed to read iperf data for pair {pair_name} from file {iperf_file}: {ex}"
-                )
-                sys.exit(1)
+                ) from ex
 
         iperf_data = {}  # type: dict[str, dict[int, dict]]
         for pair_name, raw_values in iperf_raw.items():
@@ -81,7 +79,12 @@ def gen_csv(
 
     # real and angle for VA/VB/VC/IA/IB/IC
     channels = ["VA", "VB", "VC", "IA", "IB", "IC"]
-    pmus = record["rtds"]["pmus"]
+    pmus = record.get("provider", {}).get("pmus")
+    if not pmus:
+        raise RuntimeError(
+            "the experiment record has no PMUs (record['provider']['pmus']); "
+            "the CSV needs the RTDS provider config"
+        )
     for pmu_name, pmu_label in pmus.items():
         for channel in channels:
             csv_header.append(f"{channel}_angle_{pmu_name}_{pmu_label}")
@@ -157,8 +160,7 @@ def gen_csv(
 
     es_rtds.close()  # disconnect from Elasticsearch
     if not all_docs:
-        utils.eprint("No docs were retrieved from Elasticsearch!")
-        sys.exit(1)
+        raise RuntimeError("No docs were retrieved from Elasticsearch!")
 
     proc_start = timeit.default_timer()
     utils.print_msg(f"Processing {len(all_docs)} docs...")
@@ -170,10 +172,9 @@ def gen_csv(
         m_time = doc["measurement.time"]
         r_ts = parse_time(doc["rtds_time"]).timestamp()
         if not math.isclose(m_time, r_ts, rel_tol=1e-12):
-            utils.eprint(
+            raise RuntimeError(
                 f"measurement.time {m_time} is not close to rtds_time {r_ts}, something is wrong with the rtds provider code"
             )
-            sys.exit(1)
 
         sceptre_time = parse_time(doc["sceptre_time"])
         assert sceptre_time.tzinfo.tzname(sceptre_time) == "UTC"
@@ -247,16 +248,14 @@ def gen_csv(
     # checks that first doc and last doc are within the time range
     first_ts = parse_time(ground_truth[time_steps[0]][0]["sceptre_time"])
     if first_ts < start_time:
-        utils.eprint(
+        raise RuntimeError(
             f"first timestamp in time steps of {first_ts} < start_time of {start_time}!\nfirst_ts: {first_ts}\nstart_time: {start_time}"
         )
-        sys.exit(1)
     last_ts = parse_time(ground_truth[time_steps[-1]][0]["sceptre_time"])
     if last_ts > stop_time_modified:
-        utils.eprint(
+        raise RuntimeError(
             f"last timestamp in time steps of {last_ts} > stop_time_modified of {stop_time_modified}!\nlast_ts: {last_ts}\nstop_time_modified: {stop_time_modified}"
         )
-        sys.exit(1)
 
     # This assumes PMU polling rate of 30hz
     expected_count = int(30 * configured_duration)
@@ -274,10 +273,9 @@ def gen_csv(
     # elif len(time_steps) != expected_count:
     # TODO: loosening this quite a bit for now.
     elif len(time_steps) < expected_count - 10:
-        utils.eprint(
+        raise RuntimeError(
             f"number of time_steps {len(time_steps)} != expected count of {expected_count} (30 * {configured_duration} seconds)"
         )
-        sys.exit(1)
 
     pmu_names = list(pmus.keys())
 
@@ -308,10 +306,9 @@ def gen_csv(
             pmu_zero = nested[time_step][pmu_names[0]][channels[0]]
 
             if not pmu_zero:
-                utils.eprint(
+                raise RuntimeError(
                     f"No PMU data for time step {time_step} (sequence={sequence})"
                 )
-                sys.exit(1)
 
             row = [
                 # sequence
@@ -355,8 +352,9 @@ def gen_csv(
                     try:
                         row.append(doc["measurement.phasor.angle"])
                     except Exception as ex:
-                        utils.eprint(f"bad doc: {doc!r}\nexception: {ex!s}")
-                        sys.exit(1)
+                        raise RuntimeError(
+                            f"bad doc: {doc!r}\nexception: {ex!s}"
+                        ) from ex
                     row.append(doc["measurement.phasor.real"])
 
             # Write freq and dfreq for each PMU
