@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **SCORCH**: Pydantic metadata models for components (#160).
 - **SCORCH**: `phenix-scorch-validate` checks component metadata.
 - **SCORCH pipe**: Metadata model.
+- **SCORCH disruption**: Metadata model with new margin, args, OS fields.
 
 ### Changed
 - **OT-sim App**: DNP3 address assignment is a module function (`protocols.dnp3.assign_addresses`)
@@ -59,6 +60,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **SCEPTRE App**: OPC, SCADA and historian configs now use case-insensitive matching of MGMT VLAN.
 - **SCORCH pipe**: Unquoted mapping `data` broke the command; now rejected.
 - **SCORCH pipe**: minimega expanded backslashes in `data`; they are now sent as written.
+- **SCORCH disruption**: `start` no longer fails in an hour's last second.
+- **SCORCH disruption**: `dos` waits for `start_delay` plus attack time.
+- **SCORCH disruption**: MGMT interface matched in any case; too-long `start_delay` rejected.
+- **SCORCH disruption**: Failed physical stages are all reported; short dos attacks warn.
 
 ### Security
 - **Common**: New `validate_hostname()` (phenix v2026.10.02 rules) and `safe_join()` guard hostnames and paths built from metadata; `mm_send()`/`mm_recv()` stay inside the miniccc mount. **Breaking:** rejects `_`, 1-char, all-digit, `all` and `phenix` hostnames.
