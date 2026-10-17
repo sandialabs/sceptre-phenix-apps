@@ -1,4 +1,5 @@
 import shutil
+import subprocess
 from pathlib import Path
 
 from phenix_apps.apps.scorch import ComponentBase
@@ -47,9 +48,8 @@ class PCAP(ComponentBase):
         bpf_filter = self.metadata.get("filter")
         if bpf_filter:
             logger.info(f"applying pcap BPF filter: '{bpf_filter}'")
-            self.mm.capture_pcap_filter(
-                f"'{bpf_filter}'"
-            )  # single quotes are needed here
+            # single quotes are needed here
+            self.mm.capture_pcap_filter(f"'{utils._validate_mm_filter(bpf_filter)}'")
 
         # https://wiki.wireshark.org/SnapLen
         snaplen = self.metadata.get("snaplen")
@@ -191,7 +191,7 @@ class PCAP(ComponentBase):
                         frag_path = t_path.with_stem(f"{t_path.stem}_fragmented")
                         # give tshark 2 minutes to complete
                         utils.run_command(
-                            f'tshark -r {t_path} -w {frag_path} -o ip.defragment:FALSE -o tcp.desegment_tcp_streams:FALSE -n -Y "ip.frag_offset > 0"',
+                            self._tshark_split(t_path, frag_path, "ip.frag_offset > 0"),
                             timeout=120.0,
                         )
                         fragmented.append(frag_path)
@@ -199,7 +199,9 @@ class PCAP(ComponentBase):
                         nd_path = t_path.with_stem(f"{t_path.stem}_no_dos_fragments")
                         # give tshark 2 minutes to complete
                         utils.run_command(
-                            f'tshark -r {t_path} -w {nd_path} -o ip.defragment:FALSE -o tcp.desegment_tcp_streams:FALSE -n -Y "not (ip.frag_offset > 0)"',
+                            self._tshark_split(
+                                t_path, nd_path, "not (ip.frag_offset > 0)"
+                            ),
                             timeout=120.0,
                         )
                         non_dos.append(nd_path)
@@ -253,7 +255,18 @@ class PCAP(ComponentBase):
                 logger.info(
                     f"running PCAP --> JSON conversion (source={pcap_path.name}, dest={json_path.name})"
                 )
-                utils.run_command(f"tshark -r {pcap_path} -T ek > {json_path}")
+                with json_path.open("w") as json_file:
+                    proc = subprocess.run(
+                        ["tshark", "-r", str(pcap_path), "-T", "ek"],
+                        stdout=json_file,
+                        stderr=subprocess.PIPE,
+                        check=False,
+                    )
+                if proc.returncode != 0:
+                    raise RuntimeError(
+                        f"PCAP --> JSON conversion of {pcap_path.name} failed: "
+                        f"{proc.stderr.decode(errors='replace').strip()}"
+                    )
         else:
             logger.info("PCAP --> JSON conversion disabled")
 
@@ -268,10 +281,8 @@ class PCAP(ComponentBase):
         if overwriting:
             merged_path = merged_path.with_stem("temp_merged")
 
-        mergecap_cmd = f"mergecap -w {merged_path}"
-        for pcap_path in pcap_paths:
-            mergecap_cmd += f" {pcap_path}"
-
+        mergecap_cmd = ["mergecap", "-w", str(merged_path)]
+        mergecap_cmd += [str(p) for p in pcap_paths]
         utils.run_command(mergecap_cmd, timeout=60.0)  # this shouldn't take long
 
         if not merged_path.is_file():
@@ -285,9 +296,26 @@ class PCAP(ComponentBase):
 
         return merged_path
 
+    @staticmethod
+    def _tshark_split(src: Path, dst: Path, display_filter: str) -> list[str]:
+        return [
+            "tshark",
+            "-r",
+            str(src),
+            "-w",
+            str(dst),
+            "-o",
+            "ip.defragment:FALSE",
+            "-o",
+            "tcp.desegment_tcp_streams:FALSE",
+            "-n",
+            "-Y",
+            display_filter,
+        ]
+
     def _dedupe_pcap(self, pcap_path: Path) -> None:
         dd_path = Path(self.base_dir, "deduped.pcap")
-        utils.run_command(f"editcap -d {pcap_path} {dd_path}", timeout=60.0)
+        utils.run_command(["editcap", "-d", str(pcap_path), str(dd_path)], timeout=60.0)
 
         if not dd_path.is_file():
             raise RuntimeError(

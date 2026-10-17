@@ -15,6 +15,7 @@ metadata:
   ip: <string> # (REQUIRED) Login IP of the Remote Collection Server. 
   user: <string> # (REQUIRED) User name of the Remote Collection Server. 
   password: <string> # (OPTIONAL) Password of the Remote Collection Server. If not provided, the connection will be attempted without a password, meaning and SSH key will need to be already established with the remote server and available at the default location ($HOME/.ssh). If running phenix in a container, the SSH key will need to be in /root/.ssh in the container.
+  known_hosts: <string> # (OPTIONAL) Path to a known_hosts file holding the server's host key. If provided, unknown host keys are rejected. If not, the presented host key is trusted automatically and a warning is logged.
   cmds: 
     - <string> # (REQUIRED) Command to execute on the Remote Collection Server.
     - <string> # (OPTIONAL) Additional Commands to execute on the Remote Collection Server.

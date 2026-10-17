@@ -1,17 +1,19 @@
-import os
 import subprocess
+import tempfile
 import time
 import uuid
+from typing import Final
 
 from box import Box
 
 from phenix_apps.apps.scorch import ComponentBase
 from phenix_apps.common import utils
 from phenix_apps.common.logger import logger
+from phenix_apps.common.settings import SCORCH_HOST_VALIDATORS
 
 # This can be changed here to reflect your directory structure on hosts as a default.
 # This is overwritten if a value is provided via goartPath
-GOART_BASE = "/phenix/art"
+GOART_BASE: Final[str] = "/phenix/art"
 
 
 class AtomicRedTeam(ComponentBase):
@@ -102,34 +104,38 @@ class AtomicRedTeam(ComponentBase):
             utils.mm_exec_wait(mm, hostname, cmd)
             time.sleep(5)
             logger.info(f"retrieving results: {out_file}")
-            results_file = os.path.join(self.base_dir, f"{hostname}.json")
+            results_file = self.base_dir / f"{hostname}.json"
 
             try:
                 utils.mm_recv(mm, hostname, out_file, results_file)
+                if not results_file.is_file():
+                    raise FileNotFoundError(f"{results_file} not found after transfer")
                 logger.info(f"results_file path: {results_file}")
-                logger.info(f"results_file exists: {os.path.exists(results_file)}")
             except Exception as ex:
                 raise RuntimeError(
                     f"failed to get results file from {hostname}: {ex}"
                 ) from ex
 
             validator = self.metadata.get("validator", None)
-            if validator:
+            if validator and not SCORCH_HOST_VALIDATORS:
+                logger.warning(
+                    f"skipping host-side validator for {hostname}: "
+                    "host-side commands are disabled by PHENIX_SCORCH_HOST_VALIDATORS=0"
+                )
+            elif validator:
                 logger.info(f"validating results from {hostname}")
-
-                tempfile = f"/tmp/{uuid.uuid4()!s}.sh"
-                with open(tempfile, "w") as tf:
-                    tf.write(validator)
 
                 results = Box.from_json(filename=results_file)
 
-                proc = subprocess.run(
-                    ["sh", tempfile, hostname],
-                    input=results.Executor.ExecutedCommand.results.encode(),
-                    capture_output=True,
-                )
+                with tempfile.NamedTemporaryFile("w", suffix=".sh") as tf:
+                    tf.write(validator)
+                    tf.flush()
 
-                os.remove(tempfile)
+                    proc = subprocess.run(
+                        ["sh", tf.name, hostname],
+                        input=results.Executor.ExecutedCommand.results.encode(),
+                        capture_output=True,
+                    )
 
                 if proc.returncode != 0:
                     stderr = proc.stderr.decode()

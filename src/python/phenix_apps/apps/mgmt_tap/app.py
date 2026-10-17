@@ -1,11 +1,17 @@
 import ipaddress
 import socket
+from typing import Final
 
 import minimega
 
 from phenix_apps.apps import AppBase
 from phenix_apps.common.logger import logger
-from phenix_apps.common.utils import _mm_init, mm_compute_cmd, mm_host_info
+from phenix_apps.common.utils import (
+    _mm_init,
+    mm_compute_cmd,
+    mm_host_info,
+    validate_ovs_name,
+)
 
 
 class MgmtTap(AppBase):
@@ -24,7 +30,7 @@ class MgmtTap(AppBase):
             bridge: phenix
     """
 
-    DEFAULT_BRIDGE = "phenix"
+    DEFAULT_BRIDGE: Final[str] = "phenix"
 
     def __init__(self, name: str, stage: str, dryrun: bool = False) -> None:
         super().__init__(name, stage, dryrun)
@@ -57,12 +63,12 @@ class MgmtTap(AppBase):
         bridge = self.metadata.get("bridge", None) if self.metadata else None
         if bridge:
             logger.debug(f"Using bridge '{bridge}' from app metadata")
-            return bridge
+            return validate_ovs_name(bridge, "bridge")
 
         bridge = self.experiment.spec.get("defaultBridge", None)
         if bridge:
             logger.debug(f"Using experiment default bridge '{bridge}'")
-            return bridge
+            return validate_ovs_name(bridge, "bridge")
 
         logger.debug(f"Falling back to bridge '{self.DEFAULT_BRIDGE}'")
         return self.DEFAULT_BRIDGE
