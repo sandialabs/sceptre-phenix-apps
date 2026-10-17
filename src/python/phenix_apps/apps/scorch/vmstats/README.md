@@ -1,6 +1,6 @@
 # vmstats Component
 
-Collects resource utilization statistics from VMs in the experiment, using the `vmstats` command.
+Collects resource utilization statistics from Linux VMs in the experiment, using the `vmstat` command.
 
 ```
 type:   vmstats
@@ -8,59 +8,54 @@ exe:    phenix-scorch-component-vmstats
 stages: start, stop
 ```
 
-## Notes
-- Statistics collected include memory usage, CPU times, IO counters, and process counts, among other statistics. See the section at the end of this README for a complete list.
-- Only Linux hosts are supported, and the `vmstat` command must be available and on the path.
-- Routers (VyOS) are not currently supported, since it uses a older version of `vmstat` that is missing arguments used by this component. If this functionality is needed, it shouldn't be too much work to fix this compatibility issue.
-- Compatible `os_type` (from phenix topology): `linux`, `centos`, `rhel`
-- Stats are written to the file `/vmstat.out` in the VM, which is a plain-text file. During the `stop` stage, this file is transferred to the host and parsed. The results from all hosts are combined and written to `vm_stats.jsonl` in JSON lines format (one JSON object per line). This file is needed for filebeat to ingest into Elasticsearch.
+| Stage | What it does |
+|---|---|
+| `start` | Tags each chosen VM `vmstat=1` and starts `vmstat -n -t <pollPeriod>` in the background in each Linux VM, appending to `/vmstat.out` in the VM. Does not wait for `vmstat` to start or finish; the stage ends once the commands are sent. |
+| `stop` | Stops `vmstat` on each VM, waits `stopWait` seconds, copies each VM's `/vmstat.out` back, deletes it from the VMs, and writes every sample to `vm_stats.jsonl`. |
 
+List it in both `start` and `stop` of the run. It does not need
+`background: true`: `start` does not wait for `vmstat`.
 
-## Metadata Options
+## What you get
 
-```yaml
-metadata:
-  pollPeriod: <integer>  # (Optional) Rate at which statistics are sampled ('-t' argument to 'vmstat'). Default: 1 (every second)
-  vms: <list of strings>  # (Optional) List of hostnames of VMs to run vmstats on. If empty or unspecified, this is run on all supported hosts in the topology (Linux VMs).
-  filebeat.inputs:
-    - type: filestream
-      id: vmstats-input
-      enabled: true
-      paths:
-        - vm_stats.jsonl
-      parsers:
-        - ndjson:
-            target: "vmstats"
-            add_error_key: true
-      processors:
-        - timestamp:
-            field: vmstats.UTC
-            layouts:
-              - '2006-01-02 15:04:05'
-            test:
-              - '2024-02-29 17:49:29'
-        - drop_fields:
-            fields:
-              - vmstats.UTC  # this gets parsed and copied to @timestamp, no reason to keep around
-              - input.type  # drop 'input.type', since it will always be 'filestream'
+In the component's run folder
+(`<files>/scorch/run-<run index>/<component name>/loop-<loop>-count-<count>/`):
+
+```
+<vm>.out                  each VM's raw vmstat output
+vm_stats.jsonl            one JSON object per VM per sample (fields below)
+<stage>-<UTC time>.json   the SCORCH status files (logs, and the error on failure)
 ```
 
-The `filebeat.inputs` section above can be blindly copied into user's own config and used as-is, or users can choose to change target field names if the ones used above aren't suitable.
+## Before you start
 
-## Example Configuration
+- **Linux VMs with `vmstat` on the path.** Without `vms`, every VM
+  whose topology `hardware.os_type` is `linux`, `centos`, `rhel`, `vyos` or `vyatta` is used.
+  Commands only reach VMs whose miniccc agent reports Linux, so a non-Linux VM listed
+  in `vms` collects nothing and fails `stop`.
+- **miniccc must be running in the VMs.**
+
+## Metadata
+
+| Field | Type | Default | Meaning |
+|---|---|---|---|
+| `pollPeriod` | whole number > 0 | `1` | Seconds between samples (vmstat's delay) |
+| `stopWait` | seconds, 0 or more | `5` | Time to wait after stopping vmstat, before collecting |
+| `vms` | non-empty list of VM names | every Linux VM | VMs to sample. Shorthand such as `load[1-5]` expands to `load1` ... `load5`. Names have no whitespace, quotes, `/`, `#` or `\` |
+| `filebeat.inputs` | list | | Filebeat inputs for phenix (see the example) |
+
+## Examples
 
 ```yaml
 components:
-  - name: vmstats-example
+  - name: vmstats
     type: vmstats
     metadata:
       pollPeriod: 1
       vms:
         - power-provider
         - attacker
-        - load5
-        - gen2
-        - br75
+        - load[5-6]
       filebeat.inputs:
         - type: filestream
           id: vmstats-input
@@ -69,24 +64,52 @@ components:
             - vm_stats.jsonl
           parsers:
             - ndjson:
-                target: "vmstats"
+                target: vmstats
                 add_error_key: true
           processors:
             - timestamp:
                 field: vmstats.UTC
                 layouts:
-                  - '2006-01-02 15:04:05'
+                  - "2006-01-02 15:04:05"
                 test:
-                  - '2024-02-29 17:49:29'
+                  - "2024-02-29 17:49:29"
+            # copied to @timestamp above, so no need to keep it
             - drop_fields:
                 fields:
                   - vmstats.UTC
-                  - input.type
+                  - input.type   # always "filestream"
+runs:
+  - configure: []
+    start: [vmstats]
+    stop: [vmstats]
+    cleanup: []
 ```
 
-## vmstats Data Fields
+To check a config before an experiment: `phenix-scorch-validate scenario.yaml`
 
-These are nested under `vmstats.*` in the filebeat-ingested data in Elasticsearch, e.g. `vmstats.r`.
+## Troubleshooting
+
+| Error | Cause and fix |
+|---|---|
+| `no vmstat.out from N VM(s) (the others were collected): <vms>` | Those VMs produced no output: not Linux (as miniccc reports it), no `vmstat`, miniccc not running, or the VM was down. The other VMs' samples are in `vm_stats.jsonl`. |
+| warning `skipped N unreadable line(s) from <vm>` | Lines that are not samples, usually the last one cut short when vmstat was stopped. A few are normal. |
+| Elasticsearch documents have no timestamp | The VM is not on UTC, so the timestamp column has another name. Set the VMs to UTC, or change `vmstats.UTC` in the Filebeat input. |
+| `pollPeriod: Input should be greater than 0` | `pollPeriod` must be a whole number of seconds, 1 or more. |
+
+## Limitations
+
+- On a VM whose `vmstat` has no `-t` (procps before 3.3, such as VyOS
+  routers), the component adds the timestamps itself, in UTC, using `stdbuf`
+  when the VM has it. Without `stdbuf`, vmstat may buffer its output and
+  several samples can get the same timestamp. This path is untested on a real
+  VyOS image.
+
+## Record fields
+
+Each `vm_stats.jsonl` record has `vm_name`, the sample time under the timezone's
+name (`UTC` on a VM set to UTC), and vmstat's columns. With the Filebeat input
+above they are nested under `vmstats.*` in Elasticsearch, for example
+`vmstats.r`.
 
 References:
 - https://www.redhat.com/sysadmin/linux-commands-vmstat
@@ -101,8 +124,6 @@ Data collected:
     - free: the amount of idle memory
     - buff: the amount of memory used as buffers
     - cache: the amount of memory used as cache.
-    - inact: the amount of inactive memory. (-a option)
-    - active: the amount of active memory. (-a option)
 - Swap
     - si: Amount of memory swapped in from disk (/s).
     - so: Amount of memory swapped to a block device (/s).
@@ -111,7 +132,7 @@ Data collected:
     - bo: Blocks sent to a block device (blocks/s).
 - System
     - in: The number of interrupts per second, including the clock.
-    - cs: The number of context switcher per second.
+    - cs: The number of context switches per second.
 - CPU
     - These are percentages of total CPU time.
     - us: Time spent running non-kernel code. (user time, including nice time)
