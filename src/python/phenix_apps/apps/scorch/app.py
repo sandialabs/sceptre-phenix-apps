@@ -1,3 +1,4 @@
+import difflib
 import io
 import json
 import os
@@ -8,14 +9,125 @@ import time
 from contextlib import redirect_stderr, redirect_stdout
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Annotated, Any, ClassVar
 
 import minimega
 from box import Box
 from elasticsearch import Elasticsearch
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+)
 
 from phenix_apps.common import utils
+from phenix_apps.common.error import AppError
 from phenix_apps.common.logger import logger, phenix_stderr_sink
 from phenix_apps.common.settings import PHENIX_DIR
+
+# Metadata rules. Values are validated in pydantic's strict mode: a wrong type
+# (the string "false" for a bool, "6" for an int) or a malformed value fails the
+# stage, even in a field that is not used yet, so a config is either valid or
+# rejected up front. Only an unknown key in a MetadataBlock, usually a typo, is
+# a warning, logged with a did-you-mean hint.
+
+
+def _hostname(value: str) -> str:
+    try:
+        return utils.validate_hostname(value)
+    except AppError:
+        raise ValueError(
+            "not a valid hostname: 2 to 63 letters, digits and interior hyphens"
+        ) from None
+
+
+# Field types for metadata models. Names, interfaces and paths are interpolated
+# into commands (minimega joins its arguments with spaces, treats `#` as a
+# comment and `\` as an escape), so a Token is one word with none of those or
+# quotes; Args is free text appended inside a single-quoted `bash -c '...'`.
+Name = Annotated[str, Field(pattern=r"^[A-Za-z0-9][\w.-]*$")]
+Token = Annotated[str, Field(pattern=r"""^[^\s'"#\\]+$""")]
+Args = Annotated[str, Field(pattern=r"^[^'\r\n]*$")]
+# A topology node name, by phenix core's rules (utils.validate_hostname).
+Hostname = Annotated[str, AfterValidator(_hostname)]
+# A Linux interface name: at most 15 characters (IFNAMSIZ), no `/`, `:` or
+# whitespace. phenix's schema leaves interface names unconstrained.
+Interface = Annotated[str, Field(pattern=r"^[A-Za-z0-9_][\w.-]{0,14}$")]
+# A file path on a Linux or Windows VM, with forward slashes (Windows accepts
+# them; minimega would eat a backslash). No shell or cmd.exe metacharacters, so
+# it is safe unquoted in `rm`, `del` or a minimega file command.
+FilePath = Annotated[str, Field(pattern=r"^(?:[A-Za-z]:)?[\w./+@-]+$")]
+Seconds = Annotated[float, Field(ge=0, allow_inf_nan=False)]
+PositiveSeconds = Annotated[float, Field(gt=0, allow_inf_nan=False)]
+
+
+class MetadataBlock(BaseModel):
+    """A nested metadata block. Unknown keys are kept but warned about, since
+    they are usually typos the old code silently ignored."""
+
+    model_config = ConfigDict(extra="allow")
+
+
+def _unknown_keys(model: BaseModel, path: str = "") -> list[str]:
+    """Warnings for unknown keys in every MetadataBlock below model."""
+
+    prefix = f"{path}." if path else ""
+    found = []
+    if isinstance(model, MetadataBlock):
+        known = list(type(model).model_fields)
+        for key in model.model_extra or {}:
+            close = difflib.get_close_matches(key, known, n=1, cutoff=0.6)
+            hint = (
+                f"did you mean '{close[0]}'?" if close else "known: " + ", ".join(known)
+            )
+            found.append(
+                f"{prefix}{key}: unknown key, ignored. Fix: remove it ({hint})"
+            )
+    for name in type(model).model_fields:
+        value = getattr(model, name)
+        if isinstance(value, BaseModel):
+            found += _unknown_keys(value, f"{prefix}{name}")
+        elif isinstance(value, list):
+            for index, item in enumerate(value):
+                if isinstance(item, BaseModel):
+                    found += _unknown_keys(item, f"{prefix}{name}.{index}")
+    return found
+
+
+def validate_metadata[M: BaseModel](
+    model: type[M], metadata: dict[str, Any] | None, component: str
+) -> tuple[M, list[str]]:
+    """Validate a component's metadata, returning the model and its warnings.
+
+    Raises one ValueError listing every fatal problem. Field values are left
+    out of messages so nothing sensitive reaches the status file or logs.
+    """
+
+    try:
+        config = model.model_validate({} if metadata is None else metadata, strict=True)
+    except ValidationError as ex:
+        problems = "\n".join(
+            f"  {'.'.join(str(p) for p in err['loc']) or '(metadata)'}: {err['msg']}"
+            for err in ex.errors()
+        )
+        raise ValueError(
+            f"invalid metadata for component '{component}' "
+            f"({ex.error_count()} problem(s)):\n{problems}"
+        ) from None
+    return config, _unknown_keys(config)
+
+
+def parse_metadata[M: BaseModel](
+    model: type[M], metadata: dict[str, Any] | None, component: str
+) -> M:
+    """validate_metadata, logging each warning against the component."""
+
+    config, warnings = validate_metadata(model, metadata, component)
+    for message in warnings:
+        logger.warning(f"metadata warning for component '{component}': {message}")
+    return config
 
 
 class ComponentBase:
@@ -29,6 +141,11 @@ class ComponentBase:
     """
 
     valid_stages = ("configure", "start", "stop", "cleanup")
+
+    # Optional pydantic model for this component's metadata. When set,
+    # execute_stage parses the metadata into self.config before the stage runs,
+    # so a bad config fails the stage once, naming every bad field.
+    metadata_model: ClassVar[type[BaseModel] | None] = None
 
     @classmethod
     def check_args(cls) -> None:
@@ -85,6 +202,7 @@ class ComponentBase:
         self.exp_name: str = self.experiment.spec.experimentName
         self.exp_dir: Path = Path(self.experiment.spec.baseDir)
         self.metadata: Box | None = self.extract_metadata()
+        self.config: BaseModel | None = None
 
         self.root_dir: Path = Path(PHENIX_DIR) / "images"
         self.files_dir: Path = Path(
@@ -138,12 +256,16 @@ class ComponentBase:
 
         # Configure logger to output JSON to stderr while also mirroring log lines
         # to stdout so the scorch modal continues to receive component progress.
+        # diagnose=False on every sink: a traceback must not render local
+        # values, which can include metadata secrets such as an ssh password
         logger.remove()
-        logger.add(phenix_stderr_sink)
-        ui_sink_id = logger.add(stdout_mirror, format=log_format)
+        logger.add(phenix_stderr_sink, diagnose=False)
+        ui_sink_id = logger.add(stdout_mirror, format=log_format, diagnose=False)
 
         # Add a sink to capture logs to the buffer for the status file
-        sink_id = logger.add(lambda msg: log_buffer.write(msg), format=log_format)
+        sink_id = logger.add(
+            lambda msg: log_buffer.write(msg), format=log_format, diagnose=False
+        )
 
         start = time.time()
 
@@ -151,6 +273,15 @@ class ComponentBase:
         error_occurred = False
         try:
             with redirect_stdout(stdout_mirror), redirect_stderr(stderr_mirror):
+                # a stage the component does not implement never read metadata,
+                # so a bad config must not fail it (cleanup especially)
+                implemented = getattr(type(self), self.stage) is not getattr(
+                    ComponentBase, self.stage
+                )
+                if self.metadata_model is not None and implemented:
+                    self.config = parse_metadata(
+                        self.metadata_model, self.metadata, self.name
+                    )
                 out = stages_dict[self.stage]() or ""
         except Exception as ex:
             error_occurred = True
@@ -262,7 +393,9 @@ class ComponentBase:
                     return None
 
                 for cmp in md.components:
-                    if cmp.name == self.name and cmp.type == self.type:
+                    # phenix core defaults an omitted or empty type to the name
+                    ctype = cmp.get("type") or cmp.name
+                    if cmp.name == self.name and ctype == self.type:
                         return cmp.get("metadata", None)
         return None
 

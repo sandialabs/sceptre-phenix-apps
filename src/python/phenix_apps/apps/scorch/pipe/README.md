@@ -8,48 +8,44 @@ exe:    phenix-scorch-component-pipe
 stages: start, cleanup
 ```
 
-> [!NOTE]
-> - Creation: A named pipe is created automatically on its first read, write,
->   or mode selection.  
-> - Message Delivery: Messages written to a pipe are delivered to any attached
->   readers according to the pipe's current mode.  
-> - Buffering: Messages are not buffered. If no readers are present, messages
->   are discarded. This means a new reader will only receive messages from the
->   moment it attaches to the pipe onward.  
-> - Naming: Named pipes are unique to their namespace.
+| Stage | What it does |
+|---|---|
+| `start` | In this order, each only if set: sets `via`, sets `mode`, turns `log` on or off, then writes `data` to `pipe`. |
+| `cleanup` | Resets the pipe (minimega's `clear pipe`), including its `via`, `mode` and `log` settings. |
 
-> [!CAUTION]
-> The `via`, `mode`, and `log` options are considered top-level commands and
-> if used, will be executed *before* any data is written to the pipe
+## Before you start
 
-## Metadata Options
+- A reader must already be attached to the pipe when `start` runs. minimega
+  does not buffer messages, so a message written with no reader attached is
+  discarded, and a new reader only sees messages sent after it attaches.
 
-```yaml
-metadata:
-  pipe: <string>  # (REQUIRED) Name of pipe
-  data: <string>  # (Optional) Data to write to pipe
-  via:  <string>  # (Optional) Sets a program as a via, which processes all data written to the pipe before sending to readers
-  mode: <string>  # (Optional) Sets the delivery mode for the pipe (all|round-robin|random)
-  log:  <bool>    # (Optional) Enables or disables logging for the pipe
-```
+## Metadata
 
-## Example Configurations
+| Field | Type | Required | Default | Meaning |
+|---|---|---|---|---|
+| `pipe` | word (no whitespace or quotes) | yes | | Pipe name |
+| `data` | string | no | | Message to write. No single quotes, no line breaks. Must be a string, so put JSON in quotes in YAML. An empty string is the same as leaving it out |
+| `via` | command line | no | | Program (with arguments) on the phenix host that every message passes through. One line. An empty string is the same as leaving it out |
+| `mode` | `all`, `round-robin` or `random` | no | `all` (minimega's default) | How messages are shared between readers. An empty string is the same as leaving it out |
+| `log` | bool | no | unchanged | `true` or `false` turns minimega's logging of the pipe's messages on or off |
+
+## Examples
 
 <details>
-  <summary>Send a JSON string message to a pipe</summary>
+  <summary>Send a JSON message to a pipe</summary>
 
   ```yaml
   components:
-    - name: pipe-example
+    - name: announce-run
       type: pipe
       metadata:
-        pipe: foo
-        data: '{\"duration\":0}'
+        pipe: run-control
+        data: '{"event":"start","duration":300}'
   ```
 </details>
 
 <details>
-  <summary>Set a via command for a pipe</summary>
+  <summary>Set a via program for a pipe</summary>
 
   ```yaml
   components:
@@ -57,12 +53,12 @@ metadata:
       type: pipe
       metadata:
         pipe: bar
-        via: sed -u 's/test/woot/'
+        via: sed -u s/test/woot/
   ```
 </details>
 
 <details>
-  <summary>Set the mode for a pipe</summary>
+  <summary>Set the delivery mode for a pipe</summary>
 
   ```yaml
   components:
@@ -75,7 +71,7 @@ metadata:
 </details>
 
 <details>
-  <summary>Enable the log for a pipe</summary>
+  <summary>Turn on logging for a pipe</summary>
 
   ```yaml
   components:
@@ -88,17 +84,39 @@ metadata:
 </details>
 
 <details>
-  <summary>Pipe example *</summary>
+  <summary>All options together: round-robin work queue with a via program and logging</summary>
 
   ```yaml
   components:
-    - name: pipe-example-*
+    - name: work-queue
       type: pipe
       metadata:
-        pipe: foobarbazwhizbang
-        data: '{\"duration\":0}'
-        via: sed -u 's/test/woot/'
-        mode: all
+        pipe: jobs
+        mode: round-robin
         log: true
+        via: sed -u s/test/woot/
+        data: test job
   ```
 </details>
+
+To check a config before an experiment: `phenix-scorch-validate scenario.yaml`
+
+## Troubleshooting
+
+| Error or symptom | Cause and fix |
+|---|---|
+| `pipe: Field required` | `pipe` is missing. |
+| `pipe: String should match pattern '^[^\s'"]+$'` | The pipe name has whitespace or quotes. |
+| `data: String should match pattern '^[^'\r\n]+$'` | `data` has a single quote or a line break. Use double quotes inside the message instead. |
+| `data: Input should be a valid string` | `data` is a mapping, list, number or `true`/`false`. Quote it so it is sent as written. |
+| `mode: Input should be 'all', 'round-robin' or 'random'` | A misspelt `mode`. |
+| `log: Input should be a valid boolean, unable to interpret input` | `log` must be `true` or `false`. |
+| the reader never gets the message | Nothing was reading the pipe when `start` ran, or the reader is in another namespace. |
+| messages arrive changed or not at all after setting `via` | The `via` program buffers its output or exits. It must read and write one line at a time and keep running (for example `sed -u`, not plain `sed`). |
+
+## Limitations
+
+- `via` runs a program on the phenix host with minimega's privileges, once per
+  reader, so side effects repeat; only use programs you trust.
+- `data` is written once, in `start`; there is no way to send at other stages.
+- `cleanup` resets the pipe, including settings made by something else.
