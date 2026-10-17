@@ -12,6 +12,7 @@ the cyber-experiment orchestration platform.
 - `src/go/`: Go 1.24 module with the `phenix-app-mirror` app and shared helpers.
 - `debian/`: top-level Debian package assembly.
 - `.github/workflows/`: path-scoped Python, Go, spelling, and dispatch CI.
+- `CODEOWNERS`: the authors and reviewers of each path, primary first.
 
 The root `Makefile` only delegates to the two language projects. There is no
 root build target and no long-running development server.
@@ -185,7 +186,12 @@ or create releases.
 - Update `src/python/app_migration_guide.md` when the `AppBase` authoring
   pattern changes.
 - When adding or renaming an implementation, update console scripts, entry
-  points, package-data declarations, tests, and docs together.
+  points, package-data declarations, tests, docs, and `CODEOWNERS` together.
+- Maintain authorship in the root `CODEOWNERS`, not in code comments,
+  docstrings, or package metadata. When you add, move, rename, or delete a path,
+  update its entry in the same pull request. List the main authors of a path,
+  primary first, even if they lack write access. A later pattern replaces every
+  earlier owner, so give each entry its complete owner list.
 - Core-contract or public-configuration changes may need a paired pull request
   in `sceptre-phenix` or `sceptre-phenix-docs`; cross-link them.
 - Follow [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md) and use the
