@@ -1468,10 +1468,9 @@ def connect_elastic(server_url: str) -> Elasticsearch:
     es = Elasticsearch(server_url)
 
     # Check connection to Elasticsearch
-    es_info = es.info()
-    if not es_info:
+    if not es.info():
         es.close()
-        sys.exit(1)
+        raise AppError(f"Elasticsearch at {server_url} returned no cluster info")
 
     return es
 
