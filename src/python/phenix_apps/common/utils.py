@@ -14,6 +14,8 @@ import sys
 import tempfile
 import time
 import warnings
+from collections.abc import Iterator
+from contextlib import contextmanager
 from io import StringIO
 from itertools import pairwise
 from pathlib import Path
@@ -1318,24 +1320,38 @@ def mm_host_info(mm: minimega.minimega) -> list[dict]:
         raise RuntimeError(f"Failed to get host information: {e}") from e
 
 
+@contextmanager
+def mm_cc_filter(mm: minimega.minimega, cc_filter: str) -> Iterator[None]:
+    """Set the cc filter for the block and clear it on exit, even on error, so
+    a later cc command does not silently reuse it.
+
+        with utils.mm_cc_filter(mm, f"uuid={uuid}"):
+            mm.cc_exec("...")
+    """
+    mm.cc_filter(cc_filter)
+    try:
+        yield
+    finally:
+        mm.clear_cc_filter()
+
+
 def mm_kill_process(
     mm: minimega.minimega,
     cc_filter: str,
     process: str,
     os_type: str = "linux",
 ) -> None:
-    mm.cc_filter(cc_filter)
-
-    if os_type == "linux":
-        mm.cc_exec_once(f"pkill {process}")
-    elif os_type == "windows":
-        # -f: forcefully kill
-        # -im: image name to be terminated (iperf3.exe)
-        mm.cc_exec_once(f"taskkill -f -im {process}")
-    else:
-        raise ValueError(
-            f"unknown os_type '{os_type}' for mm_kill_process with filter '{cc_filter}'"
-        )
+    with mm_cc_filter(mm, cc_filter):
+        if os_type == "linux":
+            mm.cc_exec_once(f"pkill {process}")
+        elif os_type == "windows":
+            # -f: forcefully kill
+            # -im: image name to be terminated (iperf3.exe)
+            mm.cc_exec_once(f"taskkill -f -im {process}")
+        else:
+            raise ValueError(
+                f"unknown os_type '{os_type}' for mm_kill_process with filter '{cc_filter}'"
+            )
 
 
 def mm_delete_file(
@@ -1345,33 +1361,32 @@ def mm_delete_file(
     os_type: str = "linux",
     glob_remove: bool = False,
 ) -> None:
-    mm.cc_filter(cc_filter)
+    with mm_cc_filter(mm, cc_filter):
+        if os_type == "linux":
+            if glob_remove:
+                if not filepath.endswith("*"):
+                    filepath += "*"
+                # TODO: glob remove relative to arbitrary directory
+                mm.cc_exec_once(
+                    f"bash -c '/usr/bin/find / -maxdepth 1 -wholename \"{filepath}\" -type f -print0 | /usr/bin/xargs -0 /bin/rm -f'"
+                )
+            else:
+                mm.cc_exec_once(f"rm -f {filepath}")
+        # TODO: this assumes file to delete is on C drive
+        elif os_type == "windows":
+            if filepath.startswith("/"):
+                filepath = "c:" + filepath
+            filepath = filepath.replace("/", "\\\\\\\\")
 
-    if os_type == "linux":
-        if glob_remove:
-            if not filepath.endswith("*"):
+            # glob just works on windows
+            if glob_remove and not filepath.endswith("*"):
                 filepath += "*"
-            # TODO: glob remove relative to arbitrary directory
-            mm.cc_exec_once(
-                f"bash -c '/usr/bin/find / -maxdepth 1 -wholename \"{filepath}\" -type f -print0 | /usr/bin/xargs -0 /bin/rm -f'"
-            )
+
+            mm.cc_exec_once(f"cmd /c del /q {filepath}")
         else:
-            mm.cc_exec_once(f"rm -f {filepath}")
-    # TODO: this assumes file to delete is on C drive
-    elif os_type == "windows":
-        if filepath.startswith("/"):
-            filepath = "c:" + filepath
-        filepath = filepath.replace("/", "\\\\\\\\")
-
-        # glob just works on windows
-        if glob_remove and not filepath.endswith("*"):
-            filepath += "*"
-
-        mm.cc_exec_once(f"cmd /c del /q {filepath}")
-    else:
-        raise ValueError(
-            f"unknown os_type '{os_type}' for mm_delete_file with filter '{cc_filter}'"
-        )
+            raise ValueError(
+                f"unknown os_type '{os_type}' for mm_delete_file with filter '{cc_filter}'"
+            )
 
 
 def run_command(cmd: str | list[str], timeout: float | None = None) -> str:
