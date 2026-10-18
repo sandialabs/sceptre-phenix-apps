@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **OT-sim App**: `fd-server` hosts ignored the app-level `infrastructure` setting, so their protocol registers didn't match the tags the I/O module published.
 - **Common Utils**: `mm_exec_wait` and `mm_get_cc_responses` split `cc responses` output on whole header lines; stderr no longer swallows stdout, and output containing `/` is no longer truncated.
 - **OT-sim App**: A DNP3 master without a configured `scan-rate` (FEPs without app-level `helics` metadata, and every `fd-client`) raised `AttributeError`. The `<scan-rate>` element is now omitted, so ot-sim uses its own default ([#72](https://github.com/sandialabs/sceptre-phenix-apps/issues/72)).
+- **Common**: `connect_elastic()` raises instead of exiting silently.
 - **Wind Turbine Scale Plugin**: Stage an optional `container_template.rootfs_source` on each generated VM outside the containers' shared weather volume; mount Node-RED flows at their configured container path. Reject densities that split a turbine's private network across VMs.
 - **SCEPTRE App**: With more than one PowerWorld provider, only the last one's `hil_tags` reached the object list, and only the last one's `objects.txt` was written. Tags now aggregate across providers and every PowerWorld provider gets the combined `objects.txt`.
 - **SCEPTRE App**: `fep` hosts raised `TypeError`, built without the required `device_subtype`.
