@@ -1,15 +1,39 @@
-import ipaddress
-
 import lxml.etree as ET
 
-from phenix_apps.apps.otsim.protocols.protocol import Protocol
+from phenix_apps.apps.otsim.protocols.protocol import Protocol, resolve_endpoint
+
+# register type -> DNP3 point kind (analog/binary input/output)
+POINT_KINDS = {
+    "analog-read": "ai",
+    "analog-read-write": "ao",
+    "binary-read": "bi",
+    "binary-read-write": "bo",
+}
+
+
+def assign_addresses(registers, addrs=None):
+    """Number registers the way the outstation serves them: one counter per
+    point kind, in register order. Returns (kind, index, register) tuples;
+    registers of unknown types get no point."""
+    if addrs is None:
+        addrs = dict.fromkeys(POINT_KINDS.values(), 0)
+
+    points = []
+    for reg in registers:
+        kind = POINT_KINDS.get(reg.type)
+        if kind is None:
+            continue
+        points.append((kind, addrs[kind], reg))
+        addrs[kind] += 1
+
+    return points
 
 
 class DNP3(Protocol):
     def __init__(self):
         Protocol.__init__(self, "dnp3")
 
-        self.addrs = {"ai": 0, "ao": 0, "bi": 0, "bo": 0}
+        self.addrs = dict.fromkeys(POINT_KINDS.values(), 0)
 
     def init_xml_root(self, mode, node, name="dnp3-outstation"):
         self.mode = mode
@@ -17,36 +41,7 @@ class DNP3(Protocol):
         self.root = ET.Element("dnp3", {"name": name, "mode": mode})
         endpoint = ET.SubElement(self.root, "endpoint")
 
-        md = node.metadata
-
-        if "dnp3" in md and isinstance(md["dnp3"], dict):
-            if "interface" in md["dnp3"]:
-                if ":" in md["dnp3"]["interface"]:
-                    addr, port = md["dnp3"]["interface"].split(":", 1)
-                else:
-                    addr = md["dnp3"]["interface"]
-                    port = 20000
-
-                try:
-                    # test if IP address was provided
-                    ip = str(ipaddress.ip_address(addr))
-                except ValueError:
-                    # assume interface name was provided
-                    for i in node.topology.network.interfaces:
-                        if i["name"] == addr and "address" in i:
-                            ip = i["address"]
-                            break
-            else:
-                if len(node.topology.network.interfaces[0]) > 0:
-                    ip = node.topology.network.interfaces[0].address
-                    port = 20000
-        else:  # legacy way of getting IP address
-            if len(node.topology.network.interfaces[0]) > 0:
-                ip = node.topology.network.interfaces[0].address
-                port = 20000
-
-        assert ip
-
+        ip, port = resolve_endpoint(node, "dnp3", 20000)
         endpoint.text = f"{ip}:{port}"
 
     def init_master_xml(self, scan_rate=None, name="dnp3-master"):
@@ -75,100 +70,17 @@ class DNP3(Protocol):
     def registers_to_xml(self, registers):
         parent = self.outstn if self.mode == "server" else self.master
 
-        for reg in registers:
-            if reg.type == "analog-read":
-                inp = ET.SubElement(parent, "input", {"type": "analog"})
+        for kind, index, reg in assign_addresses(registers, self.addrs):
+            direction = "input" if kind in ("ai", "bi") else "output"
+            typ = "analog" if kind in ("ai", "ao") else "binary"
+            point = ET.SubElement(parent, direction, {"type": typ})
 
-                addr = ET.SubElement(inp, "address")
-                addr.text = str(self.addrs["ai"])
+            ET.SubElement(point, "address").text = str(index)
+            ET.SubElement(point, "tag").text = reg.tag
 
-                self.addrs["ai"] += 1
+            for key in ("sgvar", "egvar", "class"):
+                if key in reg.md:
+                    ET.SubElement(point, key).text = str(reg.md[key])
 
-                tag = ET.SubElement(inp, "tag")
-                tag.text = reg.tag
-
-                if "sgvar" in reg.md:
-                    svar = ET.SubElement(inp, "sgvar")
-                    svar.text = reg.md["sgvar"]
-
-                if "egvar" in reg.md:
-                    evar = ET.SubElement(inp, "egvar")
-                    evar.text = reg.md["egvar"]
-
-                if "class" in reg.md:
-                    klass = ET.SubElement(inp, "class")
-                    klass.text = reg.md["class"]
-            elif reg.type == "analog-read-write":
-                output = ET.SubElement(parent, "output", {"type": "analog"})
-
-                addr = ET.SubElement(output, "address")
-                addr.text = str(self.addrs["ao"])
-
-                self.addrs["ao"] += 1
-
-                tag = ET.SubElement(output, "tag")
-                tag.text = reg.tag
-
-                if "sgvar" in reg.md:
-                    svar = ET.SubElement(output, "sgvar")
-                    svar.text = reg.md["sgvar"]
-
-                if "egvar" in reg.md:
-                    evar = ET.SubElement(output, "egvar")
-                    evar.text = reg.md["egvar"]
-
-                if "class" in reg.md:
-                    klass = ET.SubElement(output, "class")
-                    klass.text = reg.md["class"]
-
-                if "sbo" in reg.md:
-                    sbo = ET.SubElement(output, "sbo")
-                    sbo.text = str(reg.md["sbo"])
-            elif reg.type == "binary-read":
-                inp = ET.SubElement(parent, "input", {"type": "binary"})
-
-                addr = ET.SubElement(inp, "address")
-                addr.text = str(self.addrs["bi"])
-
-                self.addrs["bi"] += 1
-
-                tag = ET.SubElement(inp, "tag")
-                tag.text = reg.tag
-
-                if "sgvar" in reg.md:
-                    svar = ET.SubElement(inp, "sgvar")
-                    svar.text = reg.md["sgvar"]
-
-                if "egvar" in reg.md:
-                    evar = ET.SubElement(inp, "egvar")
-                    evar.text = reg.md["egvar"]
-
-                if "class" in reg.md:
-                    klass = ET.SubElement(inp, "class")
-                    klass.text = reg.md["class"]
-            elif reg.type == "binary-read-write":
-                output = ET.SubElement(parent, "output", {"type": "binary"})
-
-                addr = ET.SubElement(output, "address")
-                addr.text = str(self.addrs["bo"])
-
-                self.addrs["bo"] += 1
-
-                tag = ET.SubElement(output, "tag")
-                tag.text = reg.tag
-
-                if "sgvar" in reg.md:
-                    svar = ET.SubElement(output, "sgvar")
-                    svar.text = reg.md["sgvar"]
-
-                if "egvar" in reg.md:
-                    evar = ET.SubElement(output, "egvar")
-                    evar.text = reg.md["egvar"]
-
-                if "class" in reg.md:
-                    klass = ET.SubElement(output, "class")
-                    klass.text = reg.md["class"]
-
-                if "sbo" in reg.md:
-                    sbo = ET.SubElement(output, "sbo")
-                    sbo.text = str(reg.md["sbo"])
+            if direction == "output" and "sbo" in reg.md:
+                ET.SubElement(point, "sbo").text = str(reg.md["sbo"])

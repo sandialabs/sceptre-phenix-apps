@@ -79,9 +79,9 @@ def runtime(tmp_path):
     system.tag.configure.side_effect = configure
     system.tag.readBlocking.side_effect = read
 
-    def run(historian=True):
-        Ignition._write_tag_tree(tmp_path, historian=historian)
-        (sync,) = json.loads((tmp_path / "tags.json").read_text())
+    def run(historian=True, devices=()):
+        Ignition._write_tag_tree(tmp_path, list(devices), historian=historian)
+        sync = json.loads((tmp_path / "tags.json").read_text())[-1]
         script = sync["eventScripts"][0]["script"]
         namespace = {"system": system}
         exec("def sync():\n" + script, namespace)

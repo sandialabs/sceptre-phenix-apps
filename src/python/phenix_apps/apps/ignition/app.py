@@ -3,13 +3,14 @@ import re
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from urllib.parse import quote
 from uuid import uuid4
 
 from pydantic import BaseModel, Field, IPvAnyAddress, field_validator, model_validator
 
 from phenix_apps.apps import AppBase
+from phenix_apps.apps.otsim.points import OutstationPoint, Outstations
 from phenix_apps.common import utils
 from phenix_apps.common.logger import logger
 
@@ -28,6 +29,22 @@ PERSPECTIVE_TYPE = "perspective"
 # Fixed project name for the WebDev tag API
 API_PROJECT_NAME = "api"
 HISTORY_PROVIDER_NAME = "phenix-history"
+TAG_SYNC_NAME = "_TagSync_"
+
+# How the Ignition 8.3 DNP3 driver names the points it browses
+OPC_SERVER = "Ignition OPC UA Server"
+OPC_ITEM_PATH = "ns=1;s=[{device}]{point}{index}"
+POINT_NAMES = {
+    "ai": "AnalogInput",
+    "ao": "AnalogOutput",
+    "bi": "BinaryInput",
+    "bo": "BinaryOutput",
+}
+# Ignition tag and folder naming rules
+TAG_NAME = re.compile(r"[A-Za-z0-9_ '\-:()]{1,255}")
+# the driver's own connection diagnostics, browsed as "[Diagnostics]/<name>"
+DIAGNOSTICS_FOLDER = "_Diagnostics_"
+DIAGNOSTICS = {"Hostname": "String", "Port": "Int4", "Status": "String"}
 
 # expect windows, built with /phenix/startup and /phenix/user-startup
 GUEST_APP_DIR = "/phenix/ignition"
@@ -85,6 +102,8 @@ class RtuDeviceConfig(BaseModel):
     destination_address: Annotated[int, Field(ge=1, le=1024)] = 1024
     interface: str | None = None
     polling: PollingConfig | None = None
+    # auto: semantic tags when the RTU is an ot-sim outstation, else discovery
+    points: Literal["auto", "otsim", "discover"] = "auto"
 
     model_config = {"extra": "ignore"}
 
@@ -166,10 +185,12 @@ class IgnitionHostConfig(BaseModel):
     """Per-host metadata for a `type: gateway` node.
 
     With `connected_rtus`, rendered DNP3 device resources are injected into
-    the gateway's config tree before boot, and `perspective` optionally builds
-    a basic HMI project on top of them whose tags auto-import from whatever
-    points the devices actually serve. `polling` sets the DNP3 poll periods
-    for every connected RTU; an RTU's own `polling` overrides it per field.
+    the gateway's config tree before boot. RTUs that are ot-sim outstations
+    get a tag tree named after the ot-sim devices and variables they serve;
+    other RTUs get their points discovered on the gateway. `perspective`
+    optionally builds a basic HMI project on top of them. `polling` sets the
+    DNP3 poll periods for every connected RTU; an RTU's own `polling`
+    overrides it per field.
 
     With `gwbk`, the given gateway backup is
     restored verbatim at boot instead.
@@ -273,6 +294,121 @@ class PerspectiveClientConfig(BaseModel):
     model_config = {"extra": "ignore"}
 
 
+def history_properties(provider: str) -> dict[str, Any]:
+    """On-change OPC history, mirroring the point as Ignition observes it."""
+    return {
+        "historyEnabled": True,
+        "historyProvider": provider,
+        "sampleMode": "OnChange",
+        "historicalDeadbandStyle": "Discrete",
+        "historicalDeadbandMode": "Absolute",
+        "historicalDeadband": 0.0,
+        "historyTimeDeadband": 0,
+        "historyMaxAge": 0,
+    }
+
+
+def opc_item_path(device: str, kind: str, index: int) -> str:
+    return OPC_ITEM_PATH.format(device=device, point=POINT_NAMES[kind], index=index)
+
+
+def tag_name(name: str, context: str) -> str:
+    if not TAG_NAME.fullmatch(name):
+        raise ValueError(
+            f"{context}: '{name}' is not a valid Ignition tag name (letters, "
+            "digits, spaces, _ ' - : ( ) only, up to 255 characters)"
+        )
+    return name
+
+
+def device_tag_folder(
+    device: dict[str, Any], history: dict[str, Any] | None
+) -> dict[str, Any]:
+    """`<device>/<ot-sim device>/<variable>` OPC tags for a mapped device."""
+    name = device["name"]
+    folders: dict[str, dict[str, Any]] = {}
+    seen: dict[tuple[str, str], OutstationPoint] = {}
+
+    for point in device["points"]:
+        context = f"device '{name}' ot-sim device '{point.device}'"
+        tag_name(point.device, f"device '{name}'")
+        if point.device == DIAGNOSTICS_FOLDER:
+            raise ValueError(f"{context}: name is reserved for driver diagnostics")
+        tag_name(point.variable, context)
+        if (point.device, point.variable) in seen:
+            other = seen[point.device, point.variable]
+            raise ValueError(
+                f"{context} variable '{point.variable}' is served twice "
+                f"({POINT_NAMES[other.kind]}{other.index} and "
+                f"{POINT_NAMES[point.kind]}{point.index}); set points: discover "
+                "on this RTU to import it by DNP3 address instead"
+            )
+        seen[point.device, point.variable] = point
+
+        tag = {
+            "name": point.variable,
+            "tagType": "AtomicTag",
+            "valueSource": "opc",
+            "opcServer": OPC_SERVER,
+            "opcItemPath": opc_item_path(name, point.kind, point.index),
+            "dataType": "Float8" if point.analog else "Boolean",
+            # Ignition's default deadband would hide small per-unit changes
+            "deadband": 0.0,
+            "tooltip": f"{point.device_type} {point.device}",
+            "documentation": (
+                f"{point.device_type} {point.device} "
+                f"(ot-sim, DNP3 {POINT_NAMES[point.kind]} {point.index})"
+            ),
+        }
+        if not point.writable:
+            tag["readOnly"] = True
+        if history:
+            tag.update(history)
+
+        folder = folders.setdefault(
+            point.device, {"name": point.device, "tagType": "Folder", "tags": []}
+        )
+        folder["tags"].append(tag)
+
+    folders[DIAGNOSTICS_FOLDER] = diagnostics_tag_folder(name)
+    return {"name": name, "tagType": "Folder", "tags": list(folders.values())}
+
+
+def diagnostics_tag_folder(device: str) -> dict[str, Any]:
+    """The driver diagnostics the overview reads, as discovery would import them."""
+    return {
+        "name": DIAGNOSTICS_FOLDER,
+        "tagType": "Folder",
+        "tags": [
+            {
+                "name": diag,
+                "tagType": "AtomicTag",
+                "valueSource": "opc",
+                "opcServer": OPC_SERVER,
+                "opcItemPath": f"ns=1;s=[{device}][Diagnostics]/{diag}",
+                "dataType": data_type,
+                "readOnly": True,
+                "documentation": f"DNP3 driver {diag.lower()} for {device}",
+            }
+            for diag, data_type in DIAGNOSTICS.items()
+        ],
+    }
+
+
+def tag_sync_tag(mapped_devices: list[str], history: dict[str, Any] | None) -> dict:
+    """The expression tag whose event script discovers the points of every
+    device not in `mapped_devices` and imports them under their DNP3 names."""
+    with TAG_SYNC_TAG_FILE.open() as f:
+        tag = json.load(f)
+    with TAG_SYNC_SCRIPT_FILE.open() as f:
+        script = f.read()
+    # the script is Jython: these literals are valid there too
+    tag["eventScripts"][0]["script"] = (
+        f"\tmapped_devices = {mapped_devices!r}\n\thistory = {history!r}\n" + script
+    )
+    return tag
+
+
 class Ignition(AppBase):
     def __init__(self, name: str, stage: str, dryrun: bool = False) -> None:
         super().__init__(name, stage, dryrun)
@@ -340,9 +476,11 @@ class Ignition(AppBase):
                 self.add_inject(hostname=hostname, inject={"src": src, "dst": dst})
             if cfg.historian:
                 self._write_historian(hostname, host_dir, cfg.historian)
-            if cfg.perspective or cfg.historian:
+            if cfg.perspective or cfg.historian or cfg.api:
                 tags_dir = Path(host_dir, "tags")
-                self._write_tag_tree(tags_dir, historian=cfg.historian is not None)
+                self._write_tag_tree(
+                    tags_dir, devices, historian=cfg.historian is not None
+                )
                 for src, dst in self._tree_injects(tags_dir, GUEST_TAG_DIR):
                     self.add_inject(hostname=hostname, inject={"src": src, "dst": dst})
             if cfg.perspective:
@@ -362,10 +500,21 @@ class Ignition(AppBase):
         self, rtus: list[RtuDeviceConfig], polling: PollingConfig | None = None
     ) -> list[dict[str, Any]]:
         polling = polling or PollingConfig()
+        outstations = Outstations(self.extract_app("ot-sim"), self.extract_node)
         devices = []
 
         for rtu in rtus:
-            ip = self.extract_node_interface_ip(rtu.hostname, rtu.interface)
+            points = self._map_points(rtu, outstations)
+            ip, port = None, rtu.port
+            if points is not None:
+                # ot-sim knows where its outstation listens
+                otsim_ip, otsim_port = outstations.endpoint(rtu.hostname)
+                if "interface" not in rtu.model_fields_set:
+                    ip = otsim_ip
+                if "port" not in rtu.model_fields_set:
+                    port = otsim_port
+            if not ip:
+                ip = self.extract_node_interface_ip(rtu.hostname, rtu.interface)
             if not ip:
                 msg = (
                     f"RTU '{rtu.hostname}' has no addressed interface "
@@ -380,14 +529,40 @@ class Ignition(AppBase):
                 {
                     "name": rtu.resolved_name,
                     "ip": ip,
-                    "port": rtu.port,
+                    "port": port,
                     "source_address": rtu.source_address,
                     "destination_address": rtu.destination_address,
                     "polling": rtu.resolved_polling(polling).model_dump(),
+                    "points": points,
                 }
             )
 
         return devices
+
+    @staticmethod
+    def _map_points(
+        rtu: RtuDeviceConfig, outstations: Outstations
+    ) -> list[OutstationPoint] | None:
+        """ot-sim's point list for the RTU, or None to discover points on the
+        gateway instead."""
+        if rtu.points == "discover":
+            return None
+        if rtu.hostname in outstations:
+            points = outstations.points(rtu.hostname)
+            logger.info(
+                f"RTU '{rtu.hostname}': {len(points)} DNP3 points mapped from ot-sim"
+            )
+            return points
+        if rtu.points == "otsim":
+            raise ValueError(
+                f"RTU '{rtu.hostname}' has points: otsim but is not an ot-sim host "
+                "in this scenario"
+            )
+        logger.info(
+            f"RTU '{rtu.hostname}' is not an ot-sim host; its points will be "
+            "discovered on the gateway"
+        )
+        return None
 
     @staticmethod
     def _validate_unique_names(devices: list[dict[str, Any]]) -> None:
@@ -592,25 +767,31 @@ class Ignition(AppBase):
             json.dump(view, f, indent=2)
 
     @staticmethod
-    def _write_tag_tree(tags_dir: Path, historian: bool = False) -> None:
-        """Seed the `[default]` provider with the tag-sync heartbeat; every
-        device's points are then imported gateway-side by its event script."""
+    def _write_tag_tree(
+        tags_dir: Path, devices: list[dict[str, Any]], historian: bool = False
+    ) -> None:
+        """Seed the `[default]` provider: one folder of named tags per device
+        mapped from ot-sim, plus the tag-sync heartbeat when any device's
+        points still have to be discovered gateway-side."""
         tags_dir.mkdir(parents=True, exist_ok=True)
 
         with TAG_FOLDER_RESOURCE_FILE.open() as f:
             resource = json.load(f)
         resource["files"] = ["tags.json"]
 
-        with TAG_SYNC_TAG_FILE.open() as f:
-            tag = json.load(f)
-        with TAG_SYNC_SCRIPT_FILE.open() as f:
-            provider = HISTORY_PROVIDER_NAME if historian else None
-            tag["eventScripts"][0]["script"] = (
-                f"\thistory_provider = {provider!r}\n" + f.read()
-            )
+        history = history_properties(HISTORY_PROVIDER_NAME) if historian else None
+        tags = [
+            device_tag_folder(device, history)
+            for device in devices
+            if device["points"] is not None
+        ]
+        mapped = [tag["name"] for tag in tags]
+        # without connected RTUs the sync also picks up devices already on the gateway
+        if len(mapped) < len(devices) or not devices:
+            tags.append(tag_sync_tag(mapped, history))
 
         with Path(tags_dir, "tags.json").open("w") as f:
-            json.dump([tag], f, indent=2)
+            json.dump(tags, f, indent=2)
         with Path(tags_dir, "unary-resource.json").open("w") as f:
             json.dump(resource, f, indent=2)
 

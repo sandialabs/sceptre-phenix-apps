@@ -33,6 +33,30 @@ spec:
           - hostname: hmi-1
             metadata:
               type: perspective
+      # ieee13-1-rtu is an ot-sim fep, so its points get ot-sim names;
+      # ieee13-2-rtu is not, so its points are discovered on the gateway
+      - name: ot-sim
+        hosts:
+          - hostname: ieee13-1-rtu
+            metadata:
+              type: fep
+              upstream:
+                - cap1-ied
+                - 671692-ied
+          - hostname: cap1-ied
+            metadata:
+              type: fd-server
+              dnp3:
+                - name: cap1
+                  type: capacitor
+          - hostname: 671692-ied
+            metadata:
+              type: fd-server
+              dnp3:
+                interface: eth0:20010
+                devices:
+                  - name: '671692'
+                    type: breaker
   topology:
     nodes:
       - type: VirtualMachine
@@ -78,4 +102,22 @@ spec:
             - name: eth0
               vlan: OT
               address: 10.68.30.202
+              mask: 24
+      - type: VirtualMachine
+        general:
+          hostname: cap1-ied
+        network:
+          interfaces:
+            - name: eth0
+              vlan: OT
+              address: 10.68.30.211
+              mask: 24
+      - type: VirtualMachine
+        general:
+          hostname: 671692-ied
+        network:
+          interfaces:
+            - name: eth0
+              vlan: OT
+              address: 10.68.30.212
               mask: 24

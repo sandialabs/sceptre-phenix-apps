@@ -1,8 +1,6 @@
-import ipaddress
-
 import lxml.etree as ET
 
-from phenix_apps.apps.otsim.protocols.protocol import Protocol
+from phenix_apps.apps.otsim.protocols.protocol import Protocol, resolve_endpoint
 
 
 class Modbus(Protocol):
@@ -17,36 +15,7 @@ class Modbus(Protocol):
         self.root = ET.Element("modbus", {"name": name, "mode": mode})
         endpoint = ET.SubElement(self.root, "endpoint")
 
-        md = node.metadata
-
-        if "modbus" in md and isinstance(md["modbus"], dict):
-            if "interface" in md["modbus"]:
-                if ":" in md["modbus"]["interface"]:
-                    addr, port = md["modbus"]["interface"].split(":", 1)
-                else:
-                    addr = md["modbus"]["interface"]
-                    port = 502
-
-                try:
-                    # test if IP address was provided
-                    ip = str(ipaddress.ip_address(addr))
-                except ValueError:
-                    # assume interface name was provided
-                    for i in node.topology.network.interfaces:
-                        if i["name"] == addr and "address" in i:
-                            ip = i["address"]
-                            break
-            else:
-                if len(node.topology.network.interfaces[0]) > 0:
-                    ip = node.topology.network.interfaces[0].address
-                    port = 502
-        else:  # legacy way of getting IP address
-            if len(node.topology.network.interfaces[0]) > 0:
-                ip = node.topology.network.interfaces[0].address
-                port = 502
-
-        assert ip
-
+        ip, port = resolve_endpoint(node, "modbus", 502)
         endpoint.text = f"{ip}:{port}"
 
     def registers_to_xml(self, registers):
