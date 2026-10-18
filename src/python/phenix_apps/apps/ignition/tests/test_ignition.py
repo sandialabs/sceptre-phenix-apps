@@ -21,6 +21,7 @@ from phenix_apps.apps.ignition.app import (
     Ignition,
     IgnitionHostConfig,
     PerspectiveConfig,
+    PollingConfig,
     RtuDeviceConfig,
 )
 
@@ -85,6 +86,31 @@ def test_gwbk_with_connected_rtus_raises():
         IgnitionHostConfig(gwbk="/x/base.gwbk", connected_rtus=["rtu-1"])
 
 
+def test_polling_defaults_match_previous_fixed_periods():
+    assert IgnitionHostConfig().polling == PollingConfig(
+        class1=5000, class2=5000, class3=5000, integrity=300000
+    )
+
+
+@pytest.mark.parametrize(
+    "polling",
+    [{"class1": -1}, {"integrity": 2**31}, {"class1": "fast"}, {"class_1": 1000}],
+)
+def test_polling_rejects_invalid_periods_and_unknown_fields(polling):
+    with pytest.raises(ValidationError, match="polling"):
+        IgnitionHostConfig(connected_rtus=["rtu-1"], polling=polling)
+    with pytest.raises(ValidationError, match="polling"):
+        IgnitionHostConfig(connected_rtus=[{"hostname": "rtu-1", "polling": polling}])
+
+
+@pytest.mark.parametrize(
+    "metadata", [{"api": True}, {"gwbk": "/x/base.gwbk"}, {"historian": None}]
+)
+def test_polling_without_connected_rtus_raises(metadata):
+    with pytest.raises(ValidationError, match="no effect"):
+        IgnitionHostConfig(polling={"class1": 1000}, **metadata)
+
+
 # --- RTU resolution ----------------------------------------------------------
 
 
@@ -103,8 +129,35 @@ def test_resolve_devices_uses_topology_ip(mock_app):
             "port": 20000,
             "source_address": 1,
             "destination_address": 1024,
+            "polling": PollingConfig().model_dump(),
         }
     ]
+
+
+def test_resolve_devices_rtu_polling_overrides_gateway_per_field(mock_app):
+    mock_app.extract_node_interface_ip.return_value = "10.68.30.201"
+    gateway = PollingConfig(class1=1000, integrity=60000)
+
+    devices = mock_app._resolve_devices(
+        [
+            RtuDeviceConfig(hostname="rtu-1"),
+            RtuDeviceConfig(hostname="rtu-2", polling={"integrity": 0}),
+        ],
+        gateway,
+    )
+
+    assert devices[0]["polling"] == {
+        "class1": 1000,
+        "class2": 5000,
+        "class3": 5000,
+        "integrity": 60000,
+    }
+    assert devices[1]["polling"] == {
+        "class1": 1000,
+        "class2": 5000,
+        "class3": 5000,
+        "integrity": 0,
+    }
 
 
 def test_resolve_devices_missing_node_dryrun_placeholder(mock_app, mocker):
@@ -146,8 +199,8 @@ def test_pre_start_renders_and_injects_devices(mock_app):
     assert config["settings"]["connectivity"]["hostname"] == "10.68.30.11"
     assert config["settings"]["connectivity"]["port"] == 20000
     assert config["settings"]["connectivity"]["destinationAddress"] == 1024
-    # Non-connectivity settings pass through from the shipped template.
-    assert "dataAcquisition" in config["settings"]
+    assert config["settings"]["dataAcquisition"]["class1PollPeriod"] == 5000
+    assert config["settings"]["dataAcquisition"]["integrityPollPeriod"] == 300000
 
     with open(f"{mock_app.app_dir}/OT-scada/devices/rtu-1/resource.json") as f:
         resource = json.load(f)
@@ -166,6 +219,37 @@ def test_pre_start_renders_and_injects_devices(mock_app):
     ]
     host_files = (Path(mock_app.app_dir) / "OT-scada").iterdir()
     assert not [path for path in host_files if path.suffix == ".ps1"]
+
+
+def test_pre_start_renders_poll_periods(mock_app):
+    _nodes(
+        mock_app,
+        gateways=[
+            _gateway(
+                connected_rtus=[
+                    "rtu-1",
+                    {"hostname": "rtu-2", "polling": {"class2": 0}},
+                ],
+                polling={"class1": 1000, "class3": 2000, "integrity": 60000},
+            )
+        ],
+    )
+    mock_app.extract_node_interface_ip.return_value = "10.68.30.11"
+
+    mock_app.pre_start()
+
+    periods = {}
+    for rtu in ("rtu-1", "rtu-2"):
+        with open(f"{mock_app.app_dir}/OT-scada/devices/{rtu}/config.json") as f:
+            acquisition = json.load(f)["settings"]["dataAcquisition"]
+        periods[rtu] = [
+            acquisition[f"{key}PollPeriod"]
+            for key in ("class1", "class2", "class3", "integrity")
+        ]
+    assert periods == {
+        "rtu-1": [1000, 5000, 2000, 60000],
+        "rtu-2": [1000, 0, 2000, 60000],
+    }
 
 
 def test_no_rtus_and_no_gwbk_skips_host(mock_app, mocker):
