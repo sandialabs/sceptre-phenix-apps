@@ -537,8 +537,10 @@ def mm_cc_filter_vm(
 ) -> tuple[str, str]:
     """Point the cc filter at ``vm`` by UUID; return its ``(uuid, host)``.
 
-    By UUID, not name: ``name`` is not a cc filter field, so ``cc filter
-    name=`` matches on tags and silently targets zero clients.
+    By UUID, which matches exactly the client just located. ``cc filter
+    name=`` also works: minimega resolves a key that is not a filter field
+    against the VM's tags and ``vm info`` fields (``internal/ron/server.go``),
+    and ``name`` is one of those.
     """
     uuid, host = mm_cc_client_locate(mm, vm, grace=grace)
     mm.cc_filter(f"uuid={uuid}")
