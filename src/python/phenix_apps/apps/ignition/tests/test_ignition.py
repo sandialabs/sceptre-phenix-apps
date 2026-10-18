@@ -11,12 +11,10 @@ from pydantic import ValidationError
 from phenix_apps.apps.ignition.app import (
     API_PROJECT_NAME,
     GATEWAY_TYPE,
-    GUEST_CLIENT_SCRIPT_DST,
-    GUEST_DEVICE_DIR,
-    GUEST_GWBK_SCRIPT_DST,
-    GUEST_PROJECTS_DIR,
-    GUEST_TAG_DIR,
+    LINUX,
+    LINUX_AUTOSTART_DST,
     PERSPECTIVE_TYPE,
+    WINDOWS,
     ApiConfig,
     Ignition,
     IgnitionHostConfig,
@@ -27,15 +25,27 @@ from phenix_apps.apps.ignition.app import (
 
 pytestmark = pytest.mark.app_class(cls=Ignition, name="ignition")
 
+GUEST_DEVICE_DIR = WINDOWS.device_dir
+GUEST_TAG_DIR = WINDOWS.tag_dir
+GUEST_PROJECTS_DIR = WINDOWS.projects_dir
+GUEST_BOOT_SCRIPT_DST = WINDOWS.script_dst("98-ignition")
+GUEST_CLIENT_SCRIPT_DST = WINDOWS.script_dst("99-ignition-perspective", user=True)
 
-def _gateway(hostname="OT-scada", **metadata):
+
+def _host(hostname, os_type, metadata):
+    """A scenario host as extract_nodes_type returns it, topology node attached."""
+    topology = {"hardware": {"os_type": os_type}} if os_type else {}
+    return Box({"hostname": hostname, "metadata": metadata, "topology": topology})
+
+
+def _gateway(hostname="OT-scada", os_type="windows", **metadata):
     metadata.setdefault("type", "gateway")
-    return Box({"hostname": hostname, "metadata": metadata})
+    return _host(hostname, os_type, metadata)
 
 
-def _client(hostname="hmi-1", **metadata):
+def _client(hostname="hmi-1", os_type="windows", **metadata):
     metadata.setdefault("type", "perspective")
-    return Box({"hostname": hostname, "metadata": metadata})
+    return _host(hostname, os_type, metadata)
 
 
 def _nodes(mock_app, gateways=(), clients=()):
@@ -115,7 +125,7 @@ def test_polling_without_connected_rtus_raises(metadata):
 
 
 def test_resolve_devices_uses_topology_ip(mock_app):
-    mock_app.extract_node_interface_ip.return_value = "10.68.30.201"
+    mock_app.extract_node_interface_ip.return_value = "192.168.10.201"
 
     devices = mock_app._resolve_devices(
         [RtuDeviceConfig(hostname="rtu-1", interface="eth1")]
@@ -125,7 +135,7 @@ def test_resolve_devices_uses_topology_ip(mock_app):
     assert devices == [
         {
             "name": "rtu-1",
-            "ip": "10.68.30.201",
+            "ip": "192.168.10.201",
             "port": 20000,
             "source_address": 1,
             "destination_address": 1024,
@@ -136,7 +146,7 @@ def test_resolve_devices_uses_topology_ip(mock_app):
 
 
 def test_resolve_devices_rtu_polling_overrides_gateway_per_field(mock_app):
-    mock_app.extract_node_interface_ip.return_value = "10.68.30.201"
+    mock_app.extract_node_interface_ip.return_value = "192.168.10.201"
     gateway = PollingConfig(class1=1000, integrity=60000)
 
     devices = mock_app._resolve_devices(
@@ -190,14 +200,14 @@ def test_duplicate_device_names_raise(mock_app):
 
 def test_pre_start_renders_and_injects_devices(mock_app):
     _nodes(mock_app, gateways=[_gateway(connected_rtus=["rtu-1"])])
-    mock_app.extract_node_interface_ip.return_value = "10.68.30.11"
+    mock_app.extract_node_interface_ip.return_value = "192.168.10.11"
 
     mock_app.pre_start()
 
     with open(f"{mock_app.app_dir}/OT-scada/devices/rtu-1/config.json") as f:
         config = json.load(f)
     assert config["profile"]["type"] == "com.inductiveautomation.Dnp3DeviceType"
-    assert config["settings"]["connectivity"]["hostname"] == "10.68.30.11"
+    assert config["settings"]["connectivity"]["hostname"] == "192.168.10.11"
     assert config["settings"]["connectivity"]["port"] == 20000
     assert config["settings"]["connectivity"]["destinationAddress"] == 1024
     assert config["settings"]["dataAcquisition"]["class1PollPeriod"] == 5000
@@ -212,14 +222,17 @@ def test_pre_start_renders_and_injects_devices(mock_app):
     assert resource["attributes"]["lastModificationSignature"]
 
     # device resources go straight into the gateway's data tree pre-boot;
-    # nothing is staged and no boot script is needed
+    # the boot script only cycles the service
     dsts = [c.kwargs["inject"]["dst"] for c in mock_app.add_inject.call_args_list]
     assert dsts == [
         f"{GUEST_DEVICE_DIR}/rtu-1/config.json",
         f"{GUEST_DEVICE_DIR}/rtu-1/resource.json",
+        GUEST_BOOT_SCRIPT_DST,
     ]
     host_files = (Path(mock_app.app_dir) / "OT-scada").iterdir()
-    assert not [path for path in host_files if path.suffix == ".ps1"]
+    assert [path.name for path in host_files if path.suffix == ".ps1"] == [
+        "98-ignition.ps1"
+    ]
 
 
 def test_pre_start_renders_poll_periods(mock_app):
@@ -235,7 +248,7 @@ def test_pre_start_renders_poll_periods(mock_app):
             )
         ],
     )
-    mock_app.extract_node_interface_ip.return_value = "10.68.30.11"
+    mock_app.extract_node_interface_ip.return_value = "192.168.10.11"
 
     mock_app.pre_start()
 
@@ -277,8 +290,9 @@ def test_api_only_does_not_skip_host(mock_app, mocker):
     assert f"{GUEST_TAG_DIR}/tags.json" in dsts
     assert all(
         d.startswith((f"{GUEST_PROJECTS_DIR}/{API_PROJECT_NAME}/", f"{GUEST_TAG_DIR}/"))
-        for d in dsts
+        for d in dsts[:-1]
     )
+    assert dsts[-1] == GUEST_BOOT_SCRIPT_DST
 
 
 # --- gwbk restore ------------------------------------------------------------
@@ -292,15 +306,17 @@ def test_pre_start_gwbk_injects_backup_verbatim(mock_app, tmp_path):
     mock_app.pre_start()
 
     injects = [c.kwargs["inject"] for c in mock_app.add_inject.call_args_list]
-    assert injects[0] == {"src": str(backup), "dst": "/phenix/ignition/restore.gwbk"}
-    assert injects[1]["dst"] == GUEST_GWBK_SCRIPT_DST
+    assert injects[0] == {"src": str(backup), "dst": "/restore.gwbk"}
+    assert injects[1]["dst"] == GUEST_BOOT_SCRIPT_DST
     assert len(injects) == 2
 
-    with open(f"{mock_app.app_dir}/OT-scada/98-ignition.ps1") as f:
+    with open(f"{mock_app.app_dir}/OT-scada/98-ignition.ps1", newline="") as f:
         script = f.read()
-    assert "gwcmd.bat" in script
-    assert "-s $staged -m" in script
-    assert "Copy-Item" not in script
+    assert "\r\n" in script
+    assert "Stop-Service -Name Ignition" in script
+    assert "Start-Service -Name Ignition" in script
+    assert "__restore_" in script
+    assert "gwcmd" not in script
 
 
 def test_gwbk_missing_dryrun_warns_and_skips(mock_app, mocker, tmp_path):
@@ -479,7 +495,7 @@ def _perspective_setup(mock_app, clients=(), **perspective):
         gateways=[_gateway(connected_rtus=["rtu-1"], perspective=perspective or True)],
         clients=clients,
     )
-    mock_app.extract_node_interface_ip.return_value = "10.68.30.11"
+    mock_app.extract_node_interface_ip.return_value = "192.168.10.11"
 
 
 def test_pre_start_perspective_injects_files_into_data_tree(mock_app):
@@ -554,7 +570,7 @@ def test_perspective_project_name_in_inject_paths(mock_app):
 
 def test_perspective_client_infers_single_gateway(mock_app):
     _perspective_setup(mock_app, clients=[_client()])
-    ips = {"rtu-1": "10.68.30.201", "OT-scada": "10.68.30.11"}
+    ips = {"rtu-1": "192.168.10.201", "OT-scada": "192.168.10.11"}
     mock_app.extract_node_interface_ip.side_effect = lambda h, i: ips[h]
 
     mock_app.pre_start()
@@ -564,7 +580,7 @@ def test_perspective_client_infers_single_gateway(mock_app):
         script = f.read()
     assert "\r\n" in script
     assert "firefox.exe" in script
-    assert "http://10.68.30.11:8088/data/perspective/client/hmi" in script
+    assert "http://192.168.10.11:8088/data/perspective/client/hmi" in script
 
     dsts = [c.kwargs["inject"]["dst"] for c in mock_app.add_inject.call_args_list]
     assert dsts.count(GUEST_CLIENT_SCRIPT_DST) == 2  # gateway + hmi-1 scripts
@@ -586,7 +602,7 @@ def test_perspective_client_ambiguous_gateways_raise(mock_app):
         ],
         clients=[_client()],
     )
-    mock_app.extract_node_interface_ip.return_value = "10.68.30.11"
+    mock_app.extract_node_interface_ip.return_value = "192.168.10.11"
 
     with pytest.raises(ValueError, match="found 2 perspective-enabled"):
         mock_app.pre_start()
@@ -676,7 +692,7 @@ def test_pre_start_api_injects_files_into_data_tree(mock_app):
             )
         ],
     )
-    mock_app.extract_node_interface_ip.return_value = "10.68.30.11"
+    mock_app.extract_node_interface_ip.return_value = "192.168.10.11"
 
     mock_app.pre_start()
 
@@ -709,10 +725,109 @@ def test_perspective_and_api_together(mock_app):
         mock_app,
         gateways=[_gateway(connected_rtus=["rtu-1"], perspective=True, api=True)],
     )
-    mock_app.extract_node_interface_ip.return_value = "10.68.30.11"
+    mock_app.extract_node_interface_ip.return_value = "192.168.10.11"
 
     mock_app.pre_start()
 
     dsts = [c.kwargs["inject"]["dst"] for c in mock_app.add_inject.call_args_list]
     assert any(d.startswith(f"{GUEST_PROJECTS_DIR}/hmi/") for d in dsts)
     assert any(d.startswith(f"{GUEST_PROJECTS_DIR}/{API_PROJECT_NAME}/") for d in dsts)
+
+
+# --- Linux guests ------------------------------------------------------------
+
+
+def test_linux_gateway_injects_into_data_dir_and_cycles_service(mock_app):
+    _nodes(
+        mock_app,
+        gateways=[_gateway(os_type="linux", connected_rtus=["rtu-1"], api=True)],
+    )
+    mock_app.extract_node_interface_ip.return_value = "192.168.10.11"
+
+    mock_app.pre_start()
+
+    dsts = [c.kwargs["inject"]["dst"] for c in mock_app.add_inject.call_args_list]
+    assert f"{LINUX.device_dir}/rtu-1/config.json" in dsts
+    assert f"{LINUX.projects_dir}/{API_PROJECT_NAME}/project.json" in dsts
+    assert all(d.startswith("/opt/ignition/data/") for d in dsts[:-1])
+    assert dsts[-1] == "/etc/phenix/startup/98-ignition.sh"
+    assert not any(d.endswith(".ps1") for d in dsts)
+
+    with open(f"{mock_app.app_dir}/OT-scada/98-ignition.sh", newline="") as f:
+        script = f.read()
+    assert "\r" not in script
+    assert "systemctl stop ignition || true" in script
+    assert "systemctl start ignition" in script
+    assert "data=/opt/ignition/data" in script
+    assert "__restore_" in script
+    assert "docker" not in script
+    assert "gwcmd" not in script
+
+
+def test_linux_gwbk_is_staged_for_the_boot_script(mock_app, tmp_path):
+    backup = tmp_path / "base.gwbk"
+    backup.write_bytes(b"opaque-zip-bytes")
+    _nodes(mock_app, gateways=[_gateway(os_type="linux", gwbk=str(backup))])
+
+    mock_app.pre_start()
+
+    injects = [c.kwargs["inject"] for c in mock_app.add_inject.call_args_list]
+    assert injects[0] == {"src": str(backup), "dst": "/restore.gwbk"}
+    assert injects[1]["dst"] == "/etc/phenix/startup/98-ignition.sh"
+    assert len(injects) == 2
+
+
+def test_linux_open_client_adds_xfce_autostart(mock_app):
+    _nodes(
+        mock_app,
+        gateways=[
+            _gateway(os_type="linux", connected_rtus=["rtu-1"], perspective=True)
+        ],
+        clients=[_client(os_type="linux")],
+    )
+    mock_app.extract_node_interface_ip.return_value = "192.168.10.11"
+
+    mock_app.pre_start()
+
+    injects = [c.kwargs["inject"] for c in mock_app.add_inject.call_args_list]
+    dsts = [i["dst"] for i in injects]
+    assert dsts.count("/phenix/user-startup/99-ignition-perspective.sh") == 2
+    assert dsts.count(LINUX_AUTOSTART_DST) == 2
+    assert all(Path(i["src"]).is_file() for i in injects)
+
+    with open(f"{mock_app.app_dir}/hmi-1/99-ignition-perspective.sh", newline="") as f:
+        script = f.read()
+    assert "\r" not in script
+    assert "firefox 'http://192.168.10.11:8088/data/perspective/client/hmi'" in script
+    desktop = Path(mock_app.app_dir, "hmi-1", "99-ignition-perspective.desktop")
+    assert "Exec=/bin/bash /phenix/user-startup/99-ignition-perspective.sh" in (
+        desktop.read_text()
+    )
+
+
+def test_missing_os_type_defaults_to_linux(mock_app):
+    _nodes(mock_app, gateways=[_gateway(os_type=None, connected_rtus=["rtu-1"])])
+    mock_app.extract_node_interface_ip.return_value = "192.168.10.11"
+
+    mock_app.pre_start()
+
+    dsts = [c.kwargs["inject"]["dst"] for c in mock_app.add_inject.call_args_list]
+    assert dsts[0] == f"{LINUX.device_dir}/rtu-1/config.json"
+
+
+def test_unsupported_os_type_names_host(mock_app):
+    _nodes(mock_app, gateways=[_gateway(os_type="macos", connected_rtus=["rtu-1"])])
+
+    with pytest.raises(ValueError, match="'OT-scada' has os_type 'macos'"):
+        mock_app.pre_start()
+
+
+def test_windows_layout_matches_installer_paths():
+    assert WINDOWS.device_dir == (
+        "Program Files/Inductive Automation/Ignition/data/config/resources/core/"
+        "com.inductiveautomation.opcua/device"
+    )
+    assert WINDOWS.script_dst("98-ignition") == "/phenix/startup/98-ignition.ps1"
+    assert LINUX.tag_dir == (
+        "/opt/ignition/data/config/resources/core/ignition/tag-definition/default"
+    )

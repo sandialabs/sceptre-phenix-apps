@@ -17,7 +17,7 @@ issue analog-output setpoint or binary CROB commands.
 existing PostgreSQL database using passwordless authentication.
 
 Alternatively, if `gwbk` points at a hand-authored gateway backup, the app injects it
-untouched and restores it at boot via `gwcmd.bat -s <file> -m`.
+untouched and the boot script stages it for the gateway to restore on its next start.
 
 ## Spec / Configuration
 
@@ -97,7 +97,7 @@ spec:
 
 **`ot-sim` (or `auto` with an ot-sim outstation)**
 
-The ignition app re-uses ot-sim's deterministic numbering to name each point at build time.
+The ignition app reuses ot-sim's deterministic numbering to name each point at build time.
 In the ot-sim app: each `fd-server` lists infrastructure devices (`name: cap1, type: capacitor`),
 the infrastructure mapping lists variables (`voltage`, `setpt`, ...); a `fep` serves every register
 of its `upstream` IEDs.
@@ -163,15 +163,15 @@ A basic Perspective HMI is generated with:
 * one dashboard tab per RTU showing every tag's value and description
 * a simple popup for sending commands. The `DNP3 Command` button above each table, or
 double-clicking a row, opens the DNP3 command popup to send one of:
-  * DNP3 CROB commands
+  * CROB commands
   * analog output setpoints (Group 41 variation 1 Int32, 2 Int16, 3 Float32, or
     4 Float64)
   * on-demand class/integrity data polls
 
 ### Browser auto-open
 
-With `open_client` (and on every `type: perspective` host) a startup script at
-`/phenix/startup/99-ignition-perspective.ps1` opens the HMI URL in Firefox at boot.
+With `open_client` (and on every `type: perspective` host) a startup script waits for the
+gateway to be ready and opens the HMI URL in Firefox.
 
 ## Historian
 
@@ -306,6 +306,21 @@ Configure the gateway's TLS listener and an appropriate user/role in that User S
 `auth` requires HTTP Basic credentials for POST; reads remain open. `require_https`
 uses WebDev's HTTPS requirement on POST and requires gateway TLS configuration.
 
+## Guest layout
+
+| | Windows | Linux |
+|---|---|---|
+| Ignition data tree | `C:\Program Files\Inductive Automation\Ignition\data` | `/opt/ignition/data` |
+| Gateway service | `Ignition` Windows service | `ignition` systemd unit |
+| Staged `gwbk` | `C:\restore.gwbk` | `/restore.gwbk` |
+| Boot script (as system) | `C:\phenix\startup\98-ignition.ps1` | `/etc/phenix/startup/98-ignition.sh` |
+| Logon script | `C:\phenix\user-startup\99-ignition-perspective.ps1` | `/phenix/user-startup/99-ignition-perspective.sh` + XFCE autostart entry |
+
+The boot script stops the gateway service if it is running, moves a staged `gwbk` into the
+data tree as a timestamped `__restore_<millis>.gwbk` (which the gateway applies on its next
+start), and starts the service. It does not care whether the service is set to start on
+its own.
+
 ## Testing
 
 Unit tests live in `tests/`:
@@ -325,18 +340,25 @@ PHENIX_LOG_FILE="" phenix-app-ignition pre-start --dry-run < phenix_apps/apps/ig
 
 ### Apps
 
-* Semantic point names need the `ot-sim` app in the same scenario, with the RTUs defined
+* Semantic point names need the [`ot-sim`](../otsim/README.md) app in the same scenario, with the RTUs defined
   as `fep` or `fd-server` hosts. The mapping is computed from ot-sim's own classes
   (`phenix_apps.apps.otsim.points`), so the two apps must come from the same package.
 
 ### Images
 
-* Only developed and tested with Igntion 8.3.1.
-* Only works for Windows hosts.
+* Only developed and tested with Ignition 8.3 (8.3.1 on Windows, 8.3.9 on Linux).
 * Only works for DNP3 outstations.
 * `api` requires the WebDev module installed and enabled on the gateway.
 * `historian` requires Historian Core, SQL Historian, and PostgreSQL JDBC installed
   and licensed or in an active trial.
-* Expects VMs configured to run all scripts in `C:\phenix\startup` and `C:\phenix\user-startup` at boot.
-* Expects `firefox.exe` in the path.
-* Expects the ignition service to start automatically at boot.
+* Expects Firefox on the path (`firefox.exe` / `firefox`).
+
+#### Windows gateways
+
+* Expects a commissioned gateway installed under `C:\Program Files\Inductive Automation\Ignition`
+  and registered as the `Ignition` service.
+
+#### Linux gateways
+
+* Expects a commissioned gateway with its data tree at `/opt/ignition/data`, started and
+  stopped through an `ignition` systemd unit.

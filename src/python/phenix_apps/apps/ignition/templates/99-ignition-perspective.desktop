@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+Name=phenix Ignition Perspective
+Exec=/bin/bash /phenix/user-startup/99-ignition-perspective.sh
+Terminal=false
