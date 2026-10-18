@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **OT-sim App**: `fd-client` DNP3 masters use `helics.scan-rate` when it is set explicitly.
+- **Ignition App**: DNP3 poll rate is configurable per class and outstation.
 - **Ignition App**: DNP3 Analog Output setpoint control commands can be sent from the perspective GUI.
 - **Wind Turbine Scale Plugin**: Artifact-generation regression tests and documentation linking to the companion [complete example in sceptre-phenix-topologies](https://github.com/sandialabs/sceptre-phenix-topologies/tree/main/renewables/wind/wind-scale) (sandialabs/sceptre-phenix-apps#95).
 - **SCEPTRE App**: Pre-flight scenario validation: one pydantic model, run before either stage, reporting every problem at once with the host and field.

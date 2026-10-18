@@ -26,6 +26,10 @@ spec:
                 - hostname: ieee13-2-rtu
                   name: farm-controller
                   destination_address: 1023
+                  polling:
+                    integrity: 60000
+              polling:
+                class1: 1000
           - hostname: hmi-1
             metadata:
               type: perspective

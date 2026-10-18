@@ -60,6 +60,20 @@ GUEST_HISTORY_DIR = Path(
 )
 
 
+PollPeriod = Annotated[int, Field(ge=0, le=2147483647)]
+
+
+class PollingConfig(BaseModel):
+    """DNP3 master poll periods in milliseconds; 0 disables that poll."""
+
+    class1: PollPeriod = 5000
+    class2: PollPeriod = 5000
+    class3: PollPeriod = 5000
+    integrity: PollPeriod = 300000
+
+    model_config = {"extra": "forbid"}
+
+
 class RtuDeviceConfig(BaseModel):
     """DNP3 outstation connection settings RTU."""
 
@@ -70,6 +84,7 @@ class RtuDeviceConfig(BaseModel):
     source_address: Annotated[int, Field(ge=1, le=1024)] = 1
     destination_address: Annotated[int, Field(ge=1, le=1024)] = 1024
     interface: str | None = None
+    polling: PollingConfig | None = None
 
     model_config = {"extra": "ignore"}
 
@@ -89,6 +104,12 @@ class RtuDeviceConfig(BaseModel):
     @property
     def resolved_name(self) -> str:
         return self.name or self.hostname
+
+    def resolved_polling(self, default: PollingConfig) -> PollingConfig:
+        """Per-RTU poll periods override the gateway's field by field."""
+        if self.polling is None:
+            return default
+        return default.model_copy(update=self.polling.model_dump(exclude_unset=True))
 
 
 class PerspectiveConfig(BaseModel):
@@ -147,7 +168,8 @@ class IgnitionHostConfig(BaseModel):
     With `connected_rtus`, rendered DNP3 device resources are injected into
     the gateway's config tree before boot, and `perspective` optionally builds
     a basic HMI project on top of them whose tags auto-import from whatever
-    points the devices actually serve.
+    points the devices actually serve. `polling` sets the DNP3 poll periods
+    for every connected RTU; an RTU's own `polling` overrides it per field.
 
     With `gwbk`, the given gateway backup is
     restored verbatim at boot instead.
@@ -160,6 +182,7 @@ class IgnitionHostConfig(BaseModel):
 
     gwbk: str | None = None
     connected_rtus: list[RtuDeviceConfig] = Field(default_factory=list)
+    polling: PollingConfig = Field(default_factory=PollingConfig)
     perspective: PerspectiveConfig | None = None
     api: ApiConfig | None = None
     historian: HistorianConfig | None = None
@@ -231,6 +254,12 @@ class IgnitionHostConfig(BaseModel):
                 "'historian' injects database, history, and tag resources and "
                 "cannot be combined with 'gwbk'; configure history in the "
                 "backup itself"
+            )
+        if "polling" in self.model_fields_set and not self.connected_rtus:
+            raise ValueError(
+                "'polling' sets poll periods on connected_rtus devices and has "
+                "no effect without them; configure existing devices on the "
+                "gateway or in the gwbk instead"
             )
         return self
 
@@ -305,7 +334,7 @@ class Ignition(AppBase):
                 inject={"src": script.as_posix(), "dst": GUEST_GWBK_SCRIPT_DST},
             )
         else:
-            devices = self._resolve_devices(cfg.connected_rtus)
+            devices = self._resolve_devices(cfg.connected_rtus, cfg.polling)
             self._validate_unique_names(devices)
             for src, dst in self._write_device_tree(host_dir, devices):
                 self.add_inject(hostname=hostname, inject={"src": src, "dst": dst})
@@ -329,7 +358,10 @@ class Ignition(AppBase):
 
         return cfg
 
-    def _resolve_devices(self, rtus: list[RtuDeviceConfig]) -> list[dict[str, Any]]:
+    def _resolve_devices(
+        self, rtus: list[RtuDeviceConfig], polling: PollingConfig | None = None
+    ) -> list[dict[str, Any]]:
+        polling = polling or PollingConfig()
         devices = []
 
         for rtu in rtus:
@@ -351,6 +383,7 @@ class Ignition(AppBase):
                     "port": rtu.port,
                     "source_address": rtu.source_address,
                     "destination_address": rtu.destination_address,
+                    "polling": rtu.resolved_polling(polling).model_dump(),
                 }
             )
 
