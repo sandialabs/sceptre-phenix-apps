@@ -13,6 +13,60 @@
   "root": {
     "children": [
       {
+        "children": [
+          {
+            "meta": {
+              "name": "Hint"
+            },
+            "props": {
+              "text": "Double-click a point, or select one and press"
+            },
+            "type": "ia.display.label"
+          },
+          {
+            "events": {
+              "component": {
+                "onActionPerformed": {
+                  "config": {
+                    "script": "\t# the selected row's OPC address picks the output kind and index, if any\n\trows = self.parent.getSibling(\"pointsTable\").props.selection.data\n\ttry:\n\t\taddress = rows[0]['address']\n\texcept (IndexError, KeyError, TypeError):\n\t\taddress = None\n\tcommands.openPopup(self.view.params.rtuName, address)\n"
+                  },
+                  "scope": "G",
+                  "type": "script"
+                }
+              }
+            },
+            "meta": {
+              "name": "CommandButton"
+            },
+            "position": {
+              "basis": "160px",
+              "shrink": 0
+            },
+            "props": {
+              "text": "DNP3 Command"
+            },
+            "type": "ia.input.button"
+          }
+        ],
+        "meta": {
+          "name": "toolbar"
+        },
+        "position": {
+          "basis": "44px",
+          "shrink": 0
+        },
+        "props": {
+          "alignItems": "center",
+          "direction": "row",
+          "justify": "flex-end",
+          "style": {
+            "gap": "8px",
+            "padding": "4px"
+          }
+        },
+        "type": "ia.container.flex"
+      },
+      {
         "custom": {
           "rtuName": "ST0-rtu"
         },
@@ -20,7 +74,7 @@
           "component": {
             "onRowDoubleClick": {
               "config": {
-                "script": "\timport re\n\tpoint \u003d event.value[\u0027point\u0027]\n\tm \u003d re.search(r\u0027BinaryOutput(\\d+)$\u0027, point)\n\tidx \u003d int(m.group(1)) if m else None\n\tcommands.openPopup(self.view.params.rtuName, idx)"
+                "script": "\t# the OPC address says whether the row is an output point and which index\n\tcommands.openPopup(self.view.params.rtuName, event.value['address'])"
               },
               "scope": "G",
               "type": "script"
@@ -41,7 +95,7 @@
               },
               "transforms": [
                 {
-                  "code": "\tfolder \u003d \"[default]\" + self.view.params.rtuName\n\tresults \u003d system.tag.browse(folder, {\"recursive\": True}).getResults()\n\tpaths \u003d [str(r[\u0027fullPath\u0027]) for r in results if not r[\u0027hasChildren\u0027]]\n\tif not paths:\n\t\treturn []\n\tqvals \u003d system.tag.readBlocking(paths)\n\trows \u003d []\n\tfor p, qv in zip(paths, qvals):\n\t\trows.append({\n\t\t\t\"point\": p.replace(folder + \"/\", \"\"),\n\t\t\t\"value\": str(qv.value),\n\t\t\t\"quality\": str(qv.quality),\n\t\t\t\"timestamp\": str(qv.timestamp)\n\t\t})\n\treturn rows",
+                  "code": "\tfolder = \"[default]\" + self.view.params.rtuName\n\tresults = system.tag.browse(folder, {\"recursive\": True}).getResults()\n\tpaths = [str(r['fullPath']) for r in results if not r['hasChildren']]\n\tif not paths:\n\t\treturn []\n\t# one read for values, documentation and OPC addresses together\n\tqvals = system.tag.readBlocking(paths + [p + \".Documentation\" for p in paths] + [p + \".OpcItemPath\" for p in paths])\n\tn = len(paths)\n\trows = []\n\tfor i, p in enumerate(paths):\n\t\tqv = qvals[i]\n\t\trows.append({\n\t\t\t\"point\": p.replace(folder + \"/\", \"\"),\n\t\t\t\"description\": str(qvals[n + i].value or \"\"),\n\t\t\t\"value\": str(qv.value),\n\t\t\t\"quality\": str(qv.quality),\n\t\t\t\"timestamp\": str(qv.timestamp),\n\t\t\t\"address\": str(qvals[2 * n + i].value or \"\")\n\t\t})\n\treturn rows",
                   "type": "script"
                 }
               ],
@@ -57,6 +111,98 @@
               "dateFormat": "MM/DD/YYYY",
               "editable": false,
               "field": "point",
+              "filter": {
+                "boolean": {
+                  "condition": ""
+                },
+                "date": {
+                  "condition": "",
+                  "value": ""
+                },
+                "enabled": false,
+                "number": {
+                  "condition": "",
+                  "value": ""
+                },
+                "string": {
+                  "condition": "",
+                  "value": ""
+                },
+                "visible": "on-hover"
+              },
+              "footer": {
+                "align": "center",
+                "justify": "left",
+                "style": {
+                  "classes": ""
+                },
+                "title": ""
+              },
+              "header": {
+                "align": "center",
+                "justify": "left",
+                "style": {
+                  "classes": ""
+                },
+                "title": ""
+              },
+              "justify": "auto",
+              "nullFormat": {
+                "includeNullStrings": false,
+                "nullFormatValue": "",
+                "strict": false
+              },
+              "number": "value",
+              "numberFormat": "0,0.##",
+              "progressBar": {
+                "bar": {
+                  "color": "",
+                  "style": {
+                    "classes": ""
+                  }
+                },
+                "max": 100,
+                "min": 0,
+                "track": {
+                  "color": "",
+                  "style": {
+                    "classes": ""
+                  }
+                },
+                "value": {
+                  "enabled": true,
+                  "format": "0,0.##",
+                  "justify": "center",
+                  "style": {
+                    "classes": ""
+                  }
+                }
+              },
+              "render": "auto",
+              "resizable": true,
+              "sort": "none",
+              "sortable": true,
+              "strictWidth": false,
+              "style": {
+                "classes": ""
+              },
+              "toggleSwitch": {
+                "color": {
+                  "selected": "",
+                  "unselected": ""
+                }
+              },
+              "viewParams": {},
+              "viewPath": "",
+              "visible": true,
+              "width": ""
+            },
+            {
+              "align": "center",
+              "boolean": "checkbox",
+              "dateFormat": "MM/DD/YYYY",
+              "editable": false,
+              "field": "description",
               "filter": {
                 "boolean": {
                   "condition": ""
@@ -418,6 +564,98 @@
               "viewPath": "",
               "visible": true,
               "width": ""
+            },
+            {
+              "align": "center",
+              "boolean": "checkbox",
+              "dateFormat": "MM/DD/YYYY",
+              "editable": false,
+              "field": "address",
+              "filter": {
+                "boolean": {
+                  "condition": ""
+                },
+                "date": {
+                  "condition": "",
+                  "value": ""
+                },
+                "enabled": false,
+                "number": {
+                  "condition": "",
+                  "value": ""
+                },
+                "string": {
+                  "condition": "",
+                  "value": ""
+                },
+                "visible": "on-hover"
+              },
+              "footer": {
+                "align": "center",
+                "justify": "left",
+                "style": {
+                  "classes": ""
+                },
+                "title": ""
+              },
+              "header": {
+                "align": "center",
+                "justify": "left",
+                "style": {
+                  "classes": ""
+                },
+                "title": ""
+              },
+              "justify": "auto",
+              "nullFormat": {
+                "includeNullStrings": false,
+                "nullFormatValue": "",
+                "strict": false
+              },
+              "number": "value",
+              "numberFormat": "0,0.##",
+              "progressBar": {
+                "bar": {
+                  "color": "",
+                  "style": {
+                    "classes": ""
+                  }
+                },
+                "max": 100,
+                "min": 0,
+                "track": {
+                  "color": "",
+                  "style": {
+                    "classes": ""
+                  }
+                },
+                "value": {
+                  "enabled": true,
+                  "format": "0,0.##",
+                  "justify": "center",
+                  "style": {
+                    "classes": ""
+                  }
+                }
+              },
+              "render": "auto",
+              "resizable": true,
+              "sort": "none",
+              "sortable": true,
+              "strictWidth": false,
+              "style": {
+                "classes": ""
+              },
+              "toggleSwitch": {
+                "color": {
+                  "selected": "",
+                  "unselected": ""
+                }
+              },
+              "viewParams": {},
+              "viewPath": "",
+              "visible": false,
+              "width": ""
             }
           ],
           "filter": {
@@ -427,7 +665,7 @@
             "activeOption": 100
           },
           "selection": {
-            "enableColumnSelection": true
+            "enableColumnSelection": false
           }
         },
         "type": "ia.display.table"

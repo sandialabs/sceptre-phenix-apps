@@ -1,10 +1,15 @@
 {
   "custom": {},
   "params": {
+    "command": "crob",
     "deviceName": "value",
     "index": 0
   },
   "propConfig": {
+    "params.command": {
+      "paramDirection": "input",
+      "persistent": true
+    },
     "params.deviceName": {
       "paramDirection": "input",
       "persistent": true
@@ -47,11 +52,25 @@
           "x": 121,
           "y": 13
         },
+        "propConfig": {
+          "props.value": {
+            "binding": {
+              "config": {
+                "path": "view.params.command"
+              },
+              "type": "property"
+            }
+          }
+        },
         "props": {
           "options": [
             {
               "label": "CROB",
               "value": "crob"
+            },
+            {
+              "label": "Analog Output",
+              "value": "analog"
             },
             {
               "label": "Data Poll",
@@ -462,11 +481,191 @@
         "type": "ia.container.coord"
       },
       {
+        "children": [
+          {
+            "meta": {
+              "name": "LabelIndex"
+            },
+            "position": {
+              "height": 32,
+              "width": 70,
+              "x": 20,
+              "y": 0
+            },
+            "props": {
+              "text": "Index:"
+            },
+            "type": "ia.display.label"
+          },
+          {
+            "meta": {
+              "name": "IndexField"
+            },
+            "position": {
+              "height": 32,
+              "width": 150,
+              "x": 227,
+              "y": 0
+            },
+            "propConfig": {
+              "props.value": {
+                "binding": {
+                  "config": {
+                    "path": "view.params.index"
+                  },
+                  "type": "property"
+                }
+              }
+            },
+            "type": "ia.input.numeric-entry-field"
+          },
+          {
+            "meta": {
+              "name": "LabelMode"
+            },
+            "position": {
+              "height": 32,
+              "width": 70,
+              "x": 20,
+              "y": 49
+            },
+            "props": {
+              "text": "Mode:"
+            },
+            "type": "ia.display.label"
+          },
+          {
+            "meta": {
+              "name": "ModeDropdown"
+            },
+            "position": {
+              "height": 36,
+              "width": 256,
+              "x": 121,
+              "y": 47
+            },
+            "props": {
+              "options": [
+                {
+                  "label": "Select/Operate",
+                  "value": "Select"
+                },
+                {
+                  "label": "Direct Operate",
+                  "value": "Direct"
+                }
+              ],
+              "value": "Select"
+            },
+            "type": "ia.input.dropdown"
+          },
+          {
+            "meta": {
+              "name": "LabelVariation"
+            },
+            "position": {
+              "height": 32,
+              "width": 70,
+              "x": 20,
+              "y": 100
+            },
+            "props": {
+              "text": "Variation:"
+            },
+            "type": "ia.display.label"
+          },
+          {
+            "meta": {
+              "name": "VariationDropdown"
+            },
+            "position": {
+              "height": 36,
+              "width": 256,
+              "x": 121,
+              "y": 96
+            },
+            "props": {
+              "options": [
+                {
+                  "label": "Int32 (Var 1)",
+                  "value": 1
+                },
+                {
+                  "label": "Int16 (Var 2)",
+                  "value": 2
+                },
+                {
+                  "label": "Float32 (Var 3)",
+                  "value": 3
+                },
+                {
+                  "label": "Float64 (Var 4)",
+                  "value": 4
+                }
+              ],
+              "value": 3
+            },
+            "type": "ia.input.dropdown"
+          },
+          {
+            "meta": {
+              "name": "LabelValue"
+            },
+            "position": {
+              "height": 32,
+              "width": 70,
+              "x": 20,
+              "y": 147
+            },
+            "props": {
+              "text": "Value:"
+            },
+            "type": "ia.display.label"
+          },
+          {
+            "meta": {
+              "name": "ValueField"
+            },
+            "position": {
+              "height": 32,
+              "width": 150,
+              "x": 227,
+              "y": 143
+            },
+            "props": {
+              "format": "0,0.######",
+              "value": 0
+            },
+            "type": "ia.input.numeric-entry-field"
+          }
+        ],
+        "meta": {
+          "name": "analogParams"
+        },
+        "position": {
+          "height": 330,
+          "width": 400,
+          "x": 0,
+          "y": 60
+        },
+        "propConfig": {
+          "meta.visible": {
+            "binding": {
+              "config": {
+                "expression": "{../CommandDropdown.props.value} = 'analog'"
+              },
+              "type": "expr"
+            }
+          }
+        },
+        "type": "ia.container.coord"
+      },
+      {
         "events": {
           "component": {
             "onActionPerformed": {
               "config": {
-                "script": "\tdev = self.view.params.deviceName\n\tcmd = self.getSibling(\"CommandDropdown\").props.value\n\t\n\ttry:\n\t\tif cmd == \"poll\":\n\t\t\tpoll = self.getSibling(\"pollParams\")\n\t\t\tclasses = [c for c in (1, 2, 3, 0) if poll.getChild(\"Class%d\" % c).props.selected]\n\t\t\tsystem.dnp.demandPoll(dev, classes)\n\t\telse:\n\t\t\tcrob = self.getSibling(\"crobParams\")\n\t\t\tidx = crob.getChild(\"IndexField\").props.value\n\t\t\tmode = crob.getChild(\"ModeDropdown\").props.value\n\t\t\top = crob.getChild(\"OpTypeDropdown\").props.value\n\t\t\ttcc = crob.getChild(\"TccDropdown\").props.value\n\t\t\tcnt = crob.getChild(\"CountField\").props.value\n\t\t\tonT = crob.getChild(\"OnTimeField\").props.value\n\t\t\toffT = crob.getChild(\"OffTimeField\").props.value\n\t\t\tif mode == \"Select\":\n\t\t\t\tsystem.dnp.selectOperateBinary(dev, idx, tcc, op, cnt, onT, offT)\n\t\t\telse:\n\t\t\t\tsystem.dnp.directOperateBinary(dev, idx, tcc, op, cnt, onT, offT)\n\t\t\n\t\tself.getSibling(\"ResultLabel\").props.text = \"Sent OK\"\n\texcept Exception as e:\n\t\tself.getSibling(\"ResultLabel\").props.text = \"FAILED: \" + str(e)\n\t"
+                "script": "\tdev = self.view.params.deviceName\n\tcmd = self.getSibling(\"CommandDropdown\").props.value\n\t\n\ttry:\n\t\tif cmd == \"poll\":\n\t\t\tpoll = self.getSibling(\"pollParams\")\n\t\t\tclasses = [c for c in (1, 2, 3, 0) if poll.getChild(\"Class%d\" % c).props.selected]\n\t\t\tsystem.dnp.demandPoll(dev, classes)\n\t\telif cmd == \"analog\":\n\t\t\tanalog = self.getSibling(\"analogParams\")\n\t\t\tidx = analog.getChild(\"IndexField\").props.value\n\t\t\tmode = analog.getChild(\"ModeDropdown\").props.value\n\t\t\tvariation = analog.getChild(\"VariationDropdown\").props.value\n\t\t\tvalue = commands.analogValue(analog.getChild(\"ValueField\").props.value, variation)\n\t\t\tif mode == \"Select\":\n\t\t\t\tsystem.dnp.selectOperateAnalog(dev, variation, idx, value)\n\t\t\telse:\n\t\t\t\tsystem.dnp.directOperateAnalog(dev, variation, idx, value)\n\t\telse:\n\t\t\tcrob = self.getSibling(\"crobParams\")\n\t\t\tidx = crob.getChild(\"IndexField\").props.value\n\t\t\tmode = crob.getChild(\"ModeDropdown\").props.value\n\t\t\top = crob.getChild(\"OpTypeDropdown\").props.value\n\t\t\ttcc = crob.getChild(\"TccDropdown\").props.value\n\t\t\tcnt = crob.getChild(\"CountField\").props.value\n\t\t\tonT = crob.getChild(\"OnTimeField\").props.value\n\t\t\toffT = crob.getChild(\"OffTimeField\").props.value\n\t\t\tif mode == \"Select\":\n\t\t\t\tsystem.dnp.selectOperateBinary(dev, idx, tcc, op, cnt, onT, offT)\n\t\t\telse:\n\t\t\t\tsystem.dnp.directOperateBinary(dev, idx, tcc, op, cnt, onT, offT)\n\t\t\n\t\tself.getSibling(\"ResultLabel\").props.text = \"Sent OK\"\n\texcept Exception as e:\n\t\tself.getSibling(\"ResultLabel\").props.text = \"FAILED: \" + str(e)\n\t"
               },
               "scope": "G",
               "type": "script"
@@ -493,8 +692,8 @@
         },
         "position": {
           "height": 32,
-          "width": 76,
-          "x": 162,
+          "width": 360,
+          "x": 20,
           "y": 454
         },
         "type": "ia.display.label"
