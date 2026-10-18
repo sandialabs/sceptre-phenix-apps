@@ -17,45 +17,56 @@ spec:
               # Existing DB: gateway-restricted passwordless access, CONNECT,
               # schema USAGE/CREATE, and ownership of history tables/sequences.
               historian:
-                ip: 10.68.30.200
+                ip: 192.168.10.200
                 port: 5432
                 user: ignition
                 database: ignition_history
               connected_rtus:
-                - ieee13-1-rtu
-                - hostname: ieee13-2-rtu
+                - rtu-1
+                - hostname: rtu-2
                   name: farm-controller
                   destination_address: 1023
                   polling:
                     integrity: 60000
               polling:
                 class1: 1000
+                class2: 2000
+                class3: 3000
           - hostname: hmi-1
             metadata:
               type: perspective
-      # ieee13-1-rtu is an ot-sim fep, so its points get ot-sim names;
-      # ieee13-2-rtu is not, so its points are discovered on the gateway
+              connected_gateway: OT-scada
+          # same metadata on a Linux gateway; the OS comes from the node's hardware.os_type
+          - hostname: scada
+            metadata:
+              type: gateway
+              perspective: true
+              api: true
+              connected_rtus:
+                - rtu-1
+      # rtu-1 is an ot-sim fep, so its points get ot-sim names;
+      # rtu-2 is not, so its points are discovered on the gateway
       - name: ot-sim
         hosts:
-          - hostname: ieee13-1-rtu
+          - hostname: rtu-1
             metadata:
               type: fep
               upstream:
-                - cap1-ied
-                - 671692-ied
-          - hostname: cap1-ied
+                - capacitor1
+                - breaker1
+          - hostname: capacitor1
             metadata:
               type: fd-server
               dnp3:
-                - name: cap1
+                - name: capacitor1
                   type: capacitor
-          - hostname: 671692-ied
+          - hostname: breaker1
             metadata:
               type: fd-server
               dnp3:
                 interface: eth0:20010
                 devices:
-                  - name: '671692'
+                  - name: breaker1
                     type: breaker
   topology:
     nodes:
@@ -64,22 +75,35 @@ spec:
           hostname: OT-scada
         hardware:
           drives:
-            - image: OT-scada.qc2
+            - image: ignition.qc2
           os_type: windows
         network:
           interfaces:
             - name: eth0
-              vlan: OT
-              address: 10.68.30.190
+              vlan: SCADA
+              address: 192.168.10.190
               mask: 24
       - type: VirtualMachine
         general:
-          hostname: ieee13-1-rtu
+          hostname: scada
+        hardware:
+          drives:
+            - image: ignition-linux.qc2
+          os_type: linux
         network:
           interfaces:
             - name: eth0
-              vlan: OT
-              address: 10.68.30.201
+              vlan: SCADA
+              address: 192.168.10.192
+              mask: 24
+      - type: VirtualMachine
+        general:
+          hostname: rtu-1
+        network:
+          interfaces:
+            - name: eth0
+              vlan: SCADA
+              address: 192.168.10.201
               mask: 24
       - type: VirtualMachine
         general:
@@ -91,33 +115,33 @@ spec:
         network:
           interfaces:
             - name: eth0
-              vlan: OT
-              address: 10.68.30.191
+              vlan: SCADA
+              address: 192.168.10.191
               mask: 24
       - type: VirtualMachine
         general:
-          hostname: ieee13-2-rtu
+          hostname: rtu-2
         network:
           interfaces:
             - name: eth0
-              vlan: OT
-              address: 10.68.30.202
+              vlan: SCADA
+              address: 192.168.10.202
               mask: 24
       - type: VirtualMachine
         general:
-          hostname: cap1-ied
+          hostname: capacitor1
         network:
           interfaces:
             - name: eth0
-              vlan: OT
-              address: 10.68.30.211
+              vlan: SCADA
+              address: 192.168.10.211
               mask: 24
       - type: VirtualMachine
         general:
-          hostname: 671692-ied
+          hostname: breaker1
         network:
           interfaces:
             - name: eth0
-              vlan: OT
-              address: 10.68.30.212
+              vlan: SCADA
+              address: 192.168.10.212
               mask: 24

@@ -1,9 +1,10 @@
 import json
 import re
 import shutil
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Final, Literal
 from urllib.parse import quote
 from uuid import uuid4
 
@@ -15,66 +16,124 @@ from phenix_apps.common import utils
 from phenix_apps.common.logger import logger
 
 # Templates
-TEMPLATES_DIR = Path(Path(__file__).parent, "templates")
-PERSPECTIVE_TEMPLATES_DIR = Path(TEMPLATES_DIR, "perspective")
-API_TEMPLATES_DIR = Path(TEMPLATES_DIR, "api")
-TAG_FOLDER_RESOURCE_FILE = Path(TEMPLATES_DIR, "tag-folder-resource.json")
-TAG_SYNC_TAG_FILE = Path(TEMPLATES_DIR, "tag-sync-tag.json")
-TAG_SYNC_SCRIPT_FILE = Path(TEMPLATES_DIR, "tag-sync.py")
+TEMPLATES_DIR: Final = Path(Path(__file__).parent, "templates")
+PERSPECTIVE_TEMPLATES_DIR: Final = Path(TEMPLATES_DIR, "perspective")
+API_TEMPLATES_DIR: Final = Path(TEMPLATES_DIR, "api")
+TAG_FOLDER_RESOURCE_FILE: Final = Path(TEMPLATES_DIR, "tag-folder-resource.json")
+TAG_SYNC_TAG_FILE: Final = Path(TEMPLATES_DIR, "tag-sync-tag.json")
+TAG_SYNC_SCRIPT_FILE: Final = Path(TEMPLATES_DIR, "tag-sync.py")
+# installed packages compile the Jython templates; keep the bytecode out of projects
+IGNORE_PYCACHE: Final = shutil.ignore_patterns("__pycache__")
 
 # hosts: types
-GATEWAY_TYPE = "gateway"
-PERSPECTIVE_TYPE = "perspective"
+GATEWAY_TYPE: Final = "gateway"
+PERSPECTIVE_TYPE: Final = "perspective"
 
 # Fixed project name for the WebDev tag API
-API_PROJECT_NAME = "api"
-HISTORY_PROVIDER_NAME = "phenix-history"
-TAG_SYNC_NAME = "_TagSync_"
+API_PROJECT_NAME: Final = "api"
+HISTORY_PROVIDER_NAME: Final = "phenix-history"
+TAG_SYNC_NAME: Final = "_TagSync_"
 
 # How the Ignition 8.3 DNP3 driver names the points it browses
-OPC_SERVER = "Ignition OPC UA Server"
-OPC_ITEM_PATH = "ns=1;s=[{device}]{point}{index}"
-POINT_NAMES = {
+OPC_SERVER: Final = "Ignition OPC UA Server"
+OPC_ITEM_PATH: Final = "ns=1;s=[{device}]{point}{index}"
+POINT_NAMES: Final = {
     "ai": "AnalogInput",
     "ao": "AnalogOutput",
     "bi": "BinaryInput",
     "bo": "BinaryOutput",
 }
 # Ignition tag and folder naming rules
-TAG_NAME = re.compile(r"[A-Za-z0-9_ '\-:()]{1,255}")
+TAG_NAME: Final = re.compile(r"[A-Za-z0-9_ '\-:()]{1,255}")
 # the driver's own connection diagnostics, browsed as "[Diagnostics]/<name>"
-DIAGNOSTICS_FOLDER = "_Diagnostics_"
-DIAGNOSTICS = {"Hostname": "String", "Port": "Int4", "Status": "String"}
+DIAGNOSTICS_FOLDER: Final = "_Diagnostics_"
+DIAGNOSTICS: Final = {"Hostname": "String", "Port": "Int4", "Status": "String"}
 
-# expect windows, built with /phenix/startup and /phenix/user-startup
-GUEST_APP_DIR = "/phenix/ignition"
-GUEST_GWBK_SCRIPT_DST = "/phenix/startup/98-ignition.ps1"
-GUEST_CLIENT_SCRIPT_DST = "/phenix/user-startup/99-ignition-perspective.ps1"
-# Ignition program paths
-GUEST_DATA_DIR = "Program Files/Inductive Automation/Ignition/data"
-GUEST_DEVICE_DIR = Path(
-    GUEST_DATA_DIR,
-    "config",
-    "resources",
-    "core",
-    "com.inductiveautomation.opcua",
-    "device",
+# gwbk staging path on both guest OSes (drive-relative on Windows)
+GUEST_GWBK_DST: Final = "/restore.gwbk"
+
+
+@dataclass(frozen=True)
+class GuestLayout:
+    """Where the app's files land on a guest, by OS.
+
+    `data_dir` is the Ignition data tree: drive-relative on Windows, where
+    minimega injects into the system partition, and `/opt/ignition/data` on
+    Linux. Both OSes are expected to run the gateway as an `ignition` service.
+    """
+
+    data_dir: str
+    startup_dir: str
+    user_startup_dir: str
+    script_ext: str
+    newline: str
+
+    def resource(self, *parts: str) -> str:
+        return Path(self.data_dir, "config", "resources", "core", *parts).as_posix()
+
+    @property
+    def resource_dir(self) -> str:
+        return self.resource()
+
+    @property
+    def device_dir(self) -> str:
+        return self.resource("com.inductiveautomation.opcua", "device")
+
+    @property
+    def tag_dir(self) -> str:
+        return self.resource("ignition", "tag-definition", "default")
+
+    @property
+    def database_dir(self) -> str:
+        return self.resource("ignition", "database-connection")
+
+    @property
+    def history_dir(self) -> str:
+        return self.resource("com.inductiveautomation.historian", "historian-provider")
+
+    @property
+    def projects_dir(self) -> str:
+        return Path(self.data_dir, "projects").as_posix()
+
+    def script_dst(self, name: str, user: bool = False) -> str:
+        base = self.user_startup_dir if user else self.startup_dir
+        return f"{base}/{name}{self.script_ext}"
+
+
+# Windows images run /phenix/startup as SYSTEM and /phenix/user-startup at logon
+WINDOWS: Final = GuestLayout(
+    data_dir="Program Files/Inductive Automation/Ignition/data",
+    startup_dir="/phenix/startup",
+    user_startup_dir="/phenix/user-startup",
+    script_ext=".ps1",
+    newline="\r\n",
 )
-GUEST_TAG_DIR = Path(
-    GUEST_DATA_DIR,
-    "config",
-    "resources",
-    "core",
-    "ignition",
-    "tag-definition",
-    "default",
+# Linux images run /etc/phenix/startup as root
+LINUX: Final = GuestLayout(
+    data_dir="/opt/ignition/data",
+    startup_dir="/etc/phenix/startup",
+    user_startup_dir="/phenix/user-startup",
+    script_ext=".sh",
+    newline="\n",
 )
-GUEST_PROJECTS_DIR = Path(GUEST_DATA_DIR, "projects")
-GUEST_RESOURCE_DIR = Path(GUEST_DATA_DIR, "config", "resources", "core")
-GUEST_DATABASE_DIR = Path(GUEST_RESOURCE_DIR, "ignition", "database-connection")
-GUEST_HISTORY_DIR = Path(
-    GUEST_RESOURCE_DIR, "com.inductiveautomation.historian", "historian-provider"
-)
+LAYOUTS: Final = {"windows": WINDOWS, "linux": LINUX}
+# Linux GUI images autologin root into XFCE; this autostart entry runs the
+# client script, since nothing else runs /phenix/user-startup there
+LINUX_AUTOSTART_FILE: Final = "99-ignition-perspective.desktop"
+LINUX_AUTOSTART_DST: Final = f"/root/.config/autostart/phenix-{LINUX_AUTOSTART_FILE}"
+
+
+def guest_layout(host: Any) -> GuestLayout:
+    """The layout for a host's `hardware.os_type`; phenix defaults it to linux."""
+    topology = host.get("topology") or {}
+    os_type = (topology.get("hardware") or {}).get("os_type") or "linux"
+    try:
+        return LAYOUTS[os_type.lower()]
+    except KeyError:
+        raise ValueError(
+            f"'{host.hostname}' has os_type '{os_type}'; the ignition app "
+            f"supports {sorted(LAYOUTS)}"
+        ) from None
 
 
 PollPeriod = Annotated[int, Field(ge=0, le=2147483647)]
@@ -398,10 +457,8 @@ def diagnostics_tag_folder(device: str) -> dict[str, Any]:
 def tag_sync_tag(mapped_devices: list[str], history: dict[str, Any] | None) -> dict:
     """The expression tag whose event script discovers the points of every
     device not in `mapped_devices` and imports them under their DNP3 names."""
-    with TAG_SYNC_TAG_FILE.open() as f:
-        tag = json.load(f)
-    with TAG_SYNC_SCRIPT_FILE.open() as f:
-        script = f.read()
+    tag = json.loads(TAG_SYNC_TAG_FILE.read_text())
+    script = TAG_SYNC_SCRIPT_FILE.read_text()
     # the script is Jython: these literals are valid there too
     tag["eventScripts"][0]["script"] = (
         f"\tmapped_devices = {mapped_devices!r}\n\thistory = {history!r}\n" + script
@@ -433,6 +490,7 @@ class Ignition(AppBase):
     def _configure_gateway(self, gateway) -> IgnitionHostConfig | None:
         hostname = gateway.hostname
         cfg = IgnitionHostConfig(**gateway.metadata)
+        layout = guest_layout(gateway)
 
         if (
             not cfg.connected_rtus
@@ -458,43 +516,59 @@ class Ignition(AppBase):
                 hostname=hostname,
                 inject={
                     "src": cfg.gwbk,
-                    "dst": Path(GUEST_APP_DIR, "restore.gwbk").as_posix(),
+                    "dst": GUEST_GWBK_DST,
                 },
-            )
-            # only a gwbk restore needs boot-time work (gwcmd on the live guest)
-            script = Path(host_dir, "98-ignition.ps1")
-            with script.open("w", newline="\r\n") as f:
-                utils.mako_serve_template("98-ignition.ps1.mako", TEMPLATES_DIR, f)
-            self.add_inject(
-                hostname=hostname,
-                inject={"src": script.as_posix(), "dst": GUEST_GWBK_SCRIPT_DST},
             )
         else:
             devices = self._resolve_devices(cfg.connected_rtus, cfg.polling)
             self._validate_unique_names(devices)
-            for src, dst in self._write_device_tree(host_dir, devices):
+            for src, dst in self._write_device_tree(host_dir, layout, devices):
                 self.add_inject(hostname=hostname, inject={"src": src, "dst": dst})
             if cfg.historian:
-                self._write_historian(hostname, host_dir, cfg.historian)
+                self._write_historian(hostname, host_dir, layout, cfg.historian)
             if cfg.perspective or cfg.historian or cfg.api:
                 tags_dir = Path(host_dir, "tags")
                 self._write_tag_tree(
                     tags_dir, devices, historian=cfg.historian is not None
                 )
-                for src, dst in self._tree_injects(tags_dir, GUEST_TAG_DIR):
+                for src, dst in self._tree_injects(tags_dir, layout.tag_dir):
                     self.add_inject(hostname=hostname, inject={"src": src, "dst": dst})
             if cfg.perspective:
-                self._write_perspective(hostname, host_dir, cfg.perspective, devices)
+                self._write_perspective(
+                    hostname, host_dir, layout, cfg.perspective, devices
+                )
                 if cfg.perspective.open_client:
                     url = (
                         "http://localhost:8088/data/perspective/client/"
                         f"{cfg.perspective.project}"
                     )
-                    self._inject_open_client_script(hostname, host_dir, url)
+                    self._inject_open_client_script(hostname, host_dir, layout, url)
             if cfg.api:
-                self._write_api(hostname, host_dir, cfg.api)
+                self._write_api(hostname, host_dir, layout, cfg.api)
+
+        # stops the gateway, stages any gwbk restore and starts the service again
+        self._inject_script(hostname, host_dir, layout, "98-ignition")
 
         return cfg
+
+    def _inject_script(
+        self,
+        hostname: str,
+        host_dir: Path,
+        layout: GuestLayout,
+        name: str,
+        user: bool = False,
+        **kwargs: Any,
+    ) -> None:
+        """Render the guest OS flavour of a boot script and inject it."""
+        filename = f"{name}{layout.script_ext}"
+        script = Path(host_dir, filename)
+        with script.open("w", newline=layout.newline) as f:
+            utils.mako_serve_template(f"{filename}.mako", TEMPLATES_DIR, f, **kwargs)
+        self.add_inject(
+            hostname=hostname,
+            inject={"src": script.as_posix(), "dst": layout.script_dst(name, user)},
+        )
 
     def _resolve_devices(
         self, rtus: list[RtuDeviceConfig], polling: PollingConfig | None = None
@@ -574,7 +648,7 @@ class Ignition(AppBase):
             )
 
     def _write_device_tree(
-        self, host_dir: Path, devices: list[dict[str, Any]]
+        self, host_dir: Path, layout: GuestLayout, devices: list[dict[str, Any]]
     ) -> list[tuple[str, str]]:
         """Render one device resource folder per RTU, returning (src, dst) injects."""
         injects = []
@@ -600,7 +674,7 @@ class Ignition(AppBase):
                 injects.append(
                     (
                         Path(device_dir, fname).as_posix(),
-                        Path(GUEST_DEVICE_DIR, device["name"], fname).as_posix(),
+                        Path(layout.device_dir, device["name"], fname).as_posix(),
                     )
                 )
 
@@ -610,6 +684,7 @@ class Ignition(AppBase):
         self,
         hostname: str,
         host_dir: Path,
+        layout: GuestLayout,
         pcfg: PerspectiveConfig,
         devices: list[dict[str, Any]],
     ) -> None:
@@ -620,12 +695,12 @@ class Ignition(AppBase):
             project_dir, pcfg.project, [d["name"] for d in devices]
         )
         for src, dst in self._tree_injects(
-            project_dir, Path(GUEST_PROJECTS_DIR, pcfg.project)
+            project_dir, Path(layout.projects_dir, pcfg.project)
         ):
             self.add_inject(hostname=hostname, inject={"src": src, "dst": dst})
 
     def _write_historian(
-        self, hostname: str, host_dir: Path, hcfg: HistorianConfig
+        self, hostname: str, host_dir: Path, layout: GuestLayout, hcfg: HistorianConfig
     ) -> None:
         """Inject native passwordless database/history resources before boot."""
         with Path(TEMPLATES_DIR, "historian", "database-config.json").open() as f:
@@ -669,16 +744,18 @@ class Ignition(AppBase):
             ):
                 with Path(resource_dir, filename).open("w") as f:
                     json.dump(content, f, indent=2)
-        for src, dst in self._tree_injects(build_dir, GUEST_RESOURCE_DIR):
+        for src, dst in self._tree_injects(build_dir, layout.resource_dir):
             self.add_inject(hostname=hostname, inject={"src": src, "dst": dst})
 
-    def _write_api(self, hostname: str, host_dir: Path, acfg: ApiConfig) -> None:
+    def _write_api(
+        self, hostname: str, host_dir: Path, layout: GuestLayout, acfg: ApiConfig
+    ) -> None:
         """Render the WebDev tag-API project and inject it file-by-file into
         the gateway's data tree. Independent of perspective and connected_rtus:
         the resource browses the OPC server live at request time."""
         project_dir = Path(host_dir, "api", "project", API_PROJECT_NAME)
         self._write_api_project(project_dir, acfg)
-        dst_dir = Path(GUEST_PROJECTS_DIR, API_PROJECT_NAME)
+        dst_dir = Path(layout.projects_dir, API_PROJECT_NAME)
         for src, dst in self._tree_injects(project_dir, dst_dir):
             self.add_inject(hostname=hostname, inject={"src": src, "dst": dst})
 
@@ -691,7 +768,7 @@ class Ignition(AppBase):
         config.json."""
         if project_dir.exists():
             shutil.rmtree(project_dir)
-        shutil.copytree(API_TEMPLATES_DIR, project_dir)
+        shutil.copytree(API_TEMPLATES_DIR, project_dir, ignore=IGNORE_PYCACHE)
 
         config_path = Path(
             project_dir,
@@ -711,7 +788,7 @@ class Ignition(AppBase):
             json.dump(config, f, indent=2)
 
     @staticmethod
-    def _tree_injects(src_dir: Path, dst_dir: Path) -> list[tuple[str, str]]:
+    def _tree_injects(src_dir: Path, dst_dir: str | Path) -> list[tuple[str, str]]:
         """One inject per file: minimega creates missing parent directories
         per file, while copying a whole directory would nest wrongly if the
         destination already existed in the image."""
@@ -734,7 +811,7 @@ class Ignition(AppBase):
         station view per RTU device)."""
         if project_dir.exists():
             shutil.rmtree(project_dir)
-        shutil.copytree(PERSPECTIVE_TEMPLATES_DIR, project_dir)
+        shutil.copytree(PERSPECTIVE_TEMPLATES_DIR, project_dir, ignore=IGNORE_PYCACHE)
 
         path = Path(project_dir, "project.json")
         with path.open() as f:
@@ -800,6 +877,7 @@ class Ignition(AppBase):
     ) -> None:
         hostname = client.hostname
         cfg = PerspectiveClientConfig(**client.metadata)
+        layout = guest_layout(client)
 
         if cfg.connected_gateway:
             if cfg.connected_gateway not in gateways:
@@ -833,18 +911,19 @@ class Ignition(AppBase):
         url = (
             f"http://{ip}:8088/data/perspective/client/{gateways[gw_hostname].project}"
         )
-        self._inject_open_client_script(hostname, host_dir, url)
+        self._inject_open_client_script(hostname, host_dir, layout, url)
 
     def _inject_open_client_script(
-        self, hostname: str, host_dir: Path, url: str
+        self, hostname: str, host_dir: Path, layout: GuestLayout, url: str
     ) -> None:
-        """Startup script that opens the HMI page in a browser."""
-        script = Path(host_dir, "99-ignition-perspective.ps1")
-        with script.open("w", newline="\r\n") as f:
-            utils.mako_serve_template(
-                "99-ignition-perspective.ps1.mako", TEMPLATES_DIR, f, url=url
-            )
-        self.add_inject(
-            hostname=hostname,
-            inject={"src": script.as_posix(), "dst": GUEST_CLIENT_SCRIPT_DST},
+        """Logon script that opens the HMI page in a browser."""
+        self._inject_script(
+            hostname, host_dir, layout, "99-ignition-perspective", user=True, url=url
         )
+        if layout is LINUX:
+            autostart = Path(host_dir, LINUX_AUTOSTART_FILE)
+            shutil.copy(Path(TEMPLATES_DIR, LINUX_AUTOSTART_FILE), autostart)
+            self.add_inject(
+                hostname=hostname,
+                inject={"src": autostart.as_posix(), "dst": LINUX_AUTOSTART_DST},
+            )

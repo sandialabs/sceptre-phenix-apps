@@ -1,51 +1,30 @@
-## phenix ignition app (gwbk restore)
+## phenix ignition app (gwbk restore, gateway start)
 $ErrorActionPreference = 'Stop'
 
-Write-Host "[ IGNITION ] Configuring static .gwbk"
-echo "[ IGNITION ] Configuring static .gwbk"
+$staged = 'C:\restore.gwbk'
+$data = 'C:\Program Files\Inductive Automation\Ignition\data'
 
-$staged = 'C:\phenix\ignition\restore.gwbk'
-
-if (-not (Test-Path $staged)) {
-    Write-Host "[ IGNITION ] nothing staged; already configured."
-    echo "[ IGNITION ] nothing staged; already configured."
-    exit 0
+Write-Host "[ IGNITION ] Stopping gateway"
+echo "[ IGNITION ] Stopping gateway"
+# the service may still be starting at boot; give up quietly if it will not stop
+$service = Get-Service -Name Ignition -ErrorAction SilentlyContinue
+$deadline = (Get-Date).AddMinutes(5)
+while ($service -and $service.Status -ne 'Stopped' -and (Get-Date) -lt $deadline) {
+    Stop-Service -Name Ignition -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+    $service.Refresh()
 }
 
-Get-Service -Name Ignition | Out-Null
-
-try {
-    $deadline = (Get-Date).AddMinutes(5)
-    while ($true) {
-        try {
-            Stop-Service -Name Ignition -Force
-            break
-        }
-        catch {
-            if ((Get-Date) -ge $deadline) { throw }
-            Start-Sleep -Seconds 2
-        }
-    }
-
-    try {
-        $gwcmd = 'C:\Program Files\Inductive Automation\Ignition\gwcmd.bat'
-        & $gwcmd -s $staged -m
-        if ($LASTEXITCODE -ne 0) {
-            throw "gwcmd failed restoring $staged (exit code $LASTEXITCODE)"
-        }
-        Remove-Item -Path $staged -Force
-        Write-Host "[ IGNITION ] restored $staged"
-        echo "[ IGNITION ] restored $staged"
-    }
-    finally {
-        Start-Service -Name Ignition
-    }
-}
-catch {
-    Write-Error "[ IGNITION ] $_"
-    echo "[ IGNITION ] $_"
-    exit 1
+if (Test-Path $staged) {
+    Write-Host "[ IGNITION ] Staging restore of $staged"
+    echo "[ IGNITION ] Staging restore of $staged"
+    # the gateway restores a timestamped __restore file found in its data dir on start
+    $stamp = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    Move-Item -Path $staged -Destination (Join-Path $data ("__restore_{0}.gwbk" -f $stamp)) -Force
 }
 
+Write-Host "[ IGNITION ] Starting gateway"
+echo "[ IGNITION ] Starting gateway"
+Start-Service -Name Ignition
 Write-Host "[ IGNITION ] configured!"
 echo "[ IGNITION ] configured!"

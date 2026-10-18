@@ -63,13 +63,15 @@ def doPost(request, session):
     try:
         if not isinstance(data, dict):
             raise ValueError('body must be a JSON object')
-        allowed = {'deviceName', 'pointType', 'index'}
+        address_keys = {'deviceName', 'pointType', 'index'}
         if 'tag' in data:
-            if allowed & set(data):
+            # a tag resolves to an address, so the two forms are exclusive
+            if address_keys & set(data):
                 raise ValueError('tag cannot be combined with deviceName, pointType or index')
             deviceName, pointType, index = resolve_tag(data.get('tag'))
             allowed = {'tag'}
         else:
+            allowed = set(address_keys)
             deviceName = data.get('deviceName')
             if not isinstance(deviceName, basestring) or not deviceName.strip():
                 raise ValueError('deviceName must be a nonblank string')

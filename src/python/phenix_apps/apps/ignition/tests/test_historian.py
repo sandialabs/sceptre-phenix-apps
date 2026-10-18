@@ -11,23 +11,29 @@ import yaml
 from pydantic import ValidationError
 
 from phenix_apps.apps.ignition.app import (
-    GUEST_CLIENT_SCRIPT_DST,
-    GUEST_DATABASE_DIR,
-    GUEST_HISTORY_DIR,
-    GUEST_PROJECTS_DIR,
-    GUEST_RESOURCE_DIR,
-    GUEST_TAG_DIR,
     HISTORY_PROVIDER_NAME,
+    WINDOWS,
     HistorianConfig,
     Ignition,
     IgnitionHostConfig,
 )
-from phenix_apps.apps.ignition.tests.test_ignition import _gateway, _nodes
+from phenix_apps.apps.ignition.tests.test_ignition import (
+    GUEST_BOOT_SCRIPT_DST,
+    GUEST_CLIENT_SCRIPT_DST,
+    GUEST_PROJECTS_DIR,
+    GUEST_TAG_DIR,
+    _gateway,
+    _nodes,
+)
+
+GUEST_RESOURCE_DIR = WINDOWS.resource_dir
+GUEST_DATABASE_DIR = WINDOWS.database_dir
+GUEST_HISTORY_DIR = WINDOWS.history_dir
 
 pytestmark = pytest.mark.app_class(cls=Ignition, name="ignition")
 
 CONNECTION = {
-    "ip": "10.68.30.200",
+    "ip": "192.168.10.200",
     "user": "ignition",
     "database": "ignition_history",
 }
@@ -99,6 +105,7 @@ def test_native_resources_and_provider_linkage(mock_app, mocker):
     mock_app._write_historian(
         "OT-scada",
         Path(mock_app.app_dir) / "OT-scada",
+        WINDOWS,
         HistorianConfig(**CONNECTION),
     )
     tree_injects.assert_called_once_with(
@@ -121,7 +128,7 @@ def test_native_resources_and_provider_linkage(mock_app, mocker):
     )
     assert db["driver"] == "PostgreSQL"
     assert db["translator"] == "POSTGRES"
-    assert db["connectURL"] == "jdbc:postgresql://10.68.30.200:5432/ignition_history"
+    assert db["connectURL"] == "jdbc:postgresql://192.168.10.200:5432/ignition_history"
     assert db["username"] == CONNECTION["user"]
     assert db["connectionProps"] == ""
     assert history["profile"] == {"type": "SqlHistorian"}
@@ -151,13 +158,16 @@ def test_native_resources_and_provider_linkage(mock_app, mocker):
 
 @pytest.mark.parametrize(
     ("ip", "authority"),
-    [("10.68.30.200", "10.68.30.200:15432"), ("2001:db8::1", "[2001:db8::1]:15432")],
+    [
+        ("192.168.10.200", "192.168.10.200:15432"),
+        ("2001:db8::1", "[2001:db8::1]:15432"),
+    ],
 )
 def test_connection_details_are_json_and_jdbc_escaped(mock_app, ip, authority):
     user = 'quoted"\\user\n' + chr(0x2603)
     database = 'history/name?password=ignored&ssl=false#"\\ ' + chr(0x2603)
     cfg = HistorianConfig(ip=ip, port=15432, user=user, database=database)
-    mock_app._write_historian("OT-scada", Path(mock_app.app_dir), cfg)
+    mock_app._write_historian("OT-scada", Path(mock_app.app_dir), WINDOWS, cfg)
     config_path = (
         Path(mock_app.app_dir)
         / "historian/ignition/database-connection"
@@ -203,7 +213,7 @@ def test_historian_combinations_seed_tags_once(
             )
         ],
     )
-    mock_app.extract_node_interface_ip.return_value = "10.68.30.201"
+    mock_app.extract_node_interface_ip.return_value = "192.168.10.201"
 
     mock_app.pre_start()
 
@@ -216,7 +226,7 @@ def test_historian_combinations_seed_tags_once(
     assert dsts.count(f"{GUEST_TAG_DIR}/tags.json") == 1
     assert dsts.count(f"{GUEST_TAG_DIR}/unary-resource.json") == 1
     assert GUEST_CLIENT_SCRIPT_DST not in dsts
-    assert not any(dst.endswith(".ps1") for dst in dsts)
+    assert [dst for dst in dsts if dst.endswith(".ps1")] == [GUEST_BOOT_SCRIPT_DST]
     assert f"{GUEST_DATABASE_DIR}/{HISTORY_PROVIDER_NAME}/config.json" in dsts
     assert f"{GUEST_HISTORY_DIR}/{HISTORY_PROVIDER_NAME}/config.json" in dsts
     assert (
@@ -235,6 +245,6 @@ def test_historian_combinations_seed_tags_once(
 def test_tags_are_seeded_only_for_perspective_historian_or_api(mock_app, mocker, api):
     seed = mocker.spy(mock_app, "_write_tag_tree")
     _nodes(mock_app, gateways=[_gateway(connected_rtus=["rtu-1"], api=api)])
-    mock_app.extract_node_interface_ip.return_value = "10.68.30.201"
+    mock_app.extract_node_interface_ip.return_value = "192.168.10.201"
     mock_app.pre_start()
     assert seed.call_count == int(api)
