@@ -6,12 +6,29 @@ from phenix_apps.apps.otsim.protocols.modbus import Modbus
 
 
 class Register:
-    def __init__(self, typ, tag, md=None):
+    """One protocol register. `device`, `device_type`, `variable` and
+    `protocol` record where an infrastructure register came from so other
+    apps can give its point a meaningful name."""
+
+    def __init__(
+        self,
+        typ,
+        tag,
+        md=None,
+        device=None,
+        device_type=None,
+        variable=None,
+        protocol=None,
+    ):
         if md is None:
             md = {}
         self.type = typ
         self.tag = tag
         self.md = md
+        self.device = device
+        self.device_type = device_type
+        self.variable = variable
+        self.protocol = protocol
 
 
 class Device:
@@ -169,7 +186,13 @@ class FieldDeviceServer(Device):
                         var_type = {"type": var_type}
 
                     reg = Register(
-                        var_type["type"], f"{name}.{var}", var_type.get("dnp3", {})
+                        var_type["type"],
+                        f"{name}.{var}",
+                        var_type.get("dnp3", {}),
+                        device=name,
+                        device_type=fd["type"],
+                        variable=var,
+                        protocol="dnp3",
                     )
                     self.registers["dnp3"].append(reg)
 
@@ -203,7 +226,13 @@ class FieldDeviceServer(Device):
                         var_type = {"type": var_type}
 
                     reg = Register(
-                        var_type["type"], f"{name}.{var}", var_type.get("modbus", {})
+                        var_type["type"],
+                        f"{name}.{var}",
+                        var_type.get("modbus", {}),
+                        device=name,
+                        device_type=fd["type"],
+                        variable=var,
+                        protocol="modbus",
                     )
                     self.registers["modbus"].append(reg)
 

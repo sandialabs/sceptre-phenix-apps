@@ -1,16 +1,7 @@
-	# Intentionally indented for inclusion in json
+	# Intentionally indented for inclusion in json; `mapped_devices` and
+	# `history` are prepended by the app
 	import re
 	logger = system.util.getLogger("phenix.tag-sync")
-	history = {
-		"historyEnabled": True,
-		"historyProvider": history_provider,
-		"sampleMode": "OnChange",
-		"historicalDeadbandStyle": "Discrete",
-		"historicalDeadbandMode": "Absolute",
-		"historicalDeadband": 0.0,
-		"historyTimeDeadband": 0,
-		"historyMaxAge": 0,
-	}
 
 	def merge_tags(parent, tags):
 		results = system.tag.configure(parent, tags, "m")
@@ -71,19 +62,22 @@
 			if device == "_TagSync_":
 				logger.warn("cannot import device using reserved tag name _TagSync_")
 				continue
+			if device in mapped_devices:
+				# named tags and history were generated at build time
+				continue
 			# the browse also returns folder (OBJECT) nodes; only import real points
 			points = [
 				p
 				for p in system.opc.browse(opcServer="Ignition OPC UA Server", device=device)
 				if str(p.getType()) == "DATAVARIABLE"
 			]
-			if not points and not history_provider:
+			if not points and not history:
 				continue
 			existing = {
 				str(tag["fullPath"]): tag
 				for tag in system.tag.browse("[default]" + device, {"recursive": True}).getResults()
 			}
-			if history_provider:
+			if history:
 				reconcile_history(existing)
 			root = {"name": device, "tagType": "Folder", "tags": []}
 			folders = {"": root}
@@ -116,8 +110,9 @@
 						"opcServer": "Ignition OPC UA Server",
 						"opcItemPath": p.getOpcItemPath(),
 						"dataType": type_map.get(cls, "String"),
+						"deadband": 0.0,
 					}
-					if history_provider and parts[-1] != "_TagSync_":
+					if history and parts[-1] != "_TagSync_":
 						tag.update(history)
 					folders[at]["tags"].append(tag)
 					imported += 1

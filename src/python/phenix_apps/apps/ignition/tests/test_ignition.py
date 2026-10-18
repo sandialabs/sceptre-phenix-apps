@@ -130,6 +130,7 @@ def test_resolve_devices_uses_topology_ip(mock_app):
             "source_address": 1,
             "destination_address": 1024,
             "polling": PollingConfig().model_dump(),
+            "points": None,
         }
     ]
 
@@ -271,8 +272,13 @@ def test_api_only_does_not_skip_host(mock_app, mocker):
 
     log.warning.assert_not_called()
     dsts = [c.kwargs["inject"]["dst"] for c in mock_app.add_inject.call_args_list]
-    assert dsts
-    assert all(d.startswith(f"{GUEST_PROJECTS_DIR}/{API_PROJECT_NAME}/") for d in dsts)
+    assert any(d.startswith(f"{GUEST_PROJECTS_DIR}/{API_PROJECT_NAME}/") for d in dsts)
+    # the API reads the tag provider, so the discovery seed comes along
+    assert f"{GUEST_TAG_DIR}/tags.json" in dsts
+    assert all(
+        d.startswith((f"{GUEST_PROJECTS_DIR}/{API_PROJECT_NAME}/", f"{GUEST_TAG_DIR}/"))
+        for d in dsts
+    )
 
 
 # --- gwbk restore ------------------------------------------------------------
@@ -397,7 +403,7 @@ def test_api_with_gwbk_raises():
 def test_write_tag_tree_seeds_sync_tag(mock_app, tmp_path):
     tags_dir = tmp_path / "tags"
 
-    mock_app._write_tag_tree(tags_dir)
+    mock_app._write_tag_tree(tags_dir, [])
 
     with open(f"{tags_dir}/unary-resource.json") as f:
         resource = json.load(f)

@@ -212,3 +212,11 @@ can be added to front end processor (fep), field client devices
                 user: foo
                 pass: bar
 ```
+
+# Outstation point map
+
+`phenix_apps.apps.otsim.points.Outstations` exposes, for any `fep` or `fd-server` host,
+the DNP3 points its outstation serves (`AnalogInput 0` is `cap1.voltage` of a
+`capacitor`, ...) and its listen endpoint, using the same register processing and
+numbering as the generated config. Other apps (Ignition) build their point names from
+it, so changes to how registers are collected or numbered here change those apps too.
