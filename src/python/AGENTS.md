@@ -81,8 +81,9 @@ what it does, what it produces, what it needs first, a field table with real
 defaults, examples, troubleshooting (real error text and the fix), and
 Limitations. Do not explain the validation mechanics or repeat what a table or
 example shows; point to `phenix-scorch-validate` for checking a config. Keep
-the README's existing title. Test the examples with
-`phenix_apps.testing.readme`. CHANGELOG entries are at most 10 words.
+the README's existing title. When a change adds, removes or rewords a log
+message or error, update the README's troubleshooting table to match. Test the
+examples with `phenix_apps.testing.readme`. CHANGELOG entries are at most 10 words.
 
 ### Scale Plugins
 
