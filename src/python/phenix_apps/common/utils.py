@@ -764,8 +764,8 @@ def mm_exec_wait(
         "id": cmd_id,
         "cmd": cmd,
         "exitcode": int(exit_resp["Response"]),
-        "stderr": None,
-        "stdout": None,
+        "stderr": "",
+        "stdout": "",
     }
 
     # Read across all hosts: only the VM's host has the response; siblings report
