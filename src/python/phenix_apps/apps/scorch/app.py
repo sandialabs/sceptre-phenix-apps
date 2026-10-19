@@ -45,11 +45,20 @@ def _hostname(value: str) -> str:
 
 # Field types for metadata models. Names, interfaces and paths are interpolated
 # into commands (minimega joins its arguments with spaces, treats `#` as a
-# comment and `\` as an escape), so a Token is one word with none of those or
-# quotes; Args is free text appended inside a single-quoted `bash -c '...'`.
+# comment and `\` as an escape), so a Token is one word of plain characters:
+# none of those, quotes, or shell syntax. Every sink of a Token today takes an
+# argument vector (minimega's `shell`, miniccc, ovs-vsctl), so the allowlist is
+# defense in depth, and it still holds `vm[1-3]`, `a,b` and `ns//vlan`.
+# Args is free text for a command line that a shell may parse (inside a
+# `bash -c '...'`, where minimega's lexer has already turned a backslash-n
+# into a newline), so it is plain characters too: no quotes, backslashes or
+# shell syntax. FilterExpr is for text that only ever reaches a program as
+# arguments, never a shell: it also takes the `( ) [ ] ! & | < > ^` of a
+# tcpdump filter. An empty Args or FilterExpr is valid.
 Name = Annotated[str, Field(pattern=r"^[A-Za-z0-9][\w.-]*$")]
-Token = Annotated[str, Field(pattern=r"""^[^\s'"#\\]+$""")]
-Args = Annotated[str, Field(pattern=r"^[^'\r\n]*$")]
+Token = Annotated[str, Field(pattern=r"^[A-Za-z0-9_.:+,=@/\[\]-]+$")]
+Args = Annotated[str, Field(pattern=r"^[A-Za-z0-9_ .,:=@%/+-]*$")]
+FilterExpr = Annotated[str, Field(pattern=r"^[A-Za-z0-9_ .,:=@%/+*()\[\]!&|<>^-]*$")]
 # A topology node name, by phenix core's rules (utils.validate_hostname).
 Hostname = Annotated[str, AfterValidator(_hostname)]
 # A Linux interface name: at most 15 characters (IFNAMSIZ), no `/`, `:` or
@@ -416,7 +425,22 @@ class ComponentBase:
         name = runs[self.run].get("name", str(self.run))
 
         # name might be an empty string...
-        return name if name else str(self.run)
+        if not name:
+            return str(self.run)
+
+        name = str(name)
+
+        # Callers put the name in the name of a file under the experiment's
+        # directory on the host (cc, caldera), so a name that is not one plain
+        # word (a '/', '..' or space in it) is replaced by the run's index.
+        if not re.fullmatch(r"[A-Za-z0-9][\w.-]*", name):
+            logger.warning(
+                f"run {self.run} has a name that is not a plain word, using "
+                f"'{self.run}' in file names instead"
+            )
+            return str(self.run)
+
+        return name
 
     def extract_app(self, name: str) -> Box | None:
         for app in self.experiment.spec.scenario.apps:

@@ -9,7 +9,9 @@ from pydantic import BaseModel
 
 from phenix_apps.apps.scorch import ComponentBase
 from phenix_apps.apps.scorch.app import (
+    Args,
     FilePath,
+    FilterExpr,
     Hostname,
     Interface,
     MetadataBlock,
@@ -174,6 +176,8 @@ class Fields(BaseModel):
     iface: Interface | None = None
     path: FilePath | None = None
     token: Token | None = None
+    args: Args | None = None
+    expr: FilterExpr | None = None
 
 
 @pytest.mark.parametrize(
@@ -188,6 +192,18 @@ class Fields(BaseModel):
         ("path", "C:/phenix/results.json"),
         ("path", "relative/dir/file-1.txt"),
         ("token", "--opt=value"),
+        # minimega targets, a namespaced VLAN and an index name
+        ("token", "vm[1-3]"),
+        ("token", "a,b"),
+        ("token", "ns//lan"),
+        ("token", "rtds-clean"),
+        ("args", ""),
+        ("args", "-c 1000 -s 96"),
+        ("args", "--omit 2 -b 10M --bind=10.0.0.1"),
+        ("expr", ""),
+        ("expr", "port 80"),
+        ("expr", "(port 80 or port 443) and not host 1.2.3.4"),
+        ("expr", "tcp[tcpflags] & tcp-syn != 0"),
     ],
 )
 def test_shared_field_types_accept(field, value):
@@ -214,6 +230,32 @@ def test_shared_field_types_accept(field, value):
         ("path", "/tmp/a b"),
         ("token", "rtu#ignored"),
         ("token", "a\\tb"),
+        ("token", "a;id"),
+        ("token", "a|b"),
+        ("token", "a&b"),
+        ("token", "$(id)"),
+        ("token", "`id`"),
+        ("token", "a>b"),
+        ("token", "two words"),
+        ("args", "--omit 2; printf marker"),
+        ("args", "a | b"),
+        ("args", "$(id)"),
+        ("args", "`id`"),
+        ("args", "a && b"),
+        ("args", "a > /etc/x"),
+        ("args", "it's"),
+        ("args", 'say "hi"'),
+        ("args", "a\\nb"),
+        ("args", "a\nb"),
+        ("args", "a # b"),
+        ("expr", "a; id"),
+        ("expr", "$(id)"),
+        ("expr", "`id`"),
+        ("expr", "port 80 # x"),
+        ("expr", "it's"),
+        ("expr", 'a"b'),
+        ("expr", "a\\b"),
+        ("expr", "a\nb"),
     ],
 )
 def test_shared_field_types_reject(field, value):
@@ -228,3 +270,25 @@ def test_stage_the_component_does_not_implement_skips_metadata(run_component):
     component.execute_stage()  # Component has no cleanup(), so no error
 
     assert component.config is None
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("baseline", "baseline"),
+        ("run-1.a", "run-1.a"),
+        (3, "3"),
+        ("", "0"),
+        # a name becomes part of a file name on the host
+        ("../../etc/x", "0"),
+        ("a/b", "0"),
+        ("..", "0"),
+        ("two words", "0"),
+        ("a;b", "0"),
+    ],
+)
+def test_run_name_is_safe_in_a_file_name(run_component, name, expected):
+    component = run_component({"count": 1})
+    component.experiment.spec.scenario.apps[0].metadata["runs"] = [{"name": name}]
+
+    assert component.extract_run_name() == expected

@@ -128,3 +128,17 @@ def test_backslashes_are_doubled_for_the_minimega_lexer():
     ((_, _, sent),) = component.mm.calls
     assert sent == "'" + data.replace("\\", "\\\\") + "'"
     assert sent == r"""'{"a":"x\\ny"}\\\\'"""
+
+
+def test_via_is_refused_when_host_commands_are_disabled(monkeypatch):
+    from phenix_apps.common import error, settings
+
+    monkeypatch.setattr(settings, "SCORCH_HOST_VALIDATORS", False)
+    component = Pipe.__new__(Pipe)
+    component.name = "pipe"
+    component.config = parse_metadata(PipeMetadata, {"pipe": "p", "via": "cat"}, "p")
+    component.mm = FakeMinimega()
+
+    with pytest.raises(error.AppError, match="PHENIX_SCORCH_HOST_VALIDATORS=0"):
+        component.start()
+    assert component.mm.calls == []
