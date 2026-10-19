@@ -65,9 +65,12 @@ base class. Register each component's console script in `pyproject.toml`.
 Describe new or reworked component metadata as a pydantic model and set it as
 the class's `metadata_model`; `execute_stage()` then parses it into
 `self.config` and reports every bad field at once. Use `self.config` directly
-rather than copying its fields onto the component. Shared field types (`Name`,
-`Token`, `Args`, `Seconds`, `Hostname`, `Interface`, `FilePath`) live in
-`scorch/app.py` (#160); use them for every hostname, interface and path.
+rather than copying its fields onto the component. `metadata_model` is opt-in:
+a component without one, including out-of-tree components, reads the raw
+`self.metadata` Box as before, and the base never assigns its `config`. Shared
+field types (`Name`, `Token`, `Args`, `Seconds`, `Hostname`, `Interface`,
+`FilePath`) live in `scorch/app.py` (#160); use them for every hostname,
+interface and path.
 
 Type metadata strictly: `bool` for flags, `AnyHttpUrl` for URLs, IP types for
 addresses, constrained strings for names and paths. A wrong type or malformed
