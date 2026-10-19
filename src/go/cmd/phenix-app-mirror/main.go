@@ -151,15 +151,9 @@ func runStage(log *slog.Logger, stage string, exp *types.Experiment, dryrun bool
 func configure(log *slog.Logger, exp *types.Experiment) error {
 	app := util.ExtractApp(exp.Spec.Scenario(), "mirror")
 
-	amd, err := extractMetadata(app.Metadata())
+	amd, err := extractMetadata(app.Metadata(), exp.Spec.DefaultBridge())
 	if err != nil {
 		return fmt.Errorf("extracting app metadata: %w", err)
-	}
-
-	amd.Init()
-
-	if amd.MirrorBridge == "" {
-		amd.MirrorBridge = exp.Spec.DefaultBridge()
 	}
 
 	nw, err := mirrorNet(log, &amd)
@@ -299,15 +293,9 @@ func postStart(log *slog.Logger, exp *types.Experiment, dryrun bool) error {
 	app := util.ExtractApp(exp.Spec.Scenario(), "mirror")
 
 	var amd MirrorAppMetadataV1
-	amd, err = extractMetadata(app.Metadata())
+	amd, err = extractMetadata(app.Metadata(), exp.Spec.DefaultBridge())
 	if err != nil {
 		return fmt.Errorf("extracting app metadata: %w", err)
-	}
-
-	amd.Init()
-
-	if amd.MirrorBridge == "" {
-		amd.MirrorBridge = exp.Spec.DefaultBridge()
 	}
 
 	var nw netaddr.IPPrefix
@@ -735,15 +723,9 @@ func cleanup(log *slog.Logger, exp *types.Experiment, dryrun bool) error {
 
 	app := util.ExtractApp(exp.Spec.Scenario(), "mirror")
 
-	amd, err := extractMetadata(app.Metadata())
+	_, err := extractMetadata(app.Metadata(), exp.Spec.DefaultBridge())
 	if err != nil {
 		return fmt.Errorf("extracting app metadata: %w", err)
-	}
-
-	amd.Init()
-
-	if amd.MirrorBridge == "" {
-		amd.MirrorBridge = exp.Spec.DefaultBridge()
 	}
 
 	cluster := cluster(exp)

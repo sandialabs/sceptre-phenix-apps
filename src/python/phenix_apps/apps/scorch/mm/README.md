@@ -14,7 +14,7 @@ metadata:
     - type: start_capture
       capture:
         bridge: phenix
-        filename: capture.pcap # will be auto generated as <bridge>-<ts>.pcap if not provided
+        filename: capture.pcap # will be auto generated as <bridge>-<ts>.pcap if not provided; letters, digits and . _ : + - only
         filter: port 80 # typical BPF filter expression
         snaplen: null
     - type: stop_capture
@@ -42,7 +42,7 @@ metadata:
       - type: start_capture
         capture:
           interface: 0
-          filename: capture.pcap # will be auto generated as <host>-<iface>-<ts>.pcap if not provided
+          filename: capture.pcap # will be auto generated as <host>-<iface>-<ts>.pcap if not provided; letters, digits and . _ : + - only
           filter: port 80 # typical BPF filter expression
           snaplen: null
       - type: stop_capture # will stop captures on all interfaces (minimega limitation)

@@ -1,10 +1,21 @@
+import re
 import subprocess
+from pathlib import Path
+from typing import Final
 
 from phenix_apps.apps.scorch import ComponentBase
-from phenix_apps.common import utils
+from phenix_apps.common import error, utils
 from phenix_apps.common.logger import logger
 
 # TODO: merge tcpdump's functionality into the 'pcap' component
+
+IFACE_REGEX: Final[re.Pattern[str]] = re.compile(r"^[A-Za-z0-9_.:-]{1,32}$")
+
+
+def _validate_iface(iface: str) -> str:
+    if not IFACE_REGEX.fullmatch(iface):
+        raise error.AppError(f"invalid interface name '{iface}'")
+    return iface
 
 
 class TCPDump(ComponentBase):
@@ -31,6 +42,8 @@ class TCPDump(ComponentBase):
 
             if not iface:
                 raise ValueError("no interface name provided for VM config")
+
+            iface = _validate_iface(iface)
 
             res = utils.mm_exec_wait(mm, hostname, "which tcpdump")
             if not res["stdout"]:
@@ -73,8 +86,10 @@ class TCPDump(ComponentBase):
             if not iface:
                 raise ValueError("no interface name provided for VM config")
 
-            pcap_out = f"{self.base_dir}/{hostname}-{iface}.pcap"
-            json_out = f"{self.base_dir}/{hostname}-{iface}.pcap.jsonl"
+            iface = _validate_iface(iface)
+
+            pcap_out = str(Path(self.base_dir) / f"{hostname}-{iface}.pcap")
+            json_out = Path(self.base_dir) / f"{hostname}-{iface}.pcap.jsonl"
 
             utils.mm_exec_wait(mm, hostname, "pkill tcpdump")
 
@@ -88,10 +103,12 @@ class TCPDump(ComponentBase):
             if convert:
                 logger.info(f"starting PCAP --> JSON conversion for node {hostname}...")
 
-                subprocess.run(
-                    f"bash -c 'tshark -r {pcap_out} -T ek > {json_out} 2>/dev/null'",
-                    shell=True,
-                )
+                with json_out.open("w") as jf:
+                    subprocess.run(
+                        ["tshark", "-r", pcap_out, "-T", "ek"],
+                        stdout=jf,
+                        stderr=subprocess.DEVNULL,
+                    )
 
                 logger.info(f"PCAP --> JSON conversion for node {hostname} complete")
 

@@ -4,6 +4,7 @@ from pydantic import BeforeValidator, Field, StringConstraints
 
 from phenix_apps.apps.scorch import ComponentBase
 from phenix_apps.apps.scorch.app import MetadataBlock, Token
+from phenix_apps.common import error, settings
 from phenix_apps.common.logger import logger
 
 
@@ -63,6 +64,12 @@ class Pipe(ComponentBase):
         logger.info(f"Starting user component: {self.name}")
 
         if self.config.via:
+            if not settings.SCORCH_HOST_VALIDATORS:
+                raise error.AppError(
+                    f"pipe 'via' runs '{self.config.via}' as a command on the host, "
+                    "and host-side commands are disabled by "
+                    "PHENIX_SCORCH_HOST_VALIDATORS=0"
+                )
             logger.info(
                 f"setting via '{self.config.via}' for pipe '{self.config.pipe}'"
             )

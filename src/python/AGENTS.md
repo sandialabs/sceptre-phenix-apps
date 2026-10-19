@@ -68,9 +68,12 @@ the class's `metadata_model`; `execute_stage()` then parses it into
 rather than copying its fields onto the component. `metadata_model` is opt-in:
 a component without one, including out-of-tree components, reads the raw
 `self.metadata` Box as before, and the base never assigns its `config`. Shared
-field types (`Name`, `Token`, `Args`, `Seconds`, `Hostname`, `Interface`,
-`FilePath`) live in `scorch/app.py` (#160); use them for every hostname,
-interface and path.
+field types (`Name`, `Token`, `Args`, `FilterExpr`, `Seconds`, `Hostname`,
+`Interface`, `FilePath`) live in `scorch/app.py` (#160); use them for every
+hostname, interface and path. `Token` and `Args` are plain-character
+allowlists, safe in a minimega command or a `bash -c '...'`; `FilterExpr` also
+takes the `( ) [ ] ! & | < >` of a tcpdump filter, so only pass it to a program
+as arguments, never to a shell.
 
 Type metadata strictly: `bool` for flags, `AnyHttpUrl` for URLs, IP types for
 addresses, constrained strings for names and paths. A wrong type or malformed

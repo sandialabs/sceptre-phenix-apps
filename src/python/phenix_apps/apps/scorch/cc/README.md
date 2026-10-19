@@ -38,6 +38,11 @@ metadata:
 > validator script should be written to process STDIN. Anything the validator
 > script writes to STDERR will be available to the user if the validation fails.
 
+> [!IMPORTANT]
+> Validators run as shell scripts on the phenix host, not in the VM. To lock
+> this down, set `PHENIX_SCORCH_HOST_VALIDATORS=0` in the phenix environment;
+> each validator is then skipped with a warning and the result is not validated.
+
 ## Types
 - VM-specific command types
   - `exec`: execute a command (`cc exec`)
@@ -58,6 +63,15 @@ default routes, but may not be useful for most of the actions executed as part
 of this component. The `once` setting can be used to limit the execution of an
 exec or background command to only one time (and this is the default for this
 setting).
+
+## Notes on Stage-Level `args` and `filter`
+
+A stage-level `exec` hands `args` and `filter` to minimega as written, so
+minimega's command lexer reads them: `#` starts a comment and drops the rest,
+quotes group words, and a backslash is an escape (only `\\`, `\'`, `\"`, `\n`,
+`\r`, `\t` and `\#` are valid; any other fails the command). Write Windows
+paths with forward slashes. VM-level `exec` and `background` write `args` to a
+script on the VM instead, so none of this applies to them.
 
 ## Notes on the `send` Type
 

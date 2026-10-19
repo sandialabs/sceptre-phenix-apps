@@ -13,6 +13,11 @@ stages: start, cleanup
 | `start` | In this order, each only if set: sets `via`, sets `mode`, turns `log` on or off, then writes `data` to `pipe`. |
 | `cleanup` | Deletes the pipe (minimega's `clear pipe`), which drops its `via`, `mode` and `log` settings and disconnects its readers. minimega refuses while any writer is still open. |
 
+> [!IMPORTANT]
+> A `via` program runs on the phenix host. To lock this down, set
+> `PHENIX_SCORCH_HOST_VALIDATORS=0` in the phenix environment; a `via` then
+> fails the component.
+
 ## Before you start
 
 - A reader must already be attached to the pipe when `start` runs. minimega
