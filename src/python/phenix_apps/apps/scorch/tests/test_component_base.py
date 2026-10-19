@@ -3,6 +3,7 @@ import json
 import sys
 
 import pytest
+from box import Box
 from pydantic import BaseModel
 
 from phenix_apps.apps.scorch import ComponentBase
@@ -37,7 +38,11 @@ def run_component(monkeypatch, tmp_path):
 
     monkeypatch.setenv("PHENIX_FILES_DIR", str(tmp_path))
 
-    def run(metadata: object, ctype: str | None = "test") -> Component:
+    def run(
+        metadata: object,
+        ctype: str | None = "test",
+        cls: type[ComponentBase] = Component,
+    ) -> ComponentBase:
         experiment = {
             "spec": {
                 "experimentName": "exp",
@@ -58,12 +63,12 @@ def run_component(monkeypatch, tmp_path):
         }
         monkeypatch.setattr(sys, "argv", ["x", "configure", "c", "0", "0", "0"])
         monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(experiment)))
-        return Component()
+        return cls()
 
     return run
 
 
-def status(component: Component) -> dict:
+def status(component: ComponentBase) -> dict:
     (path,) = component.base_dir.glob("configure-*.json")
     return json.loads(path.read_text())
 
@@ -82,6 +87,30 @@ def test_invalid_metadata_fails_the_stage_with_a_status_file(run_component):
         component.execute_stage()
 
     assert "count: Input should be a valid integer" in status(component)["return"]
+
+
+class LegacyComponent(ComponentBase):
+    """An out-of-tree component written before metadata_model existed."""
+
+    def __init__(self):
+        ComponentBase.__init__(self, "test")
+
+    @property
+    def config(self):
+        return "own config"
+
+    def configure(self):
+        assert type(self.metadata) is Box
+        return f"count={self.metadata.count}"
+
+
+def test_component_without_a_model_reads_raw_metadata(run_component):
+    # nothing is validated, and the base leaves its config property alone
+    component = run_component({"count": "many", "typo": 1}, cls=LegacyComponent)
+    component.execute_stage()
+
+    assert status(component)["return"] == "count=many"
+    assert component.config == "own config"
 
 
 class Block(MetadataBlock):

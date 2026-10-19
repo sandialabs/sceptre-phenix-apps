@@ -146,6 +146,10 @@ class ComponentBase:
     # execute_stage parses the metadata into self.config before the stage runs,
     # so a bad config fails the stage once, naming every bad field.
     metadata_model: ClassVar[type[BaseModel] | None] = None
+    # A class-level default, not set in __init__: components without a model
+    # keep reading self.metadata, and their own config attribute or property
+    # must not be overwritten.
+    config: BaseModel | None = None
 
     @classmethod
     def check_args(cls) -> None:
@@ -202,7 +206,6 @@ class ComponentBase:
         self.exp_name: str = self.experiment.spec.experimentName
         self.exp_dir: Path = Path(self.experiment.spec.baseDir)
         self.metadata: Box | None = self.extract_metadata()
-        self.config: BaseModel | None = None
 
         self.root_dir: Path = Path(PHENIX_DIR) / "images"
         self.files_dir: Path = Path(
