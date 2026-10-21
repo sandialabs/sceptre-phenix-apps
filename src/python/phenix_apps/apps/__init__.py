@@ -1,19 +1,25 @@
 import argparse
 import copy
 import os
-import re
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from box import Box
 
 from phenix_apps.common import utils
+from phenix_apps.common.base import ExperimentBase
 from phenix_apps.common.logger import configure_logging, logger
 
 
-class AppBase:
-    valid_stages = ("configure", "pre-start", "post-start", "running", "cleanup")
+class AppBase(ExperimentBase):
+    valid_stages: ClassVar[tuple[str, ...]] = (
+        "configure",
+        "pre-start",
+        "post-start",
+        "running",
+        "cleanup",
+    )
 
     def __init__(self, name: str, stage: str, dryrun: bool = False) -> None:
         self.name = name
@@ -103,13 +109,6 @@ class AppBase:
     def finalize(self) -> None:
         pass
 
-    def get_annotation(self, key: str) -> str | None:
-        metadata = self.experiment.get("metadata")
-        if metadata and "annotations" in metadata:
-            return metadata.annotations.get(key)
-
-        return None
-
     def extract_app(self, name: str | None = None) -> Box | None:
         """
         Return the app definition from the Scenario matching "name",
@@ -122,25 +121,6 @@ class AppBase:
         for app in apps:
             if app.name == name:
                 return app
-        return None
-
-    def extract_node(
-        self, hostname: str, wildcard: bool = False
-    ) -> Box | list[Box] | None:
-        regex = re.compile(hostname)
-        extracted = []
-
-        for node in self.experiment.spec.topology.nodes:
-            if wildcard:
-                if regex.match(node.general.hostname):
-                    extracted.append(node)
-            else:
-                if node.general.hostname == hostname:
-                    return node
-
-        if wildcard:
-            return extracted
-
         return None
 
     def extract_topology_nodes_by_attribute(
@@ -307,46 +287,6 @@ class AppBase:
 
         return hosts
 
-    def extract_node_interface_ip(
-        self, hostname: str, iface: str, include_mask: bool = False
-    ) -> str | tuple[str, int] | None:
-        """
-        Returns str with IP address of the interface name for the matching host.
-        If include_mask is True, then a tuple is returned with the IP and
-        subnet mask integer.
-        """
-
-        node = self.extract_node(hostname)
-
-        if iface:
-            for i in node.network.interfaces:
-                if i["name"] == iface and "address" in i:
-                    if include_mask:
-                        return i["address"], i["mask"]
-                    return i["address"]
-        elif len(node.network.interfaces) > 0:
-            i = node.network.interfaces[0]
-
-            if "address" in i:
-                if include_mask:
-                    return i["address"], i["mask"]
-                return i["address"]
-
-        return None
-
-    def extract_node_hostname_for_ip(self, address: str) -> str | None:
-        if ":" in address:
-            address, _ = address.split(":", 1)
-
-        nodes = self.experiment.spec.topology.nodes
-
-        for node in nodes:
-            for i in node.network.interfaces:
-                if "address" in i and i["address"] == address:
-                    return node.general.hostname
-
-        return None
-
     def add_node(self, new_node: Box | dict, overwrite: bool = False) -> None:
         utils.validate_hostname(new_node["general"]["hostname"])
 
@@ -367,7 +307,7 @@ class AppBase:
             self.experiment.spec.topology.nodes[found] = Box(new_node)
 
     def add_annotation(self, hostname: str, key: str, value: Any) -> None:
-        node = self.extract_node(hostname)
+        node = self.require_node(hostname)
 
         annotations = node.get("annotations", {})
 
@@ -380,7 +320,7 @@ class AppBase:
         node["annotations"] = annotations
 
     def add_label(self, hostname: str, key: str, value: str) -> None:
-        node = self.extract_node(hostname)
+        node = self.require_node(hostname)
 
         labels = node.get("labels", {})
 
@@ -393,7 +333,7 @@ class AppBase:
         node["labels"] = labels
 
     def add_inject(self, hostname: str, inject: Box | dict) -> None:
-        node = self.extract_node(hostname)
+        node = self.require_node(hostname)
 
         if node.get("injections", None):
             # First check to see if this exact injection already exists. This
@@ -411,7 +351,7 @@ class AppBase:
             node["injections"] = [inject]
 
     def is_booting(self, hostname: str) -> bool:
-        node = self.extract_node(hostname)
+        node = self.require_node(hostname)
         dnb = node.general.get("do_not_boot", False)
 
         return not dnb

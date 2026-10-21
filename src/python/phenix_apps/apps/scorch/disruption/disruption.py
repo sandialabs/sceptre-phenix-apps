@@ -186,7 +186,7 @@ class Disruption(ComponentBase):
     def _attacker_extra_interfaces(self) -> list[str]:
         """Attacker interfaces other than the attack and management ones."""
         a_iface = self.dos.attacker.interface
-        a_node = self.extract_node(self.dos.attacker.hostname)
+        a_node = self.require_node(self.dos.attacker.hostname)
         return [
             iface.name
             for iface in a_node.network.interfaces

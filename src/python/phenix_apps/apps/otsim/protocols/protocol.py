@@ -1,5 +1,7 @@
 import ipaddress
 
+from phenix_apps.common import utils
+
 
 class Protocol:
     def __init__(self, name):
@@ -25,12 +27,16 @@ def resolve_endpoint(node, protocol: str, default_port: int) -> tuple[str, int]:
     settings = node.metadata.get(protocol)
     interfaces = node.topology.network.interfaces
     ip = None
-    port: int | str = default_port
+    port = default_port
 
     if isinstance(settings, dict) and "interface" in settings:
-        addr, _, given = str(settings["interface"]).partition(":")
-        if given:
-            port = given
+        try:
+            addr, given = utils.split_host_port(str(settings["interface"]))
+        except ValueError as ex:
+            raise ValueError(
+                f"'{node.hostname}' has an invalid {protocol} interface: {ex}"
+            ) from None
+        port = given or default_port
         try:
             ip = str(ipaddress.ip_address(addr))
         except ValueError:
@@ -46,9 +52,4 @@ def resolve_endpoint(node, protocol: str, default_port: int) -> tuple[str, int]:
         raise ValueError(
             f"'{node.hostname}' has no addressed interface for its {protocol} endpoint"
         )
-    try:
-        return ip, int(port)
-    except ValueError:
-        raise ValueError(
-            f"'{node.hostname}' has an invalid {protocol} port '{port}'"
-        ) from None
+    return ip, port

@@ -204,13 +204,13 @@ class VMStats(ComponentBase):
         else:  # default to all Linux-based VMs (VyOS and Vyatta are Debian)
             vms = []
             for vm in self.extract_node_names():
-                node = self.extract_node(vm)
+                os_type = self.extract_node_os_type(vm)
 
-                if node.get("hardware", {}).get("os_type", "") in compatible_os:
+                if os_type in compatible_os:
                     vms.append(vm)
                 else:
                     logger.info(
-                        f"Skipping VM {vm} with incompatible os_type '{node.get('hardware', {}).get('os_type', '')}' (must be one of {compatible_os})"
+                        f"Skipping VM {vm} with incompatible os_type '{os_type}' (must be one of {compatible_os})"
                     )
 
         return vms

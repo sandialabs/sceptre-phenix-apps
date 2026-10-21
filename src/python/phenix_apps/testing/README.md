@@ -43,8 +43,10 @@ def test_two(mock_app): ...
 ```
 
 `mock_app` bypasses `__init__`, populates standard `AppBase` attributes
-under `tmp_path`, and replaces extension methods (`extract_*`, `add_*`,
-`is_*`, `render`, `get_annotation`) with `MagicMock`s.
+under `tmp_path`, and replaces every public `AppBase` method, including those
+inherited from `ExperimentBase` (`extract_*`, `require_node`, `get_annotation`,
+`mm_init`, `add_*`, `is_*`, `render`), with `MagicMock`s. An app that overrides
+one of these and tests its own version must name it in `real_methods`.
 
 App-specific attributes (e.g. Scale's `files_dir`) are not set — assign
 them in the test if needed.

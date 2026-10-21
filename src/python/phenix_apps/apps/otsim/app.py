@@ -46,8 +46,7 @@ class OTSim(AppBase):
 
                         self.brokers[hostname]["feds"] += 1
 
-                    addr = self.extract_node_interface_ip(hostname, iface)
-                    assert addr
+                    addr = self.extract_node_ip(hostname, iface)
 
                     # Check to see if helics app is being used. If so, check if ot-sim
                     # broker matches root broker. If not, append default port 24000 to
@@ -63,11 +62,9 @@ class OTSim(AppBase):
                         if root_broker:
                             if "|" in root_broker:
                                 hostname, iface = root_broker.split("|", 1)
-                                root_broker = self.extract_node_interface_ip(
-                                    hostname, iface
-                                )
-                            elif ":" in root_broker:
-                                root_broker, _ = root_broker.split(":", 1)
+                                root_broker = self.extract_node_ip(hostname, iface)
+                            else:
+                                root_broker, _ = utils.split_host_port(root_broker)
 
                             if addr != root_broker:
                                 addr += ":24000"

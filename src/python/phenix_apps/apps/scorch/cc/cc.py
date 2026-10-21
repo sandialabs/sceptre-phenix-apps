@@ -87,11 +87,9 @@ class CC(ComponentBase):
                             f"command '{cmd.args}' executed in VM {vm.hostname} using cc"
                         )
 
-                        node = self.extract_node(vm.hostname)
-
                         # HACK: If Windows, use presence of stderr to determine
                         # success/failure instead of exit code. Ugh...
-                        if node.hardware.os_type.lower() == "windows":
+                        if self.extract_node_os_type(vm.hostname) == "windows":
                             if results["stderr"]:
                                 logger.error(
                                     f"command '{cmd.args}' resulted in output to STDERR (assuming failure)"
@@ -249,9 +247,9 @@ class CC(ComponentBase):
 
     def __send_cmd_as_file(self, hostname, cmd):
         cmd_file = f"run-{self.extract_run_name()}_{uuid.uuid4()!s}"
-        node = self.extract_node(hostname)
+        os_type = self.extract_node_os_type(hostname)
 
-        if node.hardware.os_type.lower() == "windows":
+        if os_type == "windows":
             cmd_file += ".ps1"
         else:
             cmd_file += ".sh"
@@ -267,7 +265,7 @@ class CC(ComponentBase):
 
         Path(cmd_src).unlink()
 
-        if node.hardware.os_type.lower() == "windows":
+        if os_type == "windows":
             return f"powershell.exe -ExecutionPolicy Bypass -File {cmd_dst}"
         return f"bash {cmd_dst}"
 

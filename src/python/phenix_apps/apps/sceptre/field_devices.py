@@ -91,7 +91,7 @@ class FieldDevices(PreStartState):
             fd_directory = self.host_dir(fd_.hostname)
 
             # metadata.server_hostname overrides the provider as the state source.
-            server = self.app.extract_node(srv_name) if srv_name else provider
+            server = self.app.require_node(srv_name) if srv_name else provider
             srv_endpoint = server_endpoint(address(server))
 
             # sort out experiment vs serial interface

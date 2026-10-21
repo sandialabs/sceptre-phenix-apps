@@ -23,6 +23,7 @@ from pydantic import (
 )
 
 from phenix_apps.common import utils
+from phenix_apps.common.base import ExperimentBase
 from phenix_apps.common.error import AppError
 from phenix_apps.common.logger import logger, phenix_stderr_sink
 from phenix_apps.common.settings import PHENIX_DIR
@@ -139,7 +140,7 @@ def parse_metadata[M: BaseModel](
     return config
 
 
-class ComponentBase:
+class ComponentBase(ExperimentBase):
     """
     Base class for Scorch components.
 
@@ -346,48 +347,17 @@ class ComponentBase:
         return [ln.strip() for ln in s.splitlines() if ln.strip()]
 
     @property
-    def mm(self) -> minimega.minimega:
-        """
-        minimega instance that's initialized the first time it's referenced.
-        """
-        if not self._mm:
-            self._mm = self.mm_init()
-        return self._mm
-
-    @mm.setter
-    def mm(self, mm_obj: minimega.minimega):
-        self._mm = mm_obj
-
-    def mm_init(self, namespaced: bool = True) -> minimega.minimega:
-        """
-        The minimega.connect function will print a message to STDOUT if there is
-        a version mismatch. This utility function prevents that from happening.
-        """
-
-        saved_stdout = sys.stdout
-
-        sys.stdout = Path("/dev/null").open("w")
-
-        mm = None
-
-        if namespaced:
-            mm = minimega.connect(namespace=self.exp_name)
-        else:
-            mm = minimega.connect()
-
-        sys.stdout.close()
-        sys.stdout = saved_stdout
-
-        return mm
-
-    @property
     def es(self) -> Elasticsearch:
         """Connect to Elasticsearch and return the initialized object."""
         if not self._es:
-            logger.info(
-                f"Connecting to Elasticsearch: {self.metadata.elasticsearch.server}"
-            )
-            self._es = utils.connect_elastic(self.metadata.elasticsearch.server)
+            server = ((self.metadata or {}).get("elasticsearch") or {}).get("server")
+            if not server:
+                raise ValueError(
+                    f"component '{self.name}': metadata.elasticsearch.server "
+                    "is required to connect to Elasticsearch"
+                )
+            logger.info(f"Connecting to Elasticsearch: {server}")
+            self._es = utils.connect_elastic(server)
         return self._es
 
     @es.setter
@@ -411,12 +381,8 @@ class ComponentBase:
                         return cmp.get("metadata", None)
         return None
 
-    def extract_run_name(self) -> str | None:
-        app = self.extract_app("scorch")
-        if not app:
-            return None
-
-        md = app.get("metadata", {})
+    def extract_run_name(self) -> str:
+        md = self.extract_app("scorch").get("metadata") or {}
         runs = md.get("runs", [])
 
         if len(runs) <= self.run:
@@ -442,51 +408,11 @@ class ComponentBase:
 
         return name
 
-    def extract_app(self, name: str) -> Box | None:
+    def extract_app(self, name: str) -> Box:
         for app in self.experiment.spec.scenario.apps:
             if app.name == name:
                 return app
         raise ValueError(f"failed to find app '{name}'")
-
-    def extract_node(
-        self, hostname: str, wildcard: bool = False
-    ) -> Box | list[Box] | None:
-        if wildcard:
-            extracted = []
-            regex = re.compile(hostname)
-
-            for node in self.experiment.spec.topology.nodes:
-                if regex.match(node.general.hostname):
-                    extracted.append(node)
-
-            return extracted
-        for node in self.experiment.spec.topology.nodes:
-            if node.general.hostname == hostname:
-                return node
-
-        return None
-
-    def extract_node_names(self) -> list[str]:
-        nodes = []
-
-        for node in self.experiment.spec.topology.nodes:
-            nodes.append(node.general.hostname)
-
-        return nodes
-
-    def extract_node_ip(self, name: str, iface: str) -> str:
-        # TODO: consider using minimega client to get IP address so things "just
-        # work" even if DHCP is being used for the interface.
-
-        for node in self.experiment.spec.topology.nodes:
-            if node.general.hostname == name:
-                for i in node.network.interfaces:
-                    if i.name == iface:
-                        return i.address
-
-                raise ValueError(f"interface {iface} does not exist on node {name}")
-
-        raise ValueError(f"node {name} does not exist")
 
     def get_host_and_iface(self, config: Box) -> tuple[str, int]:
         """

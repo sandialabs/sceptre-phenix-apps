@@ -250,7 +250,7 @@ class PreStart(FieldDevices, Scada, Stage):
             helics_md = fed.metadata.get("helics", {})
             # If broker isn't specified in metadata, assume it's local
             broker = helics_md.get("broker", None)  # should be hostname
-            broker = self.app.extract_node(broker) if broker else fed.topology
+            broker = self.app.require_node(broker) if broker else fed.topology
 
             config = {
                 "name": helics_md.get("name", fed.hostname),
