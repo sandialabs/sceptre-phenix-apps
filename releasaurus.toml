@@ -1,0 +1,14 @@
+[defaults.versioning]
+version_type = "%Y.%m.%d"
+
+[defaults.changelog]
+include_pr_link = true
+
+[[package]]
+name = "phenix-apps"
+path = "."
+release_type = "generic"
+additional_manifest_files = [
+    { path = "src/python/phenix_apps/__init__.py", version_regex = "__version__ = \"(?<version>[^\"]+)\"" },
+    { path = "src/go/version/version.go", version_regex = "const Version = \"(?<version>[^\"]+)\"" },
+]

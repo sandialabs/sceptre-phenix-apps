@@ -1,14 +1,14 @@
-# Changelog
+## Before automated releases
 
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+Release notes above this section are generated from the Conventional Commit
+subjects on `main` when each release is made. The notes below were written by
+hand before releases were automated; `[Unreleased]` describes the changes in
+the first automated release in more detail.
 
 ## [Unreleased]
-- **Ignition App**: New app that configures an Inductive Automation Ignition Gateway 8.3 SCADA master
 
 ### Added
+- **Ignition App**: New app that configures an Inductive Automation Ignition Gateway 8.3 SCADA master
 - **OT-sim App**: `fd-client` DNP3 masters use `helics.scan-rate` when it is set explicitly.
 - **Ignition App**: Add linux support.
 - **Ignition App**: Tags pick up the ot-sim devices and variables behind each DNP3 point (ex: `rtu/cap1/voltage`).
