@@ -2,6 +2,7 @@ import copy
 from collections import defaultdict
 
 import lxml.etree as ET
+from phenix_apps.common.logger import logger
 
 DEFAULT_INFRASTRUCTURES = {
     "power-distribution": {
@@ -60,184 +61,6 @@ DEFAULT_INFRASTRUCTURES = {
             "to_reactive_power": {"type": "analog-read", "modbus": {"scaling": 2}},
         },
     },
-    "power-3-phase-distribution": {
-        "node": {
-            "Va-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Vb-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Vc-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Va-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Vb-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Vc-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-        },
-        "bus": {
-            "Va-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Vb-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Vc-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Va-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Vb-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Vc-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-        },
-        "breaker": {
-            "Va-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Vb-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Vc-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Va-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Vb-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Vc-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Ia-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Ib-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Ic-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Ia-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Ib-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Ic-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Pa": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Pb": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Pc": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Qa": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Qb": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Qc": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "status": {"type": "binary-read"},
-            "controls": {"type": "binary-read-write"},
-        },
-        "line": {
-            "from_Va-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Vb-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Vc-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Va-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Vb-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Vc-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Ia-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Ib-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Ic-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Ia-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Ib-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Ic-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Pa": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Pb": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Pc": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Qa": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Qb": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Qc": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Va-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Vb-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Vc-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Va-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Vb-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Vc-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Ia-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Ib-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Ic-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Ia-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Ib-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Ic-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Pa": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Pb": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Pc": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Qa": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Qb": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Qc": {"type": "analog-read", "modbus": {"scaling": 2}},
-        },
-        "transformer": {
-            "from_Va-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Vb-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Vc-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Va-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Vb-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Vc-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Ia-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Ib-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Ic-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Ia-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Ib-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Ic-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Pa": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Pb": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Pc": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Qa": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Qb": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "from_Qc": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Va-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Vb-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Vc-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Va-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Vb-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Vc-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Ia-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Ib-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Ic-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Ia-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Ib-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Ic-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Pa": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Pb": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Pc": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Qa": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Qb": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "to_Qc": {"type": "analog-read", "modbus": {"scaling": 2}},
-        },
-        "capacitor": {
-            "Va-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Vb-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Vc-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Va-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Vb-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Vc-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Ia-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Ib-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Ic-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Ia-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Ib-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Ic-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Pa": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Pb": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Pc": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Qa": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Qb": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Qc": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "setpt": {"type": "analog-read-write", "modbus": {"scaling": 2}},
-        },
-        "regulator": {
-            "Va-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Vb-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Vc-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Va-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Vb-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Vc-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Ia-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Ib-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Ic-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Ia-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Ib-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Ic-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Pa": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Pb": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Pc": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Qa": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Qb": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Qc": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "setpt": {"type": "analog-read-write", "modbus": {"scaling": 2}},
-        },
-        "load": {
-            "Va-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Vb-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Vc-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Va-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Vb-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Vc-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Ia-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Ib-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Ic-mag": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Ia-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Ib-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Ic-ang": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Pa": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Pb": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Pc": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Qa": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Qb": {"type": "analog-read", "modbus": {"scaling": 2}},
-            "Qc": {"type": "analog-read", "modbus": {"scaling": 2}},
-        },
-    },
 }
 
 
@@ -246,12 +69,17 @@ def merge_infrastructure_with_default(infra, mappings):
     # mappings (if any). Note that this only goes two levels deep (which is all
     # that's needed right now).
     merged = copy.deepcopy(DEFAULT_INFRASTRUCTURES.get(infra, {}))
-
+    logger.info(f"In MERGE, INITAL merged is {merged}")
     for k, v in mappings.items():
+        logger.info(f"In MERGE, looking at {k}:{v} in mappings.items")
         if k in merged:
-            merged[k] = {**merged[k], **v}
+            merged.pop(k) # remove the default mapping for this key so we can merge it with the provided mapping
+            merged[k] = v.to_dict() if hasattr(v, "to_dict") else v
+            #merged[k] = {**merged[k], **v}
+            logger.info(f"In MERGE merged[k] {k} value: {merged[k]}")
         else:
             merged[k] = v
+            logger.info(f"In MERGE ELSE merged[k] {k} is {merged[k]}")
 
     return merged
 
@@ -262,8 +90,10 @@ class Infrastructure:
 
     def io_module_xml(self, doc, infra, devices):
         # merge provided mappings (if any) with default mappings (if any)
+        logger.info(f"io_module_xml BEFORE MERGING infra is {infra}, mapping is {self.mappings.get(infra, {})}")
         mapping = merge_infrastructure_with_default(infra, self.mappings.get(infra, {}))
-
+        logger.info(f"io_module_xml Mapping is {mapping}")
+        logger.info(f"io_module_xml Devices is {devices}")
         # mapping of unique message endpoint names --> tag elements for IO module
         endpoints = defaultdict(list)
 
@@ -283,7 +113,9 @@ class Infrastructure:
                 # We don't care about scaling in the I/O module, so if the variable
                 # type is a dictionary convert it to a string (using its `type` entry)
                 # so the rest of the code can assume it's just a string.
+                phases = None
                 if isinstance(var_type, dict):
+                    phases = var_type.get("phases")
                     var_type = var_type["type"]
 
                 sub = ET.Element("subscription")
@@ -297,7 +129,10 @@ class Infrastructure:
                 typ = ET.SubElement(sub, "type")
 
                 if var_type in ["analog-read", "analog-read-write"]:
-                    typ.text = "double"
+                    if phases:
+                        typ.text = "vector"
+                    else:
+                        typ.text = "double"
                 else:
                     typ.text = "boolean"
 
