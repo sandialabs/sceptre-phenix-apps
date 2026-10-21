@@ -340,8 +340,15 @@ def test_custom_infrastructure_mapping_and_per_host_infrastructure():
         ("ai", 0, "p1", "flow"),
         ("bo", 0, "p1", "run"),
     ]
-    # the app-level default infrastructure is not applied to registers (ot-sim parity)
-    assert [p.variable for p in rtus.points("node-ied")] == ["voltage"]
+    # hosts without their own infrastructure fall back to the app-level one
+    assert [p.variable for p in rtus.points("node-ied")] == [
+        "Va-mag",
+        "Vb-mag",
+        "Vc-mag",
+        "Va-ang",
+        "Vb-ang",
+        "Vc-ang",
+    ]
 
 
 def test_empty_dnp3_section_has_no_points():
