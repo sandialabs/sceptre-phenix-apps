@@ -157,7 +157,9 @@ Security requirements:
 | `python.yml` | `src/python/**.py` or the workflow file | `make check`, `make test` in `src/python` |
 | `go.yml` | `src/go/**.go`, `go.mod`, `go.sum`, or the workflow file | `make check`, `make coverage` in `src/go` |
 | `codespell.yml` | Every pull request | `codespell` with `.codespellrc` |
+| `commits.yml` | Every pull request | Conventional Commit check of each commit subject |
 | `dispatch.yml` | Push to `main`, `sandialabs` only | `apps-update` repository dispatch to `sceptre-phenix` |
+| `release.yml` | Push to `main`, `sandialabs` only; manual dry run | releasaurus release pull request, tag, and notes |
 
 Path filters do not cover every build input. Run the relevant local checks after
 changing `pyproject.toml`, a `Makefile`, templates, package data, scripts, or
@@ -179,8 +181,11 @@ or create releases.
 
 ## Change Management
 
-- Record user-visible code and behavior changes in `CHANGELOG.md` under
-  `[Unreleased]`, using the existing Keep a Changelog categories.
+- Do not edit `CHANGELOG.md`. Releasaurus (`releasaurus.toml`,
+  `.github/workflows/release.yml`) generates it from the commit subjects on
+  `main`, which `commits.yml` checks, and keeps a release pull request open.
+  Merging that pull request tags a `vYYYY.MM.DD` release. Write each commit
+  subject for the changelog reader.
 - Update the app or component `README.md` when configuration, lifecycle
   behavior, dependencies, or examples change.
 - Update `src/python/app_migration_guide.md` when the `AppBase` authoring

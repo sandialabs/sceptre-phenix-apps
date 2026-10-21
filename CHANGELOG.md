@@ -1,14 +1,14 @@
-# Changelog
+## Before automated releases
 
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+Release notes above this section are generated from the Conventional Commit
+subjects on `main` when each release is made. The notes below were written by
+hand before releases were automated; `[Unreleased]` describes the changes in
+the first automated release in more detail.
 
 ## [Unreleased]
-- **Ignition App**: New app that configures an Inductive Automation Ignition Gateway 8.3 SCADA master
 
 ### Added
+- **Ignition App**: New app that configures an Inductive Automation Ignition Gateway 8.3 SCADA master
 - **OT-sim App**: `fd-client` DNP3 masters use `helics.scan-rate` when it is set explicitly.
 - **Wind Turbine Scale Plugin**: Artifact-generation regression tests and documentation linking to the companion [complete example in sceptre-phenix-topologies](https://github.com/sandialabs/sceptre-phenix-topologies/tree/main/renewables/wind/wind-scale) (sandialabs/sceptre-phenix-apps#95).
 - **SCEPTRE App**: Pre-flight scenario validation: one pydantic model, run before either stage, reporting every problem at once with the host and field.

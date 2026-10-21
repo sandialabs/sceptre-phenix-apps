@@ -17,6 +17,7 @@
 /CODEOWNERS             @GhostofGoes
 /Makefile               @glattercj @nblair2 @GhostofGoes
 /README.md              @glattercj @GhostofGoes @cmulk @activeshadow
+/releasaurus.toml       @nblair2
 
 # Repository configuration
 /.github/               @mgaliar @GhostofGoes

@@ -1,0 +1,57 @@
+name: Release
+
+# Releases with releasaurus (see releasaurus.toml). Each push to main opens or
+# updates a release PR that names the next version (vYYYY.MM.DD), prepends its
+# changelog to CHANGELOG.md, and sets the Python and Go version strings.
+# Merging that PR tags the release and publishes its notes.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Show what would be released without changing anything
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  releasaurus:
+    name: Release
+    # Forks don't release, but can preview with a dry run.
+    if: github.repository == 'sandialabs/sceptre-phenix-apps' || inputs.dry-run
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    env:
+      DRY_RUN: ${{ inputs.dry-run && '--dry-run' || '' }}
+    steps:
+      - name: Tag and publish a merged release PR
+        uses: robgonnella/releasaurus/action@9843e67bc1fdd96c0cf033c9b5b24a1e2fc91c77 # v1.3.0
+        with:
+          command: release
+          command_args: >-
+            --forge github
+            --repo ${{ github.server_url }}/${{ github.repository }}
+            ${{ env.DRY_RUN }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Open or update the release PR
+        uses: robgonnella/releasaurus/action@9843e67bc1fdd96c0cf033c9b5b24a1e2fc91c77 # v1.3.0
+        with:
+          command: release-pr
+          command_args: >-
+            --forge github
+            --repo ${{ github.server_url }}/${{ github.repository }}
+            ${{ env.DRY_RUN }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
