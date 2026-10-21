@@ -7,10 +7,14 @@ OPC primary-vs-backup routing, and the two preserved bugs.
 from types import SimpleNamespace
 
 import pytest
+from box import Box
 
+from phenix_apps.apps.sceptre import simulators
 from phenix_apps.apps.sceptre.app import Sceptre
+from phenix_apps.apps.sceptre.metadata import Simulator
 from phenix_apps.apps.sceptre.prestart import PreStart
 from phenix_apps.apps.sceptre.tests.conftest import iface, node
+from phenix_apps.common.error import AppError
 
 pytestmark = pytest.mark.app_class(cls=Sceptre, name="sceptre")
 
@@ -253,7 +257,7 @@ class TestServerEndpoint:
         sceptre_app.extract_nodes_type.return_value = [
             fd_server("rtu-1", [iface("IF0", "10.2.0.11")], server_hostname="relay-1")
         ]
-        sceptre_app.extract_node.return_value = node(
+        sceptre_app.require_node.return_value = node(
             "relay-1", interfaces=[iface("IF0", "10.9.0.9")]
         ).topology
 
@@ -449,3 +453,15 @@ class TestHistorians:
             if c.args[0] == "historian_config.mako"
         )
         assert kwargs["hist_config"].tags == {}
+
+
+class TestYamlConfigAnnotations:
+    @pytest.mark.parametrize("annotations", [{}, {"topology": "t"}, {"scenario": "s"}])
+    def test_missing_topology_or_scenario_is_an_app_error(self, tmp_path, annotations):
+        stage = SimpleNamespace(app=SimpleNamespace(get_annotation=annotations.get))
+        provider = Box({"hostname": "p", "metadata": {}})
+
+        with pytest.raises(AppError, match="must name its topology and scenario"):
+            simulators.yaml_config_kwargs(
+                stage, provider, next(iter(Simulator)), tmp_path, "10.0.0.1"
+            )

@@ -28,15 +28,18 @@ _IGNORE_METHODS = {"main", "execute_stage", "finalize"} | {
     stage.replace("-", "_") for stage in AppBase.valid_stages
 }
 
-# Methods on AppBase replaced with MagicMock on the instance so tests can
-# assert calls without invoking real logic. Source of truth:
-# phenix_apps/apps/__init__.py.
+# Methods on AppBase, including those it inherits from ExperimentBase, replaced
+# with MagicMock on the instance so tests can assert calls without invoking real
+# logic. Source of truth: phenix_apps/apps/__init__.py and common/base.py.
 _APPBASE_METHODS = tuple(
-    method
-    for method, value in vars(AppBase).items()
-    if not method.startswith("_")
-    and method not in _IGNORE_METHODS
-    and (inspect.isfunction(value) or inspect.ismethod(value))
+    dict.fromkeys(
+        method
+        for base in AppBase.__mro__[:-1]
+        for method, value in vars(base).items()
+        if not method.startswith("_")
+        and method not in _IGNORE_METHODS
+        and (inspect.isfunction(value) or inspect.ismethod(value))
+    )
 )
 
 # Patched at class level so subclass overrides that call super().method(...)
@@ -129,7 +132,7 @@ def build_mock_app(
 
     subclass_overrides = set()
     for cls in app_cls.__mro__:
-        if cls in (AppBase, object):
+        if cls in AppBase.__mro__:
             continue
         subclass_overrides.update(m for m in _APPBASE_METHODS if m in cls.__dict__)
 

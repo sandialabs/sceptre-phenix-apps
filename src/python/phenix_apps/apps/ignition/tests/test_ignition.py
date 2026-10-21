@@ -125,13 +125,13 @@ def test_polling_without_connected_rtus_raises(metadata):
 
 
 def test_resolve_devices_uses_topology_ip(mock_app):
-    mock_app.extract_node_interface_ip.return_value = "192.168.10.201"
+    mock_app.extract_node_ip.return_value = "192.168.10.201"
 
     devices = mock_app._resolve_devices(
         [RtuDeviceConfig(hostname="rtu-1", interface="eth1")]
     )
 
-    mock_app.extract_node_interface_ip.assert_called_once_with("rtu-1", "eth1")
+    mock_app.extract_node_ip.assert_called_once_with("rtu-1", "eth1")
     assert devices == [
         {
             "name": "rtu-1",
@@ -146,7 +146,7 @@ def test_resolve_devices_uses_topology_ip(mock_app):
 
 
 def test_resolve_devices_rtu_polling_overrides_gateway_per_field(mock_app):
-    mock_app.extract_node_interface_ip.return_value = "192.168.10.201"
+    mock_app.extract_node_ip.return_value = "192.168.10.201"
     gateway = PollingConfig(class1=1000, integrity=60000)
 
     devices = mock_app._resolve_devices(
@@ -173,7 +173,7 @@ def test_resolve_devices_rtu_polling_overrides_gateway_per_field(mock_app):
 
 def test_resolve_devices_missing_node_dryrun_placeholder(mock_app, mocker):
     log = mocker.patch("phenix_apps.apps.ignition.app.logger")
-    mock_app.extract_node_interface_ip.return_value = None
+    mock_app.extract_node_ip.side_effect = ValueError("node ghost does not exist")
 
     devices = mock_app._resolve_devices([RtuDeviceConfig(hostname="ghost")])
 
@@ -183,7 +183,7 @@ def test_resolve_devices_missing_node_dryrun_placeholder(mock_app, mocker):
 
 def test_resolve_devices_missing_node_raises_non_dryrun(mock_app):
     mock_app.dryrun = False
-    mock_app.extract_node_interface_ip.return_value = None
+    mock_app.extract_node_ip.side_effect = ValueError("node ghost does not exist")
 
     with pytest.raises(ValueError, match="no addressed interface"):
         mock_app._resolve_devices([RtuDeviceConfig(hostname="ghost")])
@@ -200,7 +200,7 @@ def test_duplicate_device_names_raise(mock_app):
 
 def test_pre_start_renders_and_injects_devices(mock_app):
     _nodes(mock_app, gateways=[_gateway(connected_rtus=["rtu-1"])])
-    mock_app.extract_node_interface_ip.return_value = "192.168.10.11"
+    mock_app.extract_node_ip.return_value = "192.168.10.11"
 
     mock_app.pre_start()
 
@@ -248,7 +248,7 @@ def test_pre_start_renders_poll_periods(mock_app):
             )
         ],
     )
-    mock_app.extract_node_interface_ip.return_value = "192.168.10.11"
+    mock_app.extract_node_ip.return_value = "192.168.10.11"
 
     mock_app.pre_start()
 
@@ -495,7 +495,7 @@ def _perspective_setup(mock_app, clients=(), **perspective):
         gateways=[_gateway(connected_rtus=["rtu-1"], perspective=perspective or True)],
         clients=clients,
     )
-    mock_app.extract_node_interface_ip.return_value = "192.168.10.11"
+    mock_app.extract_node_ip.return_value = "192.168.10.11"
 
 
 def test_pre_start_perspective_injects_files_into_data_tree(mock_app):
@@ -571,11 +571,11 @@ def test_perspective_project_name_in_inject_paths(mock_app):
 def test_perspective_client_infers_single_gateway(mock_app):
     _perspective_setup(mock_app, clients=[_client()])
     ips = {"rtu-1": "192.168.10.201", "OT-scada": "192.168.10.11"}
-    mock_app.extract_node_interface_ip.side_effect = lambda h, i: ips[h]
+    mock_app.extract_node_ip.side_effect = lambda h, i: ips[h]
 
     mock_app.pre_start()
 
-    mock_app.extract_node_interface_ip.assert_any_call("OT-scada", None)
+    mock_app.extract_node_ip.assert_any_call("OT-scada", None)
     with open(f"{mock_app.app_dir}/hmi-1/99-ignition-perspective.ps1", newline="") as f:
         script = f.read()
     assert "\r\n" in script
@@ -602,7 +602,7 @@ def test_perspective_client_ambiguous_gateways_raise(mock_app):
         ],
         clients=[_client()],
     )
-    mock_app.extract_node_interface_ip.return_value = "192.168.10.11"
+    mock_app.extract_node_ip.return_value = "192.168.10.11"
 
     with pytest.raises(ValueError, match="found 2 perspective-enabled"):
         mock_app.pre_start()
@@ -692,7 +692,7 @@ def test_pre_start_api_injects_files_into_data_tree(mock_app):
             )
         ],
     )
-    mock_app.extract_node_interface_ip.return_value = "192.168.10.11"
+    mock_app.extract_node_ip.return_value = "192.168.10.11"
 
     mock_app.pre_start()
 
@@ -725,7 +725,7 @@ def test_perspective_and_api_together(mock_app):
         mock_app,
         gateways=[_gateway(connected_rtus=["rtu-1"], perspective=True, api=True)],
     )
-    mock_app.extract_node_interface_ip.return_value = "192.168.10.11"
+    mock_app.extract_node_ip.return_value = "192.168.10.11"
 
     mock_app.pre_start()
 
@@ -742,7 +742,7 @@ def test_linux_gateway_injects_into_data_dir_and_cycles_service(mock_app):
         mock_app,
         gateways=[_gateway(os_type="linux", connected_rtus=["rtu-1"], api=True)],
     )
-    mock_app.extract_node_interface_ip.return_value = "192.168.10.11"
+    mock_app.extract_node_ip.return_value = "192.168.10.11"
 
     mock_app.pre_start()
 
@@ -785,7 +785,7 @@ def test_linux_open_client_adds_xfce_autostart(mock_app):
         ],
         clients=[_client(os_type="linux")],
     )
-    mock_app.extract_node_interface_ip.return_value = "192.168.10.11"
+    mock_app.extract_node_ip.return_value = "192.168.10.11"
 
     mock_app.pre_start()
 
@@ -807,7 +807,7 @@ def test_linux_open_client_adds_xfce_autostart(mock_app):
 
 def test_missing_os_type_defaults_to_linux(mock_app):
     _nodes(mock_app, gateways=[_gateway(os_type=None, connected_rtus=["rtu-1"])])
-    mock_app.extract_node_interface_ip.return_value = "192.168.10.11"
+    mock_app.extract_node_ip.return_value = "192.168.10.11"
 
     mock_app.pre_start()
 

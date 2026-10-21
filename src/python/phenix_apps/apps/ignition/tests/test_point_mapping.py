@@ -98,16 +98,16 @@ def test_otsim_outstation_points_and_endpoint_are_used(otsim):
         ("ai", 0, "cap1", "voltage"),
         ("ai", 1, "cap1", "current"),
     ]
-    otsim.extract_node_interface_ip.assert_not_called()
+    otsim.extract_node_ip.assert_not_called()
 
 
 def test_explicit_interface_and_port_override_otsim(otsim):
-    otsim.extract_node_interface_ip.return_value = "10.0.0.3"
+    otsim.extract_node_ip.return_value = "10.0.0.3"
     (device,) = otsim._resolve_devices(
         [RtuDeviceConfig(hostname="ied-1", interface="eth0", port=20100)]
     )
     assert (device["ip"], device["port"]) == ("10.0.0.3", 20100)
-    otsim.extract_node_interface_ip.assert_called_once_with("ied-1", "eth0")
+    otsim.extract_node_ip.assert_called_once_with("ied-1", "eth0")
 
 
 def test_fep_points_are_the_upstream_registers(otsim):
@@ -118,7 +118,7 @@ def test_fep_points_are_the_upstream_registers(otsim):
 
 def test_unknown_rtu_falls_back_to_discovery(otsim, mocker):
     log = mocker.patch("phenix_apps.apps.ignition.app.logger")
-    otsim.extract_node_interface_ip.return_value = "10.9.9.9"
+    otsim.extract_node_ip.return_value = "10.9.9.9"
     (device,) = otsim._resolve_devices([RtuDeviceConfig(hostname="other-rtu")])
     assert device["points"] is None
     assert device["ip"] == "10.9.9.9"
@@ -126,7 +126,7 @@ def test_unknown_rtu_falls_back_to_discovery(otsim, mocker):
 
 
 def test_points_discover_skips_otsim(otsim):
-    otsim.extract_node_interface_ip.return_value = "10.0.0.3"
+    otsim.extract_node_ip.return_value = "10.0.0.3"
     (device,) = otsim._resolve_devices(
         [RtuDeviceConfig(hostname="ied-1", points="discover")]
     )
@@ -146,7 +146,7 @@ def test_otsim_host_that_is_not_an_outstation_is_an_error(otsim):
 
 def test_without_an_otsim_app_every_rtu_is_discovered(mock_app):
     mock_app.extract_app.return_value = None
-    mock_app.extract_node_interface_ip.return_value = "10.9.9.9"
+    mock_app.extract_node_ip.return_value = "10.9.9.9"
     (device,) = mock_app._resolve_devices([RtuDeviceConfig(hostname="rtu-1")])
     assert device["points"] is None
 

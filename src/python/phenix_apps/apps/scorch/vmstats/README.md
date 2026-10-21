@@ -30,7 +30,7 @@ vm_stats.jsonl            one JSON object per VM per sample (fields below)
 ## Before you start
 
 - **Linux VMs with `vmstat` on the path.** Without `vms`, every VM
-  whose topology `hardware.os_type` is `linux`, `centos`, `rhel`, `vyos` or `vyatta` is used.
+  whose topology `hardware.os_type` is `linux`, `centos`, `rhel`, `vyos` or `vyatta` is used. A VM without `os_type` counts as `linux`, as phenix core defaults it.
   Commands only reach VMs whose miniccc agent reports Linux, so a non-Linux VM listed
   in `vms` collects nothing and fails `stop`.
 - **miniccc must be running in the VMs.**

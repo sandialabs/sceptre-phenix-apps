@@ -182,21 +182,7 @@ class WindTurbine(AppBase):
 
                         self.brokers[hostname]["feds"] += 1
 
-                    node = self.extract_node(hostname)
-                    assert node
-
-                    if iface:
-                        for i in node.network.interfaces:
-                            if i["name"] == iface and "address" in i:
-                                addr = i["address"]
-                                break
-                    else:
-                        if len(node.network.interfaces) > 0:
-                            if "address" in node.network.interfaces[0]:
-                                addr = node.network.interfaces[0]["address"]
-
-                    assert addr
-                    return addr
+                    return self.extract_node_ip(hostname, iface)
                 if "address" in broker:
                     return broker["address"]
         return None

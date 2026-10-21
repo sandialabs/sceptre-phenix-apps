@@ -72,8 +72,7 @@ class Caldera(AppBase):
         for idx, server in enumerate(md.get("servers", [])):
             hostname = utils.validate_hostname(server.get("hostname", f"caldera-{idx}"))
 
-            node = self.extract_node(hostname)
-            addr = node.network.interfaces[0].address
+            addr = self.extract_node_ip(hostname)
 
             for fact in server.get("facts", []):
                 inject = {
@@ -154,8 +153,7 @@ class Caldera(AppBase):
                 else:
                     iface = int(tokens[1])
 
-                node = self.extract_node(server)
-                addr = node.network.interfaces[iface].address
+                addr = self.extract_node_ip(server, iface)
 
             if host.topology.hardware.os_type == "windows":
                 if not (Path(templates) / "windows_agent.mako").exists():

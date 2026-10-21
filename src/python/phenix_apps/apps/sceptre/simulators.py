@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Final, TypedDict
 from box import Box
 
 from phenix_apps.apps.sceptre.metadata import Simulator
+from phenix_apps.common import error
 
 if TYPE_CHECKING:
     from phenix_apps.apps.sceptre.configure import ConfigureStage
@@ -261,12 +262,14 @@ def yaml_config_kwargs(
     if not provider.metadata.get("data_dir"):
         provider.metadata.data_dir = f"/root/{simulator.lower()}/"
 
-    provider.metadata.sceptre_topology = (
-        stage.app.experiment.metadata.annotations.topology
-    )
-    provider.metadata.sceptre_scenario = (
-        stage.app.experiment.metadata.annotations.scenario
-    )
+    topology = stage.app.get_annotation("topology")
+    scenario = stage.app.get_annotation("scenario")
+    if not topology or not scenario:
+        raise error.AppError(
+            "experiment metadata.annotations must name its topology and scenario"
+        )
+    provider.metadata.sceptre_topology = topology
+    provider.metadata.sceptre_scenario = scenario
     provider.metadata.sceptre_experiment = stage.app.exp_name
     provider.metadata.provider_hostname = provider.hostname
     provider.metadata.provider_ip = ipv4_address

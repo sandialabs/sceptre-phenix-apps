@@ -98,6 +98,27 @@ class MyApp(AppBase):
         # ... other app-specific initialization can go here
 ```
 
+## Step 3: Use the Shared Experiment Helpers
+
+`AppBase` and SCORCH's `ComponentBase` both inherit `ExperimentBase`
+(`phenix_apps/common/base.py`). Use its helpers instead of walking the topology
+by hand:
+
+- `extract_node(hostname)` and `extract_node_names()`
+- `extract_node_ip(name, iface=None)`: the address of an interface, chosen by
+  name, by index, or the first interface when `iface` is unset. It raises
+  `ValueError` naming the node and interface. A SCORCH component that read an
+  empty address from it, for a DHCP interface, now gets that `ValueError`
+  and must catch it.
+- `extract_node_hostname_for_ip(address)`: accepts `ip`, `ip:port` and IPv6.
+- `self.mm`: a minimega connection in the experiment's namespace, opened on
+  first use.
+
+`extract_node_interface_ip`, which returns `None` when nothing matches, is
+deprecated. Replace it with `extract_node_ip`, and replace the `None` check
+with an `except ValueError`. To split `host:port` strings, use
+`utils.split_host_port`.
+
 # Migrating Wind Turbine App to Scale Plugin
 
 The standalone `wind-turbine` app has been deprecated in favor of the `wind_turbine` plugin for the `scale` app. This shift moves from manually defining topology nodes (or using complex regex patterns) to a declarative model where you simply state the number of turbines desired.

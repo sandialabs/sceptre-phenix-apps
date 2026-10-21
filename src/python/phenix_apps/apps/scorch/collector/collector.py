@@ -65,8 +65,12 @@ class Collector(ComponentBase):
         self.meta_dir.mkdir()
 
         # sceptre: topology, scenario, experiment
-        sceptre_topo = self.experiment.metadata.annotations.topology
-        sceptre_scenario = self.experiment.metadata.annotations.scenario
+        sceptre_topo = self.get_annotation("topology")
+        sceptre_scenario = self.get_annotation("scenario")
+        if not sceptre_topo or not sceptre_scenario:
+            raise ValueError(
+                "experiment metadata.annotations must name its topology and scenario"
+            )
 
         topo_data = utils.run_command(
             ["phenix", "config", "get", f"topology/{sceptre_topo}"]
@@ -94,11 +98,11 @@ class Collector(ComponentBase):
             mc_dir = Path(self.base_dir, "miniccc")
             vm_names = self.extract_node_names()
             for vm in vm_names:
-                node = self.extract_node(vm)
+                os_type = self.extract_node_os_type(vm)
                 m_dest = str(mc_dir / f"{vm}_miniccc.log")
-                if node.hardware.os_type == "windows":
+                if os_type == "windows":
                     self.recv_file(vm, "/minimega/miniccc.log", m_dest)
-                elif node.hardware.os_type == "linux" and node.type != "Router":
+                elif os_type == "linux" and self.require_node(vm).type != "Router":
                     self.recv_file(vm, "/miniccc.log", m_dest)
 
         # iperf: client, server, histograms
@@ -240,7 +244,9 @@ class Collector(ComponentBase):
         # map hostnames to IP addresses
         all_hosts = {}  # hostname: ip
         for node in self.extract_node_names():
-            ifaces = self.extract_node(node).network.interfaces
+            ifaces = (self.require_node(node).get("network") or {}).get(
+                "interfaces"
+            ) or []
             # skip hosts with only management interface, like power provider
             if len(ifaces) > 1:
                 all_hosts[node] = ifaces[0].address

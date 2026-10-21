@@ -21,10 +21,6 @@ class AtomicRedTeam(ComponentBase):
         ComponentBase.__init__(self, "art")
         self.execute_stage()
 
-    def _get_os_type(self, hostname):
-        node = self.extract_node(hostname)
-        return node.get("hardware", {}).get("os_type", "linux").lower()
-
     def _goart_path(self, os_type):
         if os_type == "windows":
             return "C:/phenix/art/goart.exe"
@@ -70,7 +66,7 @@ class AtomicRedTeam(ComponentBase):
 
         for vm in vms:
             hostname = vm.hostname
-            os_type = self._get_os_type(hostname)
+            os_type = self.extract_node_os_type(hostname)
             goart_path = self._goart_path(os_type)
             out_filename = f"{uuid.uuid4()!s}.json"
             out_file = self._tmp_path(os_type, out_filename)

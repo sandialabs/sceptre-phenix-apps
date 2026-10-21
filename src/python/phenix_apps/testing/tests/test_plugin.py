@@ -50,6 +50,14 @@ def test_mock_app_extension_methods_are_mocks(mock_app):
     mock_app.add_inject.assert_called_once_with("host1", {"src": "/a", "dst": "/b"})
 
 
+@pytest.mark.app_class(cls=_DummyApp, real_methods=["extract_node"])
+def test_inherited_methods_are_mocked_and_can_be_real(mock_app):
+    # extract_node lives on ExperimentBase, AppBase's parent.
+    assert isinstance(mock_app.extract_node_ip, MagicMock)
+    assert not isinstance(mock_app.extract_node, MagicMock)
+    assert mock_app.extract_node("missing") is None
+
+
 @pytest.mark.app_class(cls=_DummyApp, real_methods=["add_node"])
 def test_real_methods_marker_unmocks_method(mock_app):
     assert not isinstance(mock_app.add_node, MagicMock)

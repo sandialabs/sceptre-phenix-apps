@@ -264,7 +264,11 @@ def test_short_dos_attack_warns():
 def stub_disruption(md: dict) -> Disruption:
     disruption = Disruption.__new__(Disruption)
     disruption.config = parse_metadata(DisruptionMetadata, md, "d")
-    disruption.extract_node_ip = lambda name, iface: f"10.0.0.{len(name)}"  # type: ignore[method-assign]
+
+    def node_ip(name: str, iface: str | int | None = None) -> str:
+        return f"10.0.0.{len(name)}"
+
+    disruption.extract_node_ip = node_ip  # type: ignore[method-assign]
     return disruption
 
 

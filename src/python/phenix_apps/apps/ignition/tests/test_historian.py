@@ -213,7 +213,7 @@ def test_historian_combinations_seed_tags_once(
             )
         ],
     )
-    mock_app.extract_node_interface_ip.return_value = "192.168.10.201"
+    mock_app.extract_node_ip.return_value = "192.168.10.201"
 
     mock_app.pre_start()
 
@@ -245,6 +245,6 @@ def test_historian_combinations_seed_tags_once(
 def test_tags_are_seeded_only_for_perspective_historian_or_api(mock_app, mocker, api):
     seed = mocker.spy(mock_app, "_write_tag_tree")
     _nodes(mock_app, gateways=[_gateway(connected_rtus=["rtu-1"], api=api)])
-    mock_app.extract_node_interface_ip.return_value = "192.168.10.201"
+    mock_app.extract_node_ip.return_value = "192.168.10.201"
     mock_app.pre_start()
     assert seed.call_count == int(api)

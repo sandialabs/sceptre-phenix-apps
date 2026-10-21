@@ -117,6 +117,8 @@ def test_assign_addresses_continues_shared_counters():
         ({"dnp3": {"interface": "eth1"}}, ("10.0.0.2", 20000)),
         ({"dnp3": {"interface": "eth1:20001"}}, ("10.0.0.2", 20001)),
         ({"dnp3": {"interface": "192.0.2.9:1234"}}, ("192.0.2.9", 1234)),
+        ({"dnp3": {"interface": "fe80::1"}}, ("fe80::1", 20000)),
+        ({"dnp3": {"interface": "[fe80::1]:1234"}}, ("fe80::1", 1234)),
         ({}, ("10.0.0.1", 20000)),
     ],
 )
@@ -145,7 +147,7 @@ def test_resolve_endpoint(metadata, expected):
         (
             {"dnp3": {"interface": "eth0:http"}},
             [{"name": "eth0", "address": "10.0.0.1"}],
-            "invalid dnp3 port",
+            "invalid dnp3 interface: invalid port",
         ),
     ],
 )

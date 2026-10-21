@@ -67,6 +67,32 @@ def validate_hostname(name: str) -> str:
     return name
 
 
+def split_host_port(value: str) -> tuple[str, int | None]:
+    """
+    Split 'host', 'host:port', '[ipv6]:port' or a bare IPv6 address into the
+    host and the port, or None when there is no port. The host is not checked:
+    it may be an address, a hostname or an interface name.
+    """
+    host, port = value, None
+
+    if value.startswith("["):
+        host, sep, rest = value[1:].partition("]")
+        if not sep or (rest and not rest.startswith(":")):
+            raise ValueError(f"malformed address '{value}'")
+        port = rest[1:] if rest else None
+    elif value.count(":") == 1:
+        host, _, port = value.partition(":")
+
+    if not host:
+        raise ValueError(f"no host in '{value}'")
+    if port is None:
+        return host, None
+    if not port.isdigit() or not 0 < int(port) < 65536:
+        raise ValueError(f"invalid port '{port}' in '{value}'")
+
+    return host, int(port)
+
+
 def safe_join(base: str | Path, *parts: str | Path) -> Path:
     """
     Join base with parts and ensure the resolved result stays within the

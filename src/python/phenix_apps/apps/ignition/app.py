@@ -587,15 +587,15 @@ class Ignition(AppBase):
                     ip = otsim_ip
                 if "port" not in rtu.model_fields_set:
                     port = otsim_port
-            if not ip:
-                ip = self.extract_node_interface_ip(rtu.hostname, rtu.interface)
-            if not ip:
+            try:
+                ip = ip or self.extract_node_ip(rtu.hostname, rtu.interface)
+            except ValueError as ex:
                 msg = (
                     f"RTU '{rtu.hostname}' has no addressed interface "
-                    f"'{rtu.interface or '(first)'}' in the topology"
+                    f"'{rtu.interface or '(first)'}' in the topology: {ex}"
                 )
                 if not self.dryrun:
-                    raise ValueError(msg)
+                    raise ValueError(msg) from ex
                 logger.warning(f"Dry run: {msg}; using placeholder IP")
                 ip = "127.0.0.1"
 
@@ -894,14 +894,15 @@ class Ignition(AppBase):
                 "perspective-enabled gateways"
             )
 
-        ip = self.extract_node_interface_ip(gw_hostname, cfg.interface)
-        if not ip:
+        try:
+            ip = self.extract_node_ip(gw_hostname, cfg.interface)
+        except ValueError as ex:
             msg = (
                 f"gateway '{gw_hostname}' has no addressed interface "
-                f"'{cfg.interface or '(first)'}' in the topology"
+                f"'{cfg.interface or '(first)'}' in the topology: {ex}"
             )
             if not self.dryrun:
-                raise ValueError(msg)
+                raise ValueError(msg) from ex
             logger.warning(f"Dry run: {msg}; using placeholder IP")
             ip = "127.0.0.1"
 

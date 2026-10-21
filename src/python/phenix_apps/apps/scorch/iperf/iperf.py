@@ -23,11 +23,9 @@ class Iperf(ComponentBase):
 
     def _get_node_info(self) -> dict:
         """
-        There doesn't seem to be a straightforward way to get OS
-        information from minimega. Inspecting the topology
-        (self.experiment.spec.topology) would usually work
-        using "hardware.os_type", however it COULD fail if
-        someone neglected to include os_type for a node.
+        minimega has no straightforward way to report a VM's OS, so read
+        hardware.os_type from the topology. An unset os_type is linux, as
+        phenix core defaults it.
         """
         vms = set()
         for server in self.metadata.servers:
@@ -36,14 +34,11 @@ class Iperf(ComponentBase):
                 vms.add(client.hostname)
 
         os_types = {}
-        for node in self.experiment.spec.topology.nodes:
-            if node.general.hostname in vms:
-                os_type = node.hardware.os_type.lower()
-                if os_type not in ["linux", "windows"]:
-                    raise ValueError(
-                        f'unknown os_type "{os_type}" for {node.general.hostname}'
-                    )
-                os_types[node.general.hostname] = os_type
+        for vm in sorted(vms):
+            os_type = self.extract_node_os_type(vm)
+            if os_type not in ["linux", "windows"]:
+                raise ValueError(f'unknown os_type "{os_type}" for {vm}')
+            os_types[vm] = os_type
 
         return {
             "vms": sorted(vms),
@@ -101,11 +96,13 @@ class Iperf(ComponentBase):
         logger.info("building iperf mapping")
 
         for server in self.metadata.servers:
-            s_node = self.extract_node(server.hostname)
+            s_node = self.require_node(server.hostname)
             s_if = s_node.network.interfaces[
                 0
             ]  # TODO: be smarter about selecting interface
-            s_exe = Path(self.metadata.iperf_paths[s_node.hardware.os_type.lower()])
+            s_exe = Path(
+                self.metadata.iperf_paths[self.extract_node_os_type(server.hostname)]
+            )
             s_map = {
                 **server,
                 "ip": s_if.address,
@@ -118,7 +115,7 @@ class Iperf(ComponentBase):
             curr_port = server.port_range_start  # type: int
 
             for client in server.clients:
-                c_node = self.extract_node(client.hostname)
+                c_node = self.require_node(client.hostname)
                 c_if = c_node.network.interfaces[
                     0
                 ]  # TODO: be smarter about selecting interface
@@ -129,7 +126,11 @@ class Iperf(ComponentBase):
                     )
                 all_ports.add(curr_port)
 
-                c_exe = Path(self.metadata.iperf_paths[c_node.hardware.os_type.lower()])
+                c_exe = Path(
+                    self.metadata.iperf_paths[
+                        self.extract_node_os_type(client.hostname)
+                    ]
+                )
                 c_map = {
                     **client,
                     "port": curr_port,

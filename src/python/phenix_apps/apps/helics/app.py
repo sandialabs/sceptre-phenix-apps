@@ -24,15 +24,12 @@ class Helics(AppBase):
         if "|" in root:  # hostname|iface
             root_hostname, iface = root.split("|", 1)
 
-            root_ip = self.extract_node_interface_ip(root_hostname, iface)
-
-            if not root_ip:
-                raise ValueError(f"root broker not found in topology: {root_hostname}")
-        else:  # ip[:port]
-            root_ip = root
-
-        if ":" in root_ip:  # silently ignore port if provided
-            root_ip, _ = root_ip.split(":", 1)
+            try:
+                root_ip = self.extract_node_ip(root_hostname, iface)
+            except ValueError as ex:
+                raise ValueError(f"root broker not found in topology: {ex}") from ex
+        else:  # ip[:port], port silently ignored
+            root_ip, _ = utils.split_host_port(root)
 
         root_hostname = self.extract_node_hostname_for_ip(root_ip)
 
@@ -85,12 +82,10 @@ class Helics(AppBase):
 
                 if "|" in broker:  # hostname|iface
                     broker_hostname, iface = broker.split("|", 1)
-                    broker_ip = self.extract_node_interface_ip(broker_hostname, iface)
-
-                    if not broker_ip:
-                        raise ValueError(
-                            f"broker not found in topology: {broker_hostname}"
-                        )
+                    try:
+                        broker_ip = self.extract_node_ip(broker_hostname, iface)
+                    except ValueError as ex:
+                        raise ValueError(f"broker not found in topology: {ex}") from ex
                 else:  # ip[:port]
                     broker_ip = broker
 

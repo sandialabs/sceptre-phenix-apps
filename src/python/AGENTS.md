@@ -20,7 +20,8 @@ contracts. These rules apply to all work under `src/python/`.
   SCORCH component, each with its own `README.md`.
 - `phenix_apps/common/`: shared settings, structured logging, minimega helpers,
   and error types. Reuse these instead of re-implementing protocol or command
-  handling.
+  handling. `common/base.py` holds `ExperimentBase`, the topology lookups and
+  `mm` connection that `AppBase` and `ComponentBase` share.
 - `phenix_apps/schedulers/`: `SchedulerBase` and the `single-node` scheduler.
 - `phenix_apps/testing/`: the auto-loaded pytest plugin. See its
   [`README.md`](phenix_apps/testing/README.md).
@@ -152,9 +153,10 @@ input file.
 - For `AppBase` subclasses, prefer `@pytest.mark.app_class(cls=MyApp)` with the
   auto-loaded `mock_app` fixture. `cls` must be a keyword argument. Apply it
   module-wide with `pytestmark`.
-- `mock_app` bypasses `__init__` and replaces the `extract_*`, `add_*`, `is_*`,
-  `render`, and `get_annotation` helpers with mocks. Set app-specific attributes
-  in the test yourself.
+- `mock_app` bypasses `__init__` and replaces every public `AppBase` method,
+  including those inherited from `ExperimentBase` (`extract_*`, `require_node`,
+  `get_annotation`, `mm_init`, `add_*`, `is_*`, `render`), with mocks. Set
+  app-specific attributes in the test yourself.
 - Use `real_methods=[...]` only for base methods whose real behavior is under
   test. Use `build_mock_app()` directly for non-marker flows.
 - Golden files under the SCEPTRE app are intentional compatibility fixtures.
