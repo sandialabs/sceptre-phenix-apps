@@ -87,13 +87,21 @@ class MgmtTap(AppBase):
             logger.error(f"Failed to get host information: {e}")
             raise RuntimeError(f"Failed to get host information: {e}") from e
 
+    def _find_vlan(self):
+        """Look up the VLAN ID for the alias, ignoring case (MGMT vs mgmt)."""
+        wanted = self.vlan.lower()
+        for alias, vlan_id in self.experiment.status.vlans.items():
+            if alias.lower() == wanted:
+                return vlan_id
+        return None
+
     def post_start(self):
         logger.info(f"Running post_start for user application: {self.name}")
         # Create tap
-        vlan = self.experiment.status.vlans.get(self.vlan, None)
+        vlan = self._find_vlan()
         if vlan is None:
             logger.error(f"Cannot find VLAN ID for alias {self.vlan}")
-            raise RuntimeError("Cannot find VLAN ID for alias {self.vlan}")
+            raise RuntimeError(f"Cannot find VLAN ID for alias {self.vlan}")
         if self.subnet:
             network = ipaddress.ip_network(self.subnet, strict=False)
         else:
