@@ -47,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **SCEPTRE App**: SunSpec has been burned away by the SCORCHing heat of 3000 Suns and thus no longer exists in this repo.
 
 ### Fixed
+- **mgmt_tap App**: The VLAN alias matches case-insensitively, and the missing-VLAN error names the alias.
 - **Common Utils**: fix cc commands parsing to be resilient to header changes.
 - **OT-sim App**: `fd-server` hosts ignored the app-level `infrastructure` setting, so their protocol registers didn't match the tags the I/O module published.
 - **Common Utils**: `mm_exec_wait` and `mm_get_cc_responses` split `cc responses` output on whole header lines; stderr no longer swallows stdout, and output containing `/` is no longer truncated.

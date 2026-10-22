@@ -70,3 +70,36 @@ def test_post_start_uses_resolved_bridge(mock_app, mocker):
     command = compute_cmd.call_args.kwargs["command"]
     assert "bridge metabr" in command
     assert "bridge phenix" not in command
+
+
+# --- VLAN alias resolution ---------------------------------------------------
+
+
+def _post_start_app(mock_app, vlan, vlans):
+    mock_app.vlan = vlan
+    mock_app.subnet = None
+    mock_app.bridge = "phenix"
+    mock_app.tap = "testexp_test"
+    mock_app.hosts = ["host1"]
+    mock_app.experiment = Box({"status": {"vlans": vlans}})
+    return mock_app
+
+
+@pytest.mark.parametrize("alias", ["mgmt", "MGMT", "Mgmt"])
+def test_vlan_alias_matches_case_insensitively(mock_app, mocker, alias):
+    """A topology that renames MGMT to mgmt must still resolve the VLAN."""
+    app = _post_start_app(mock_app, alias, {"mgmt": 101})
+    mocker.patch.object(MgmtTap, "_get_mm_connection", return_value=mocker.MagicMock())
+    compute_cmd = mocker.patch("phenix_apps.apps.mgmt_tap.app.mm_compute_cmd")
+
+    app.post_start()
+
+    assert compute_cmd.call_args.kwargs["command"].startswith("create 101 ")
+
+
+def test_missing_vlan_error_names_the_alias(mock_app):
+    """The error message must contain the alias, not a literal '{self.vlan}'."""
+    app = _post_start_app(mock_app, "MGMT_9", {"other": 5})
+
+    with pytest.raises(RuntimeError, match="alias MGMT_9"):
+        app.post_start()
