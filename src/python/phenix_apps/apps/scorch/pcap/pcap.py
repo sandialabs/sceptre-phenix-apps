@@ -1,10 +1,29 @@
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Annotated, Any, Self
+
+from box import Box
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    NonNegativeInt,
+    StringConstraints,
+    model_validator,
+)
 
 from phenix_apps.apps.scorch import ComponentBase
+from phenix_apps.apps.scorch.app import (
+    Hostname,
+    Interface,
+    MetadataBlock,
+    PositiveSeconds,
+)
 from phenix_apps.common import utils
 from phenix_apps.common.logger import logger
+
+MATCH_ALL_BPF = "len >= 0"
 
 # TODO: bridge capture functionality from mm.py component
 # The issue with bridge captures in phenix is it will capture MGMT traffic,
@@ -15,16 +34,74 @@ from phenix_apps.common.logger import logger
 # to phenix can be leveraged.
 
 # TODO: pcap file retrieval functionality from mm.py component (this assumes one node)
-# TODO: allow settings per-vm (or per-bridge) that override the "global" setting,
-# e.g. a filter that applies to only one VM. Is this even possible?
 # TODO: netflow capture
 # TODO: allow tcpdump and/or tshark to be used instead of minimega api
+
+
+# minimega needs the filter wrapped in single quotes, and re-lexes it on the
+# way to each host, so no quotes, backslashes, '#' or line breaks (the same
+# rule as utils._validate_mm_filter)
+Bpf = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, pattern=r"^[^'\"\\#\r\n]*$"),
+]
+
+
+class VM(MetadataBlock):
+    hostname: Hostname
+    # an index into the node's interfaces, or an interface name
+    interface: Interface | NonNegativeInt = 0
+    # override the component-wide filter and snaplen for this VM
+    filter: Bpf | None = None
+    snaplen: NonNegativeInt | None = None
+
+
+class PCAPMetadata(BaseModel):
+    """Metadata for the pcap component; see README.md for each field."""
+
+    model_config = ConfigDict(extra="allow")
+
+    vms: Annotated[list[VM], Field(min_length=1)]
+    filter: Bpf | None = None
+    snaplen: NonNegativeInt | None = None
+    convert_to_json: bool = False
+    create_merged_pcap: bool = False
+    dedupe: bool = True
+    merge_timeout: PositiveSeconds = 60.0  # mergecap and editcap
+    tshark_timeout: PositiveSeconds = 120.0  # DoS fragment splitting
+
+    @model_validator(mode="before")
+    @classmethod
+    def _convert_to_json_alias(cls, data: Any) -> Any:
+        """`convertToJSON` is the deprecated name of `convert_to_json`."""
+
+        if isinstance(data, dict) and "convertToJSON" in data:
+            data = dict(data)
+            old = data.pop("convertToJSON")
+            logger.warning(
+                "pcap: 'convertToJSON' is deprecated; rename it to 'convert_to_json'"
+            )
+            data.setdefault("convert_to_json", old)
+        return data
+
+    @model_validator(mode="after")
+    def _check_vms(self) -> Self:
+        seen = [(vm.hostname, str(vm.interface)) for vm in self.vms]
+        if dupes := sorted({f"{h} {i}" for h, i in seen if seen.count((h, i)) > 1}):
+            raise ValueError(
+                f"vms: captured more than once: {', '.join(dupes)}; each capture "
+                "writes the same file"
+            )
+        return self
 
 
 class PCAP(ComponentBase):
     """
     Implements minimega's "capture pcap" API as a Scorch component.
     """
+
+    metadata_model = PCAPMetadata
+    config: PCAPMetadata
 
     def __init__(self):
         ComponentBase.__init__(self, "pcap")
@@ -41,66 +118,118 @@ class PCAP(ComponentBase):
     def start(self):
         logger.info(f"Starting user component: {self.name}")
 
+        self._check_run_order()
+        for row in self._active_captures():
+            logger.warning(
+                f"another capture is active in this minimega namespace: {row}; "
+                "clearing pcap captures to start ours will stop it. Do not run "
+                "pcap alongside other capture components (mm, tcpdump, erspan)"
+            )
+
         logger.info("clearing capture on minimega")
         self.mm.clear_capture("pcap")
 
-        # Berkeley Packet Filter (BPF) syntax: https://biot.com/capstats/bpf.html
-        bpf_filter = self.metadata.get("filter")
-        if bpf_filter:
-            logger.info(f"applying pcap BPF filter: '{bpf_filter}'")
-            # single quotes are needed here
-            self.mm.capture_pcap_filter(f"'{utils._validate_mm_filter(bpf_filter)}'")
+        vms = self.config.vms
+        logger.info(f"starting capture for {len(vms)} VMs")
+        try:
+            for i, vm in enumerate(vms):
+                hostname, interface = self.get_host_and_iface(Box(vm.model_dump()))
+                filepath = Path(self.base_dir, f"{hostname}-{interface}.pcap")
 
-        # https://wiki.wireshark.org/SnapLen
-        snaplen = self.metadata.get("snaplen")
-        if snaplen is not None:
-            try:
-                snaplen = int(str(snaplen).strip())
-            except Exception:
-                raise ValueError("snaplen must be a integer") from None
-
-            if not snaplen >= 0:
-                raise ValueError("snaplen must be a positive number")
-
-            logger.info(f"applying pcap snaplen: {snaplen}")
-            self.mm.capture_pcap_snaplen(snaplen)
-
-        # TODO: bridge (note: this is implemented in mm.py component)
-        # bridge_path = Path(self.base_dir, "phenix.pcap")
-        # self.mm.mesh_send('all', f'shell mkdir -p {self.base_dir}')
-        # self.mm.capture_pcap_bridge("phenix", str(bridge_path))
-
-        logger.info(f"starting capture for {len(self.metadata.vms)} VMs")
-        for i, vm in enumerate(self.metadata.vms):
-            hostname, interface = self.get_host_and_iface(vm)
-            filepath = Path(self.base_dir, f"{hostname}-{interface}.pcap")
-
-            logger.info(
-                f"starting capture on '{hostname}' interface '{interface}' to '{filepath}' ({i + 1} of {len(self.metadata.vms)})"
-            )
-            self.mm.capture_pcap_vm(hostname, interface, str(filepath))
+                self._set_capture_options(
+                    vm.filter or self.config.filter,
+                    self.config.snaplen if vm.snaplen is None else vm.snaplen,
+                )
+                logger.info(
+                    f"starting capture on '{hostname}' interface '{interface}' to '{filepath}' ({i + 1} of {len(vms)})"
+                )
+                self.mm.capture_pcap_vm(hostname, interface, str(filepath))
+        finally:
+            # unset, so they do not apply to later captures in the namespace
+            self._set_capture_options(None, None)
 
         logger.info(f"Started user component: {self.name}")
+
+    def _set_capture_options(self, bpf: str | None, snaplen: int | None) -> None:
+        """Set minimega's namespace-wide filter and snaplen, which it copies
+        into each capture when the capture starts. None resets them: a match-all
+        filter, and snaplen 0, which minimega reads as its 1600-byte default.
+        (With no argument these commands only print the current value.)"""
+
+        # Berkeley Packet Filter (BPF) syntax: https://biot.com/capstats/bpf.html
+        # minimega reads the filter as one argument only when quoted
+        # (minimega pkg/minicli/input.go).
+        # The reset cannot be "": phenix runs commands under "namespace <ns>",
+        # which rebuilds the command text and drops the empty argument, so
+        # "capture pcap filter" only prints the current filter and the previous
+        # VM's filter sticks. A match-all filter selects every packet, the same
+        # as no filter, and always overwrites.
+        if bpf:
+            logger.info(f"applying pcap BPF filter: '{bpf}'")
+        self.mm.capture_pcap_filter(
+            f"'{utils._validate_mm_filter(bpf)}'" if bpf else f"'{MATCH_ALL_BPF}'"
+        )
+        # https://wiki.wireshark.org/SnapLen
+        if snaplen:
+            logger.info(f"applying pcap snaplen: {snaplen}")
+        self.mm.capture_pcap_snaplen(snaplen or 0)
+
+    def _check_run_order(self) -> None:
+        app = self.extract_app("scorch")
+        assert app is not None
+        scorch = app.metadata
+        for message in run_order_warnings(
+            self.name, scorch.components, scorch.runs[self.run]
+        ):
+            logger.warning(message)
+
+    def _active_captures(self) -> list[str]:
+        """One string per capture minimega reports in this namespace."""
+
+        return [
+            " ".join(row)
+            for resp in self.mm.capture() or []
+            for row in resp.get("Tabular") or []
+        ]
+
+    def _stop_captures(self) -> tuple[list[Path], dict[str, str]]:
+        """Stop the capture on each listed interface; return the capture files
+        and which VM each came from, for the DoS special processing."""
+
+        pcap_paths = []
+        host_of: dict[str, str] = {}
+
+        vms = self.config.vms
+        logger.info(f"stopping captures for {len(vms)} VMs")
+        for i, vm in enumerate(vms):
+            hostname, interface = self.get_host_and_iface(Box(vm.model_dump()))
+
+            logger.info(
+                f"stopping PCAP capture on interface {interface} for VM {hostname} ({i + 1} of {len(vms)})"
+            )
+            # only this interface: other captures on the VM are not ours
+            self.mm.capture_pcap_delete_vm(hostname, interface)
+
+            pcap_path = Path(self.base_dir, f"{hostname}-{interface}.pcap")
+            pcap_paths.append(pcap_path)
+            host_of[pcap_path.name] = hostname
+
+        # clearing also stops other components' captures, so only reset
+        # minimega's filter and snaplen once nothing else is capturing
+        if self._active_captures():
+            logger.info("other captures are active, not clearing capture on minimega")
+        else:
+            logger.info("clearing capture on minimega")
+            self.mm.clear_capture("pcap")
+
+        return pcap_paths, host_of
 
     def stop(self):
         logger.info(f"Stopping user component: {self.name}")
 
-        pcap_paths = []
+        self._check_run_order()
 
-        logger.info(f"stopping captures for {len(self.metadata.vms)} VMs")
-        for i, vm in enumerate(self.metadata.vms):
-            hostname, interface = self.get_host_and_iface(vm)
-
-            logger.info(
-                f"stopping PCAP capture on interface {interface} for VM {hostname} ({i + 1} of {len(self.metadata.vms)})"
-            )
-            self.mm.capture_pcap_delete_vm(hostname)
-
-            pcap_path = Path(self.base_dir, f"{hostname}-{interface}.pcap")
-            pcap_paths.append(pcap_path)
-
-        logger.info("clearing capture on minimega")
-        self.mm.clear_capture("pcap")
+        pcap_paths, host_of = self._stop_captures()
 
         logger.info(f"verifying {len(pcap_paths)} PCAP files")
         pcap_metadata = {}
@@ -125,7 +254,7 @@ class PCAP(ComponentBase):
 
         # merge pcap files together into a single consolidated PCAP
         # the pcaps that were merged will be moved into "raw" sub-directory
-        if self.metadata.get("create_merged_pcap", False):
+        if self.config.create_merged_pcap:
             logger.info(
                 f"merging {len(pcap_paths)} PCAP files into a single file (create_merged_pcap=true)"
             )
@@ -144,42 +273,36 @@ class PCAP(ComponentBase):
             pcap_paths = new_paths
             pcap_paths.append(merged_path)
 
-            if self.metadata.get("dedupe", True):
+            if self.config.dedupe:
                 logger.info(
                     f"'dedupe' is true, removing duplicates from '{merged_path.name}'"
                 )
 
                 # special processing for TCP flood packets
-                dos_targets = []
-                for comp in self.extract_app("scorch").metadata.components:
-                    if (
-                        comp.type == "disruption"
-                        and comp.metadata.current_disruption
-                        in ["dos", "cyber_physical"]
-                    ):
-                        dos_targets = [t.hostname for t in comp.metadata.dos.targets]
-                        break
+                scorch = self.extract_app("scorch").metadata
+                dos_targets = dos_targets_for_run(
+                    scorch.components, scorch.runs[self.run]
+                )
 
                 if dos_targets:
                     logger.info("Performing special processing for TCP packet flood")
-                    non_target_paths = [
-                        p
-                        for p in pcap_paths
-                        if p != merged_path
-                        and not any(t in p.name for t in dos_targets)
-                    ]
-                    target_paths = [
-                        p
-                        for p in pcap_paths
-                        if p != merged_path and p not in non_target_paths
-                    ]
+                    target_paths, non_target_paths = split_by_host(
+                        [p for p in pcap_paths if p != merged_path],
+                        host_of,
+                        dos_targets,
+                    )
 
                     # merge all hosts EXCEPT hosts targeted by DOS into merged.pcap, dedupe
                     logger.info(
                         f"Special processing: merging non-target PCAPs: {[p.name for p in non_target_paths]}"
                     )
-                    merged_path = self._merge_pcaps(non_target_paths)
-                    self._dedupe_pcap(merged_path)
+                    # when every capture is a DoS target there is nothing to
+                    # merge here; mergecap fails on an empty input list
+                    base: list[Path] = []
+                    if non_target_paths:
+                        merged_path = self._merge_pcaps(non_target_paths)
+                        self._dedupe_pcap(merged_path)
+                        base = [merged_path]
 
                     # split each target's PCAP into two, first part has the DOS packets, second one has everything else
                     logger.info(
@@ -189,20 +312,20 @@ class PCAP(ComponentBase):
                     fragmented = []
                     for t_path in target_paths:
                         frag_path = t_path.with_stem(f"{t_path.stem}_fragmented")
-                        # give tshark 2 minutes to complete
+                        # tshark gets tshark_timeout seconds
                         utils.run_command(
                             self._tshark_split(t_path, frag_path, "ip.frag_offset > 0"),
-                            timeout=120.0,
+                            timeout=self.config.tshark_timeout,
                         )
                         fragmented.append(frag_path)
 
                         nd_path = t_path.with_stem(f"{t_path.stem}_no_dos_fragments")
-                        # give tshark 2 minutes to complete
+                        # tshark gets tshark_timeout seconds
                         utils.run_command(
                             self._tshark_split(
                                 t_path, nd_path, "not (ip.frag_offset > 0)"
                             ),
-                            timeout=120.0,
+                            timeout=self.config.tshark_timeout,
                         )
                         non_dos.append(nd_path)
 
@@ -211,7 +334,7 @@ class PCAP(ComponentBase):
                         "Special processing: merging non-attack packets into merged.pcap and deduping"
                     )
                     # GAH, need to make sure pcap is merged into self
-                    merged_path = self._merge_pcaps([merged_path, *non_dos])
+                    merged_path = self._merge_pcaps([*base, *non_dos])
                     self._dedupe_pcap(merged_path)
 
                     # merge the "dos packets" pcaps from targets into merged.pcap, DON'T dedupe this time
@@ -242,7 +365,7 @@ class PCAP(ComponentBase):
         utils.write_json(m_path, pcap_metadata)
 
         # Process PCAPs to JSON, once all captures have been stopped
-        if self.metadata.get("convertToJSON", False):
+        if self.config.convert_to_json:
             logger.info(
                 f"PCAP --> JSON conversion enabled, converting {len(pcap_paths)} files"
             )
@@ -283,7 +406,9 @@ class PCAP(ComponentBase):
 
         mergecap_cmd = ["mergecap", "-w", str(merged_path)]
         mergecap_cmd += [str(p) for p in pcap_paths]
-        utils.run_command(mergecap_cmd, timeout=60.0)  # this shouldn't take long
+        utils.run_command(
+            mergecap_cmd, timeout=self.config.merge_timeout
+        )  # this shouldn't take long
 
         if not merged_path.is_file():
             raise RuntimeError(
@@ -315,7 +440,10 @@ class PCAP(ComponentBase):
 
     def _dedupe_pcap(self, pcap_path: Path) -> None:
         dd_path = Path(self.base_dir, "deduped.pcap")
-        utils.run_command(["editcap", "-d", str(pcap_path), str(dd_path)], timeout=60.0)
+        utils.run_command(
+            ["editcap", "-d", str(pcap_path), str(dd_path)],
+            timeout=self.config.merge_timeout,
+        )
 
         if not dd_path.is_file():
             raise RuntimeError(
@@ -323,6 +451,87 @@ class PCAP(ComponentBase):
             )
 
         dd_path.replace(pcap_path)  # overwrite merged.pcap with deduped.pcap
+
+
+def split_by_host(
+    paths: list[Path], host_of: dict[str, str], hosts: list[str]
+) -> tuple[list[Path], list[Path]]:
+    """Split capture files into those from the given VMs and the rest.
+
+    Matches the capture's VM exactly; testing the file name for the hostname
+    would count load10's capture as one of load1's.
+    """
+
+    matched = [p for p in paths if host_of.get(p.name) in hosts]
+    return matched, [p for p in paths if p not in matched]
+
+
+def _loop_chain(run_config: Any) -> list[dict]:
+    """The run's stage lists, then those of its loop, its loop's loop, and so on.
+
+    `loop: null` ends the chain.
+    """
+
+    chain = []
+    while isinstance(run_config, dict):
+        chain.append(run_config)
+        run_config = run_config.get("loop")
+    return chain
+
+
+def _stage_names(run_config: dict, stage: str | None = None) -> set[str]:
+    return {
+        n
+        for level in _loop_chain(run_config)
+        for key, names in level.items()
+        if key != "loop" and stage in (None, key) and isinstance(names, list)
+        for n in names
+    }
+
+
+def dos_targets_for_run(components: list, run_config: dict) -> list[str]:
+    """Hostnames targeted by the first dos/cyber_physical disruption in this run.
+
+    A component is in the run if its name is in any stage list of the run or of
+    any of its nested loops; a disruption defined for another run does not count.
+    """
+
+    in_run = _stage_names(run_config)
+    for comp in components:
+        if (
+            comp.type == "disruption"
+            and comp.name in in_run
+            and comp.metadata.current_disruption in ["dos", "cyber_physical"]
+        ):
+            return [t.hostname for t in comp.metadata.dos.targets]
+    return []
+
+
+def run_order_warnings(name: str, components: list, run_config: dict) -> list[str]:
+    """Problems with where `name` sits in the run's stage lists."""
+
+    warnings = []
+    for stage in ("start", "stop"):
+        if name not in _stage_names(run_config, stage):
+            warnings.append(
+                f"'{name}' is not in a '{stage}' stage list of this run; a capture "
+                "needs both: start before the traffic you want, stop after it ends"
+            )
+
+    # a type may be omitted in the scenario, in which case it is the name
+    collectors = {
+        c.name for c in components if (c.get("type") or c.name) == "collector"
+    }
+    for level in _loop_chain(run_config):
+        stop = level.get("stop")
+        if isinstance(stop, list) and name in stop:
+            early = [n for n in stop[: stop.index(name)] if n in collectors]
+            if early:
+                warnings.append(
+                    f"collector {early} runs before '{name}' in a stop list, so it "
+                    f"copies the captures before they are written; list '{name}' first"
+                )
+    return warnings
 
 
 def main():
