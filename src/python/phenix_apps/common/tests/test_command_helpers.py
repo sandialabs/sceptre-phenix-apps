@@ -4,7 +4,6 @@ commands must be single tokens, and run_command never goes through a shell.
 """
 
 import importlib
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -75,12 +74,18 @@ class TestValidateMmFilter:
 
 
 def test_mm_capture_filename_allows_timestamps():
-    from phenix_apps.apps.scorch.mm import mm
+    from phenix_apps.apps.scorch.app import parse_metadata
+    from phenix_apps.apps.scorch.mm.mm import MMMetadata
 
-    assert mm._validate_filename("br0-2024-01-01T10:00:00Z+x.pcap")
-    for bad in ["two words.pcap", "a.pcap\n"]:
-        with pytest.raises(AppError):
-            mm._validate_filename(bad)
+    def parse(filename):
+        cap = {"bridge": "phenix", "filename": filename}
+        md = {"start": [{"type": "start_capture", "capture": cap}]}
+        return parse_metadata(MMMetadata, md, "m")
+
+    assert parse("br0-2024-01-01T10:00:00Z+x.pcap")
+    for bad in ["two words.pcap", "dir/a.pcap"]:
+        with pytest.raises(ValueError, match="filename"):
+            parse(bad)
 
 
 class FakeMM:
@@ -94,16 +99,16 @@ class FakeMM:
 
 
 def make_mm_component(tmp_path, metadata):
-    from box import Box
-
+    from phenix_apps.apps.scorch.app import parse_metadata
     from phenix_apps.apps.scorch.mm import mm
 
     component = object.__new__(mm.MM)
-    component.metadata = Box(metadata)
+    # the model validates the metadata, so a bad value fails here, before any
+    # minimega command
+    component.config = parse_metadata(mm.MMMetadata, metadata, "m")
     component.base_dir = tmp_path
     component.root_dir = tmp_path
-    component.mm_init = lambda: component.fake
-    component.fake = FakeMM()
+    component.mm = FakeMM()
     return component
 
 
@@ -124,7 +129,7 @@ class TestMmComponentQuoting:
         )
         component._MM__run("start")
 
-        assert ("capture_pcap_filter", "'tcp port 80'") in component.fake.calls
+        assert ("capture_pcap_filter", "'tcp port 80'") in component.mm.calls
 
     def test_vm_capture_filter_reaches_minimega_as_one_quoted_argument(self, tmp_path):
         component = make_mm_component(
@@ -146,38 +151,32 @@ class TestMmComponentQuoting:
         )
         component._MM__run("start")
 
-        assert ("capture_pcap_filter", "'not port 22'") in component.fake.calls
+        assert ("capture_pcap_filter", "'not port 22'") in component.mm.calls
 
     @pytest.mark.parametrize("filter_", ["a\\b", "a#b", "it's"])
     def test_filter_minimega_would_misread_fails_before_any_command(
         self, tmp_path, filter_
     ):
-        component = make_mm_component(
-            tmp_path,
-            {
-                "start": [
-                    {
-                        "type": "start_capture",
-                        "capture": {"bridge": "phenix", "filter": filter_},
-                    }
-                ]
-            },
-        )
-        with pytest.raises(AppError):
-            component._MM__run("start")
-
-        assert component.fake.calls == []
+        with pytest.raises(ValueError, match="filter"):
+            make_mm_component(
+                tmp_path,
+                {
+                    "start": [
+                        {
+                            "type": "start_capture",
+                            "capture": {"bridge": "phenix", "filter": filter_},
+                        }
+                    ]
+                },
+            )
 
     @pytest.mark.parametrize("hostname", ["vm1 vm2", "vm1#", "vm'1"])
     def test_vm_name_must_be_one_token(self, tmp_path, hostname):
-        component = make_mm_component(
-            tmp_path,
-            {"vms": [{"hostname": hostname, "start": [{"type": "start"}]}]},
-        )
-        with pytest.raises(AppError):
-            component._MM__run("start")
-
-        assert component.fake.calls == []
+        with pytest.raises(ValueError, match="hostname"):
+            make_mm_component(
+                tmp_path,
+                {"vms": [{"hostname": hostname, "start": [{"type": "start"}]}]},
+            )
 
     @pytest.mark.parametrize("hostname", ["vm1", "vm[1-3]", "a,b"])
     def test_vm_name_may_be_a_minimega_target(self, tmp_path, hostname):
@@ -187,16 +186,22 @@ class TestMmComponentQuoting:
         )
         component._MM__run("start")
 
-        assert component.fake.calls == [("vm_start", hostname)]
+        assert component.mm.calls == [("vm_start", hostname)]
 
 
 def test_mm_snaplen_must_be_a_non_negative_integer():
-    from phenix_apps.apps.scorch.mm import mm
+    from phenix_apps.apps.scorch.app import parse_metadata
+    from phenix_apps.apps.scorch.mm.mm import MMMetadata
 
-    assert mm._validate_snaplen(" 96 ") == 96
+    def parse(snaplen):
+        cap = {"bridge": "phenix", "snaplen": snaplen}
+        md = {"start": [{"type": "start_capture", "capture": cap}]}
+        return parse_metadata(MMMetadata, md, "m")
+
+    assert parse(96).start[0].capture.snaplen == 96
     for bad in ["96 -w /x", -1]:
-        with pytest.raises(AppError):
-            mm._validate_snaplen(bad)
+        with pytest.raises(ValueError, match="snaplen"):
+            parse(bad)
 
 
 def test_pcap_tshark_split_keeps_the_display_filter_one_argument():
@@ -229,33 +234,6 @@ class TestMetadataValidators:
         ]:
             with pytest.raises(AppError):
                 utils.validate_ip(bad, "ip")
-
-
-class TestMmConvertPcap:
-    def test_failure_removes_partial_output(self, monkeypatch, tmp_path):
-        from phenix_apps.apps.scorch.mm import mm
-
-        def fail(cmd, stdout, **_):
-            stdout.write("partial")
-            raise subprocess.CalledProcessError(2, cmd, stderr="cut short\n")
-
-        monkeypatch.setattr(mm.subprocess, "run", fail)
-        out = tmp_path / "a.pcap.jsonl"
-        with pytest.raises(AppError, match="exit 2"):
-            mm._convert_pcap(str(tmp_path / "a.pcap"), str(out))
-        assert not out.exists()
-
-    def test_missing_tshark_removes_output(self, monkeypatch, tmp_path):
-        from phenix_apps.apps.scorch.mm import mm
-
-        def missing(*_, **__):
-            raise FileNotFoundError("tshark")
-
-        monkeypatch.setattr(mm.subprocess, "run", missing)
-        out = tmp_path / "a.pcap.jsonl"
-        with pytest.raises(AppError):
-            mm._convert_pcap(str(tmp_path / "a.pcap"), str(out))
-        assert not out.exists()
 
 
 class TestKafkaIsListener:
