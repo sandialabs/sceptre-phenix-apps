@@ -36,6 +36,12 @@ def intercambio(dictionary, string):
         % endfor
     % endfor
 % endfor
+% for tag, value in internal_tags.items():
+            <internal-tag>
+                <name>${tag}</name>
+                <value>${value}</value>
+            </internal-tag>
+% endfor
         </tags>
         <comms>
 % for protocol in fd_config.protocols:
