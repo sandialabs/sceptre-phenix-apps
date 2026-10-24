@@ -3,7 +3,10 @@ import json
 import time
 from pathlib import PurePath
 
+from pydantic import TypeAdapter
+
 from phenix_apps.apps.scorch import ComponentBase
+from phenix_apps.apps.scorch.app import Interface
 from phenix_apps.common import utils
 from phenix_apps.common.logger import logger
 
@@ -63,9 +66,22 @@ class Snort(ComponentBase):
         logger.info(f"Starting user component: {self.name}")
 
         hostname = self.metadata.get("hostname", "detector")
-        iface = self.metadata.get("sniffInterface", "eth0")
+        # Checked before it reaches the bash -c below.
+        iface = TypeAdapter(Interface).validate_python(
+            self.metadata.get("sniffInterface", "eth0")
+        )
+        startup_wait = self.metadata.get("startupWait", 5)
 
         mm = self.mm_init()
+
+        # snort -i on a missing interface exits at once, and the background
+        # start below would still report success.
+        try:
+            self.run_and_check_command(hostname, f"ip link show {iface}")
+        except RuntimeError as ex:
+            raise RuntimeError(
+                f"sniffInterface {iface} not found on {hostname}: {ex}"
+            ) from ex
 
         logger.info(f"clearing existing Snort logs in {hostname}")
 
@@ -76,7 +92,20 @@ class Snort(ComponentBase):
         logger.info(f"starting Snort in {hostname}")
 
         mm.cc_filter(f"name={hostname}")
-        mm.cc_background(f"snort -i {iface} -c /etc/snort/snort.conf")
+        mm.cc_background(
+            f"bash -c 'snort -i {iface} -c /etc/snort/snort.conf"
+            " 2> /var/log/snort/snort.err'"
+        )
+
+        # A bad config, rule or link type makes snort exit within a second or
+        # two, and a background command reports nothing back.
+        time.sleep(startup_wait)
+
+        if not self.check_process_running(hostname, "snort"):
+            err = self.run_and_check_command(hostname, "cat /var/log/snort/snort.err")
+            raise RuntimeError(
+                f"snort exited right after starting on {hostname}:\n{err['stdout']}"
+            )
 
         logger.info(f"Started user component: {self.name}")
 
