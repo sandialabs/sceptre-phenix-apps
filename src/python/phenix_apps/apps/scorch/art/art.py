@@ -1,12 +1,26 @@
+import shlex
 import subprocess
 import tempfile
 import time
 import uuid
-from typing import Final
+from typing import Annotated, Final, Self
 
 from box import Box
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    NonNegativeInt,
+    model_validator,
+)
 
 from phenix_apps.apps.scorch import ComponentBase
+from phenix_apps.apps.scorch.app import (
+    FilePath,
+    Hostname,
+    MetadataBlock,
+    Name,
+)
 from phenix_apps.common import utils
 from phenix_apps.common.logger import logger
 from phenix_apps.common.settings import SCORCH_HOST_VALIDATORS
@@ -15,13 +29,53 @@ from phenix_apps.common.settings import SCORCH_HOST_VALIDATORS
 # This is overwritten if a value is provided via goartPath
 GOART_BASE: Final[str] = "/phenix/art"
 
+# env/input names and values land on the goart command line unquoted, so no
+# whitespace, quotes or shell operators
+EnvKey = Annotated[str, Field(pattern=r"^[A-Za-z_][A-Za-z0-9_.-]*$")]
+EnvValue = Annotated[str, Field(pattern=r"^[^\s'\"`$;&|<>\\]*$")]
+# atomic test names have spaces ("Dump LSASS memory"), so unlike a Token this
+# allows them
+TestName = Annotated[str, Field(pattern=r"^[A-Za-z0-9_][A-Za-z0-9_ .,:=@%/+()-]*$")]
+
+
+class VM(MetadataBlock):
+    hostname: Hostname
+    env: dict[EnvKey, EnvValue] = Field(default_factory=dict)
+    inputs: dict[EnvKey, EnvValue] = Field(default_factory=dict)
+
+
+class ARTMetadata(BaseModel):
+    """Metadata for the art component; see README.md for each field."""
+
+    model_config = ConfigDict(extra="allow")
+
+    technique: Name
+    testName: TestName | None = None
+    testIndex: NonNegativeInt | None = None
+    abortOnError: bool = False
+    goartPath: FilePath | None = None
+    env: dict[EnvKey, EnvValue] = Field(default_factory=dict)
+    validator: str | None = None
+    vms: Annotated[list[VM], Field(min_length=1)]
+
+    @model_validator(mode="after")
+    def _check_test(self) -> Self:
+        if self.testName is None and self.testIndex is None:
+            raise ValueError("no technique test configured (set testName or testIndex)")
+        return self
+
 
 class AtomicRedTeam(ComponentBase):
+    metadata_model = ARTMetadata
+    config: ARTMetadata
+
     def __init__(self):
         ComponentBase.__init__(self, "art")
         self.execute_stage()
 
     def _goart_path(self, os_type):
+        if self.config.goartPath:
+            return self.config.goartPath
         if os_type == "windows":
             return "C:/phenix/art/goart.exe"
         return f"{GOART_BASE}/goart"
@@ -47,24 +101,11 @@ class AtomicRedTeam(ComponentBase):
     def start(self):
         logger.info(f"Starting user component: {self.name}")
 
-        technique = self.metadata.get("technique", None)
-        test_name = self.metadata.get("testName", None)
-        test_index = self.metadata.get("testIndex", None)
-        abort_on_error = self.metadata.get("abortOnError", False)
-
-        if not technique:
-            raise ValueError("no technique configured")
-
-        if test_name is None and test_index is None:
-            raise ValueError("no technique test configured (set testName or testIndex)")
-
-        vms = self.metadata.get("vms", None)
-        if not vms:
-            raise ValueError("no vms configured")
+        cfg = self.config
 
         mm = self.mm_init()
 
-        for vm in vms:
+        for vm in cfg.vms:
             hostname = vm.hostname
             os_type = self.extract_node_os_type(hostname)
             goart_path = self._goart_path(os_type)
@@ -78,21 +119,29 @@ class AtomicRedTeam(ComponentBase):
 
             self._check_binary(mm, hostname, goart_path, os_type)
 
-            args = ["-q", "-f", "json", "-t", technique, "-o", out_file]
+            args = [
+                "-q",
+                "-f",
+                "json",
+                "-t",
+                shlex.quote(cfg.technique),
+                "-o",
+                out_file,
+            ]
 
-            if test_index is not None:
-                args.extend(["-i", str(test_index)])
-            elif test_name is not None:
-                args.extend(["-n", test_name])
+            if cfg.testIndex is not None:
+                args.extend(["-i", str(cfg.testIndex)])
+            elif cfg.testName is not None:
+                args.extend(["-n", shlex.quote(cfg.testName)])
 
-            for name, value in self.metadata.get("env", {}).items():
-                args.extend(["--env", f"{name}={value}"])
+            for name, value in cfg.env.items():
+                args.extend(["--env", shlex.quote(f"{name}={value}")])
 
-            for name, value in vm.get("env", {}).items():
-                args.extend(["--env", f"{name}={value}"])
+            for name, value in vm.env.items():
+                args.extend(["--env", shlex.quote(f"{name}={value}")])
 
-            for name, value in vm.get("inputs", {}).items():
-                args.extend(["--input", f"{name}={value}"])
+            for name, value in vm.inputs.items():
+                args.extend(["--input", shlex.quote(f"{name}={value}")])
 
             cmd = f"{goart_path} {' '.join(args)}"
 
@@ -112,7 +161,7 @@ class AtomicRedTeam(ComponentBase):
                     f"failed to get results file from {hostname}: {ex}"
                 ) from ex
 
-            validator = self.metadata.get("validator", None)
+            validator = cfg.validator
             if validator and not SCORCH_HOST_VALIDATORS:
                 logger.warning(
                     f"skipping host-side validator for {hostname}: "
@@ -140,7 +189,7 @@ class AtomicRedTeam(ComponentBase):
                         if stderr
                         else "results validation failed"
                     )
-                    if abort_on_error:
+                    if cfg.abortOnError:
                         raise RuntimeError("results validation failed")
                 else:
                     logger.info("results are valid")
