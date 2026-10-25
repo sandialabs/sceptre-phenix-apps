@@ -1,14 +1,37 @@
 import json
 import time
+from ipaddress import IPv4Address
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
 from phenix_apps.apps.scorch import ComponentBase
+from phenix_apps.apps.scorch.app import Hostname
 from phenix_apps.common import utils
 from phenix_apps.common.logger import logger
 
 
+class OpcexportMetadata(BaseModel):
+    """Metadata for the opcexport component; see README.md for each field."""
+
+    model_config = ConfigDict(extra="allow")
+
+    opc_hostname: Hostname
+    elastic_ip: IPv4Address = IPv4Address("172.16.0.254")
+    elastic_port: int = Field(default=9200, ge=1, le=65535, strict=True)
+
+    @field_validator("elastic_ip", mode="before")
+    @classmethod
+    def _parse_ip(cls, value):
+        # strict mode refuses the YAML string for IPv4Address; parse it here
+        return IPv4Address(value) if isinstance(value, str) else value
+
+
 class OPCExport(ComponentBase):
+    metadata_model = OpcexportMetadata
+    config: OpcexportMetadata
+
     def __init__(self):
         ComponentBase.__init__(self, "opcexport")
         self.execute_stage()
@@ -16,7 +39,7 @@ class OPCExport(ComponentBase):
     def configure(self):
         logger.info(f"Configuring user component: {self.name}")
 
-        host = self.metadata["opc_hostname"]  # type: str
+        host = self.config.opc_hostname
 
         # this will copy all files from opcexport into C:/opcexport/
         # Faster and simpler than copying individual files
@@ -71,7 +94,7 @@ class OPCExport(ComponentBase):
         )
 
         # This is a bit of a dirty hack to auto-add the route out of the tap
-        elastic_ip = self.metadata.get("elastic_ip", "172.16.0.254")
+        elastic_ip = str(self.config.elastic_ip)
         if elastic_ip != "172.16.0.254":
             logger.info("configuring route")
 
@@ -116,9 +139,9 @@ class OPCExport(ComponentBase):
     def start(self):
         logger.info(f"Starting user component: {self.name}")
 
-        host = self.metadata["opc_hostname"]  # type: str
-        elastic_ip = self.metadata.get("elastic_ip", "172.16.0.254")
-        elastic_port = self.metadata.get("elastic_port", "9200")
+        host = self.config.opc_hostname
+        elastic_ip = str(self.config.elastic_ip)
+        elastic_port = self.config.elastic_port
 
         # start dirty elastic
         # open in new powershell window so that it will run in background and scorch can return
@@ -156,7 +179,7 @@ class OPCExport(ComponentBase):
     def stop(self):
         logger.info(f"Stopping user component: {self.name}")
 
-        host = self.metadata["opc_hostname"]  # type: str
+        host = self.config.opc_hostname
 
         # Stop dirty elastic
         # TODO: find a better way to do this that doesn't kill all pythons
@@ -178,9 +201,9 @@ class OPCExport(ComponentBase):
     def cleanup(self):
         logger.info(f"Cleaning up user component: {self.name}")
 
-        host = self.metadata["opc_hostname"]  # type: str
-        elastic_ip = self.metadata.get("elastic_ip", "172.16.0.254")
-        elastic_port = self.metadata.get("elastic_port", "9200")
+        host = self.config.opc_hostname
+        elastic_ip = str(self.config.elastic_ip)
+        elastic_port = self.config.elastic_port
 
         # delete data from elastic
         logger.info(
