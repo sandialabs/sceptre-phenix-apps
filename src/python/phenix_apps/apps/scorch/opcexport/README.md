@@ -15,28 +15,50 @@ type: opcexport
 exe:  phenix-scorch-component-opcexport
 ```
 
-## Metadata Options
+## Examples
 
-```yaml
-metadata:
-  opc_hostname: the hostname of the OPC server from the topology file.
-  elastic_ip: the ip address of the host with Elasticsearch. Defaults to 172.16.0.254.
-  elastic_port: the Elasticsearch port. Defaults to 9200.
-```
-
-## Stages
-> NOTE: The `configure` stage installs everything needed to run `opcexport` on the OPC and creates the `opcexport` config file from the OPC config file. The `start` stage starts the actual `opcexport` Python process, `scada_to_elastic.py`. The `stop` stage stops the `python.exe` process for `scada_to_elastic.py`, and the `cleanup` stage deletes the data from Elasticsearch.
-
-> NOTE: The `stop` and `cleanup` stages are **optional** depending on your needs. If you use the `cleanup` stage, your data will be **DELETED**. If you wish to keep the data, ensure you moved it elsewhere before cleanup.
-
-## Example Configuration
+Default Elasticsearch location (`172.16.0.254:9200`), so no route is added:
 
 ```yaml
 components:
-  - name: myopcexportcomponet
+  - name: opcexport
+    type: opcexport
+    metadata:
+      opc_hostname: opc
+```
+
+Elasticsearch on the tap network, with a route added automatically:
+
+```yaml
+components:
+  - name: opcexport
     type: opcexport
     metadata:
       opc_hostname: opc
       elastic_ip: 172.16.111.1
       elastic_port: 9200
 ```
+
+## Metadata
+
+| Field | Type | Required | Default | Meaning |
+|---|---|---|---|---|
+| `opc_hostname` | hostname | yes | | OPC server VM in the topology: 2 to 63 letters, digits and interior hyphens |
+| `elastic_ip` | IPv4 address | no | `172.16.0.254` | Elasticsearch host. Any other value adds a /24 route via the tap (needs the `tap` or `mgmt_tap` app) |
+| `elastic_port` | integer 1-65535 | no | `9200` | Elasticsearch port. Must be a number, not a string |
+
+## Stages
+
+> NOTE: The `configure` stage installs everything needed to run `opcexport` on the OPC and creates the `opcexport` config file from the OPC config file. The `start` stage starts the actual `opcexport` Python process, `scada_to_elastic.py`. The `stop` stage stops the `python.exe` process for `scada_to_elastic.py`, and the `cleanup` stage deletes the data from Elasticsearch.
+
+> NOTE: The `stop` and `cleanup` stages are **optional** depending on your needs. If you use the `cleanup` stage, your data will be **DELETED**. If you wish to keep the data, ensure you moved it elsewhere before cleanup.
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `invalid metadata ... opc_hostname: Field required` | No OPC hostname given | Set `opc_hostname` to the OPC VM's hostname |
+| `elastic_ip: Value error, Expected 4 octets in ...` | Hostname, IPv6 or malformed address | Use a literal IPv4 address |
+| `elastic_port: Input should be a valid integer` | Port quoted as a string | Write `9200`, not `"9200"` |
+| `scada_to_elastic.py is not running!` | OPC server or Elasticsearch unreachable | Check `elastic_ip`, routes and the OPC server on port 4840 |
+| `no tap app defined and a non-default elastic IP` | No route could be added | Add the `tap` or `mgmt_tap` app, or route manually |
