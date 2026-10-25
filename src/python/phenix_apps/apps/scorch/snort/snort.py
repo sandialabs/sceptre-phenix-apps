@@ -3,12 +3,52 @@ import json
 import time
 from pathlib import PurePath
 
+from pydantic import BaseModel, ConfigDict, Field
+
 from phenix_apps.apps.scorch import ComponentBase
+from phenix_apps.apps.scorch.app import (
+    FilePath,
+    Hostname,
+    Interface,
+    MetadataBlock,
+    Name,
+    Seconds,
+)
 from phenix_apps.common import utils
 from phenix_apps.common.logger import logger
 
 
+class ConfigFile(MetadataBlock):
+    src: FilePath  # a path on the phenix server
+    dst: FilePath  # where to drop it in the VM
+    name: Name | None = None  # optional label; not used by the component
+
+
+class ConfigScript(MetadataBlock):
+    script: FilePath  # a path on the phenix server
+    executor: FilePath  # the interpreter to run it with, e.g. bash
+
+
+class Scripts(MetadataBlock):
+    configSnort: ConfigScript | None = None
+
+
+class SnortMetadata(BaseModel):
+    """Metadata for the snort component; see README.md for each field."""
+
+    model_config = ConfigDict(extra="allow")
+
+    hostname: Hostname = "detector"
+    sniffInterface: Interface = "eth0"
+    waitDuration: Seconds = 30.0
+    configs: list[ConfigFile] = Field(default_factory=list)
+    scripts: Scripts = Field(default_factory=Scripts)
+
+
 class Snort(ComponentBase):
+    metadata_model = SnortMetadata
+    config: SnortMetadata
+
     def __init__(self):
         ComponentBase.__init__(self, "snort")
 
@@ -17,17 +57,16 @@ class Snort(ComponentBase):
     def configure(self):
         logger.info(f"Configuring user component: {self.name}")
 
-        hostname = self.metadata.get("hostname", "detector")
-        scripts = self.metadata.get("scripts", {})
-        configs = self.metadata.get("configs", [])
+        hostname = self.config.hostname
+        iface = self.config.sniffInterface
 
         mm = self.mm_init()
 
-        config_snort = scripts.get("configSnort", None)
+        config_snort = self.config.scripts.configSnort
 
         if config_snort:
-            script = config_snort["script"]
-            executor = config_snort["executor"]
+            script = config_snort.script
+            executor = config_snort.executor
             script_name = PurePath(script).name
 
             logger.info(f"copying {script_name} to {hostname}")
@@ -42,15 +81,10 @@ class Snort(ComponentBase):
             mm.cc_filter(f"name={hostname}")
             mm.cc_exec(f"{executor} /{script_name}")
 
-        for config in configs:
-            src = config["src"]
-            dst = config["dst"]
+        for config in self.config.configs:
+            logger.info(f"copying {PurePath(config.src).name} to {hostname}")
 
-            logger.info(f"copying {PurePath(src).name} to {hostname}")
-
-            utils.mm_send(mm, hostname, src, dst)
-
-        iface = self.metadata.get("sniffInterface", "eth0")
+            utils.mm_send(mm, hostname, config.src, config.dst)
 
         logger.info(f"ensuring {iface} is up in {hostname}")
 
@@ -62,8 +96,8 @@ class Snort(ComponentBase):
     def start(self):
         logger.info(f"Starting user component: {self.name}")
 
-        hostname = self.metadata.get("hostname", "detector")
-        iface = self.metadata.get("sniffInterface", "eth0")
+        hostname = self.config.hostname
+        iface = self.config.sniffInterface
 
         mm = self.mm_init()
 
@@ -83,8 +117,8 @@ class Snort(ComponentBase):
     def stop(self):
         logger.info(f"Stopping user component: {self.name}")
 
-        hostname = self.metadata.get("hostname", "detector")
-        wait = self.metadata.get("waitDuration", 30)
+        hostname = self.config.hostname
+        wait = self.config.waitDuration
 
         mm = self.mm_init()
 
@@ -106,12 +140,15 @@ class Snort(ComponentBase):
             utils.mm_recv(mm, hostname, f"/var/log/snort/{log}", str(log_path))
 
             if log == "snort.stats" and log_path.is_file():
-                logger.info("converting snort.stats to JSON")
-
-                lines = []
-
                 with log_path.open() as f:
                     lines = f.readlines()
+
+                # a comment line, then the header; nothing to convert without both
+                if len(lines) < 2:
+                    logger.info("snort.stats has no header, skipping JSON conversion")
+                    continue
+
+                logger.info("converting snort.stats to JSON")
 
                 # get rid of comment in file
                 lines.pop(0)
@@ -134,7 +171,7 @@ class Snort(ComponentBase):
     def cleanup(self):
         logger.info(f"Cleaning up user component: {self.name}")
 
-        hostname = self.metadata.get("hostname", "detector")
+        hostname = self.config.hostname
         logfiles = ["snort.log", "snort.err", "snort.stats"]
 
         mm = self.mm_init()
