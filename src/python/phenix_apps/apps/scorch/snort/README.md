@@ -30,4 +30,5 @@ running. Snort's startup output goes to `/var/log/snort/snort.err` on the VM.
 | Error | Fix |
 |---|---|
 | `sniffInterface <iface> not found on <host>` | Use the guest's interface name (`ip -br link` on the VM). Snort cannot sniff `any`. |
+| `String should match pattern` for `sniffInterface` | Interface names are letters, digits, `_`, `.` and `-`, up to 15 characters. |
 | `snort exited right after starting on <host>:` followed by Snort's output | Snort's own error is in the output, usually a bad config line, rule, or unsupported link type. |
