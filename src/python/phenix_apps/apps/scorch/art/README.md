@@ -2,26 +2,20 @@
 
 The Atomic Red Team (ART) component provides a means to connect scorch experiment configuration files to action Atomic Red Team attacks - using the ATT&CK framework. This provides a programmatic way to run attacks via experiments.
 
-#The goart executable:
-https://github.com/activeshadow/go-atomicredteam
+The goart executable: https://github.com/activeshadow/go-atomicredteam
 
-#Reference Techniques, Index and Requirements:
-https://github.com/redcanaryco/atomic-red-team/tree/master/atomics
+Reference techniques, indexes and requirements: https://github.com/redcanaryco/atomic-red-team/tree/master/atomics
 
 ```
 type: art
 exe:  phenix-scorch-component-art
 ```
 
-It is assumed that the `goart` executable is available on the target VM in either the default path or the path specified in the configuration file. The component will verify the binary exists and is executable on the VM before attempting to run it.
-
-
+It is assumed that the `goart` executable is available on the target VM in either the default path or the path specified in the configuration file. The component verifies the binary exists and is executable on the VM before running it.
 
 ## Executable Requirement
 
-The `goart` binary must be injected, downloaded or preloaded into each target VM. The examples below demonstrate injecting the binary/executable via the topology config.
-
-topology.yml:
+The `goart` binary must be injected, downloaded or preloaded into each target VM. These topology injections place it at the default paths.
 
 Windows VMs:
 
@@ -39,71 +33,9 @@ injections:
     dst: /phenix/art/goart
 ```
 
-Scenario File (Scenario-Scorch.yml)
-## Metadata Options
+## Examples
 
-```yaml
-metadata:
-  technique: <technique ID> *REQUIRED
-  testName: <name of technique test> *ONLY REQUIRED if testIndex is not present
-  testIndex: <index of technique test> *ONLY REQUIRED if testName is not present
-  goartPath: <path to goart executable on the VM> (optional) default: /phenix/art/goart or C:/phenix/art/goart.exe
-  outputPath: <path to write goart output on the VM (optional, default: /phenix/art or /tmp)>
-  execWaitSeconds: <seconds to wait after execution before retrieving results (optional, default: 5)>
-  env: <map of environment variables>
-  validator: <bash script to validate results>
-  abortOnError: bool
-  vms: <list of VM settings> *REQUIRED
-```
-
-Only one of `testName` and `testIndex` needs to be provided. If both are
-present, `testIndex` takes precedence.
-
-`goartPath` overrides the default goart binary path on the VM. Defaults to
-`C:/phenix/art/goart.exe` for Windows and `/phenix/art/goart` for Linux.
-
-`outputPath` overrides the directory where goart writes its JSON results on the
-VM. Defaults to `/phenix/art` for Windows and `/tmp` for Linux. Note that for
-Windows, this path must be accessible to the miniccc process.
-
-`execWaitSeconds` controls how long the component waits after goart finishes
-before attempting to retrieve the results file. Increase this for techniques
-that have significant post-execution activity.
-
-`env` key/value pairs are merged into the execution environment Atomic tests are
-executed in.
-
-`validator` script should expect to be passed the hostname of the VM as the only
-command line argument and the `.Executor.ExecutedCommand.results` portion of the
-JSON output of the executed Atomic test as STDIN. If the script exits with zero
-then it's assumed that it passed. If it exits with non-zero then it's assumed
-that it failed. For exit zero, anything passed to STDOUT will be streamed to the
-UI, and for exit non-zero anything passed to STDERR will be streamed to the UI.
-If exit non-zero and `abortOnError` is true, then the component exits as failed.
-If no validator is provided then it is assumed the test succeeded if the atomic
-executor exits cleanly.
-
-> [!IMPORTANT]
-> Validators run as shell scripts on the phenix host, not in the VM. To lock
-> this down, set `PHENIX_SCORCH_HOST_VALIDATORS=0` in the phenix environment;
-> each validator is then skipped with a warning and the result is not validated.
-
-`vms` is a list of settings per VM to execute the test on.
-
-## VM Settings
-
-```yaml
-vms:
-  - hostname: <VM hostname> *REQUIRED
-    inputs: <map of input key/value pairs> *REQUIRED as per technique information. Refer to Atomic Red Team Github.
-    env: <map of environment variables>
-    abortOnError: bool
-```
-
-`inputs` key/value pairs are used to fill in Atomic test variables for that
-specific VM.
-
-## Example Configuration
+A technique run by test index on two Windows VMs:
 
 ```yaml
 components:
@@ -112,7 +44,6 @@ components:
     metadata:
       technique: T1006
       testIndex: 0
-      execWaitSeconds: 10
       vms:
         - hostname: IT-ws10
           inputs:
@@ -122,7 +53,7 @@ components:
             volume: "c:"
 ```
 
-With optional overrides:
+A technique run by test name, with a custom binary path, environment variables, per-VM inputs and a host-side validator:
 
 ```yaml
 components:
@@ -130,18 +61,19 @@ components:
     type: art
     metadata:
       technique: T1190
-      testIndex: 0
-      goartPath: /custom/path/goart.exe
-      outputPath: /custom/output
-      execWaitSeconds: 15
+      testName: Exploit public-facing application
+      goartPath: /custom/path/goart
+      abortOnError: true
+      env:
+        LOG_LEVEL: debug
       vms:
         - hostname: kali-inet
-          abortOnError: false
           inputs:
             rhost: 172.29.0.25
             lhost: 1.2.3.4
         - hostname: kali-dmz
-          abortOnError: true
+          env:
+            PROXY: 10.0.0.1
           inputs:
             rhost: 10.11.12.13
             lhost: 172.29.0.25
@@ -155,3 +87,50 @@ components:
         echo "T1190 ($1) -- Failure" >&2
         exit 1
 ```
+
+## Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `technique` | string | required | ATT&CK technique ID, e.g. `T1006` or `T1003.001`. |
+| `testName` | string | - | Name of the technique test. Required if `testIndex` is not set. |
+| `testIndex` | integer >= 0 | - | Index of the technique test. Required if `testName` is not set. |
+| `goartPath` | path | `/phenix/art/goart` (Linux), `C:/phenix/art/goart.exe` (Windows) | Path to the goart executable on the VM. Forward slashes only. |
+| `env` | map | `{}` | Environment variables merged into the environment Atomic tests run in, for every VM. |
+| `validator` | string | - | Shell script that validates the results (see below). |
+| `abortOnError` | bool | `false` | Fail the component when the validator exits non-zero. |
+| `vms` | list | required | VMs to run the test on (at least one). |
+
+Only one of `testName` and `testIndex` needs to be provided. If both are present, `testIndex` takes precedence.
+
+Each entry in `vms`:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `hostname` | string | required | VM hostname. |
+| `env` | map | `{}` | Environment variables for this VM, after the component-wide `env`. |
+| `inputs` | map | `{}` | Values for the Atomic test's input variables, as required by the technique. See the Atomic Red Team repository. |
+
+`env` and `inputs` names are letters, digits, `_`, `.` and `-`, not starting with a digit. Their values go on the goart command line, so they cannot contain whitespace, quotes, backslashes, backticks or any of `$ ; & | < >`.
+
+The `validator` script is passed the hostname of the VM as its only command line argument and the `.Executor.ExecutedCommand.results` portion of the JSON output of the executed Atomic test as STDIN. If the script exits with zero then it's assumed that it passed. If it exits with non-zero then it's assumed that it failed, and if `abortOnError` is true the component exits as failed. If no validator is provided then it is assumed the test succeeded if the atomic executor exits cleanly.
+
+> [!IMPORTANT]
+> Validators run as shell scripts on the phenix host, not in the VM. To lock
+> this down, set `PHENIX_SCORCH_HOST_VALIDATORS=0` in the phenix environment;
+> each validator is then skipped with a warning and the result is not validated.
+
+Results are saved as `<hostname>.json` in the component's output directory.
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `no technique test configured (set testName or testIndex)` | Neither `testName` nor `testIndex` is set. | Set one of them. |
+| `vms: List should have at least 1 item` | `vms` is missing or empty. | List at least one VM. |
+| `goart not found or not executable at ...` | The binary is not on the VM at that path. | Inject it via the topology or set `goartPath`. |
+| `failed to get results file from <host>` | goart did not write its results, or the transfer failed. | Run goart by hand on the VM and check the technique's requirements. |
+| `technique` or `env`/`inputs` name rejected | It contains characters that would break the command line. | Use a plain ID or name. |
+| A value is rejected | It contains whitespace, a quote, a backslash or one of `` ` $ ; & | < > ``. | Pass a simpler value. |
+| `results validation failed` | The validator exited non-zero. | Check the validator's output; with `abortOnError: false` the run continues. |
+| Validator skipped with a warning | `PHENIX_SCORCH_HOST_VALIDATORS=0` is set. | Unset it to run validators. |
