@@ -26,8 +26,7 @@ metadata:
       method: <MITM method>     # optional, defaults to `arp`
 ```
 
-`interface` was once `iface`. The old name still works but logs a deprecation
-warning; switch to `interface`.
+`interface` was once `iface`; the old name is still accepted as an alias.
 
 Every field is validated before the stage runs; a bad value fails the stage
 rather than reaching the VM. `targets` and `method` are restricted to the

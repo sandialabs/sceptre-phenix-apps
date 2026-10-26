@@ -1,14 +1,16 @@
-from typing import Annotated, Any, Self
+from typing import Annotated, Self
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    model_validator,
+)
 
 from phenix_apps.apps.scorch import ComponentBase
-from phenix_apps.apps.scorch.app import (
-    Hostname,
-    Interface,
-    MetadataBlock,
-    rename_deprecated,
-)
+from phenix_apps.apps.scorch.app import Hostname, Interface, MetadataBlock
 from phenix_apps.common import utils
 from phenix_apps.common.logger import logger
 
@@ -40,15 +42,9 @@ Targets = Annotated[
 
 class EttercapVM(MetadataBlock):
     hostname: Hostname
-    interface: Interface
+    interface: Interface = Field(validation_alias=AliasChoices("interface", "iface"))
     targets: Targets
     method: Method = "arp"
-
-    @model_validator(mode="before")
-    @classmethod
-    def _accept_deprecated_keys(cls, data: Any) -> Any:
-        # iface was renamed to interface; keep old configs working
-        return rename_deprecated(data, "iface", "interface")
 
 
 class EttercapMetadata(BaseModel):

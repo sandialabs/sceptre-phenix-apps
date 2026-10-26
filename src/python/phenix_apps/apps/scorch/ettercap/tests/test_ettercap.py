@@ -10,11 +10,20 @@ from phenix_apps.testing.readme import readme_components
 README = Path(__file__).parents[1] / "README.md"
 
 
-def test_iface_is_accepted_with_a_deprecation_warning():
+def test_iface_is_an_alias_for_interface():
     md = {"vms": [{"hostname": "aa", "iface": "eth0", "targets": "/10.0.0.1//"}]}
     config, warnings = validate_metadata(EttercapMetadata, md, "e")
     assert config.vms[0].interface == "eth0"
-    assert warnings == ["iface is deprecated, use interface instead"]
+    assert warnings == []
+
+
+def test_interface_wins_over_iface():
+    vm = {"hostname": "aa", "interface": "eth1", "iface": "eth0", "targets": "/1//"}
+    config, warnings = validate_metadata(EttercapMetadata, {"vms": [vm]}, "e")
+    assert config.vms[0].interface == "eth1"
+    assert warnings == [
+        "vms.0.iface: unknown key, ignored. Fix: remove it (did you mean 'interface'?)"
+    ]
 
 
 def readme_examples() -> list[dict]:
@@ -34,7 +43,11 @@ def test_readme_examples_are_valid_and_clean(cmp):
 def test_method_defaults_to_arp():
     config = parse_metadata(
         EttercapMetadata,
-        {"vms": [{"hostname": "attacker", "interface": "eth0", "targets": "/10.0.0.1//"}]},
+        {
+            "vms": [
+                {"hostname": "attacker", "interface": "eth0", "targets": "/10.0.0.1//"}
+            ]
+        },
         "e",
     )
     assert config.vms[0].method == "arp"
@@ -73,19 +86,30 @@ def test_valid_methods(method):
     [
         ({}, "vms: Field required"),
         ({"vms": []}, "vms: List should have at least 1 item"),
-        ({"vms": [{"interface": "eth0", "targets": "/10.0.0.1//"}]}, r"vms\.0\.hostname"),
+        (
+            {"vms": [{"interface": "eth0", "targets": "/10.0.0.1//"}]},
+            r"vms\.0\.hostname",
+        ),
         ({"vms": [{"hostname": "aa", "targets": "/10.0.0.1//"}]}, r"vms\.0\.interface"),
         ({"vms": [{"hostname": "aa", "interface": "eth0"}]}, r"vms\.0\.targets"),
         (
             {
                 "vms": [
-                    {"hostname": "a;reboot", "interface": "eth0", "targets": "/10.0.0.1//"}
+                    {
+                        "hostname": "a;reboot",
+                        "interface": "eth0",
+                        "targets": "/10.0.0.1//",
+                    }
                 ]
             },
             r"vms\.0\.hostname",
         ),
         (
-            {"vms": [{"hostname": "aa", "interface": "x" * 16, "targets": "/10.0.0.1//"}]},
+            {
+                "vms": [
+                    {"hostname": "aa", "interface": "x" * 16, "targets": "/10.0.0.1//"}
+                ]
+            },
             r"vms\.0\.interface",
         ),
         (
