@@ -3,12 +3,54 @@ import json
 import time
 from pathlib import PurePath
 
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+
 from phenix_apps.apps.scorch import ComponentBase
+from phenix_apps.apps.scorch.app import (
+    FilePath,
+    Hostname,
+    Interface,
+    MetadataBlock,
+    Name,
+    Seconds,
+)
 from phenix_apps.common import utils
 from phenix_apps.common.logger import logger
 
 
+class ConfigFile(MetadataBlock):
+    src: FilePath  # a path on the phenix server
+    dst: FilePath  # where to drop it in the VM
+    name: Name | None = None  # optional label; not used by the component
+
+
+class ConfigScript(MetadataBlock):
+    script: FilePath  # a path on the phenix server
+    executor: FilePath  # the interpreter to run it with, e.g. bash
+
+
+class Scripts(MetadataBlock):
+    configSnort: ConfigScript | None = None
+
+
+class SnortMetadata(BaseModel):
+    """Metadata for the snort component; see README.md for each field."""
+
+    model_config = ConfigDict(extra="allow")
+
+    hostname: Hostname = "detector"
+    interface: Interface = Field(
+        "eth0", validation_alias=AliasChoices("interface", "sniffInterface")
+    )
+    waitDuration: Seconds = 30.0
+    configs: list[ConfigFile] = Field(default_factory=list)
+    scripts: Scripts = Field(default_factory=Scripts)
+
+
 class Snort(ComponentBase):
+    metadata_model = SnortMetadata
+    config: SnortMetadata
+
     def __init__(self):
         ComponentBase.__init__(self, "snort")
 
@@ -17,17 +59,14 @@ class Snort(ComponentBase):
     def configure(self):
         logger.info(f"Configuring user component: {self.name}")
 
-        hostname = self.metadata.get("hostname", "detector")
-        scripts = self.metadata.get("scripts", {})
-        configs = self.metadata.get("configs", [])
+        hostname = self.config.hostname
+        iface = self.config.interface
 
-        mm = self.mm_init()
-
-        config_snort = scripts.get("configSnort", None)
+        config_snort = self.config.scripts.configSnort
 
         if config_snort:
-            script = config_snort["script"]
-            executor = config_snort["executor"]
+            script = config_snort.script
+            executor = config_snort.executor
             script_name = PurePath(script).name
 
             logger.info(f"copying {script_name} to {hostname}")
@@ -35,58 +74,49 @@ class Snort(ComponentBase):
             # Copies script to root directory of VM. For example, if script is
             # /phenix/topologies/snort-test/scripts/configure-snort.sh, then it
             # will be copied to /configure-snort.sh in the VM.
-            utils.mm_send(mm, hostname, script, script_name)
+            utils.mm_send(self.mm, hostname, script, script_name)
 
             logger.info(f"running {script_name} on {hostname}")
 
-            mm.cc_filter(f"name={hostname}")
-            mm.cc_exec(f"{executor} /{script_name}")
+            with utils.mm_cc_filter(self.mm, f"name={hostname}"):
+                self.mm.cc_exec(f"{executor} /{script_name}")
 
-        for config in configs:
-            src = config["src"]
-            dst = config["dst"]
+        for config in self.config.configs:
+            logger.info(f"copying {PurePath(config.src).name} to {hostname}")
 
-            logger.info(f"copying {PurePath(src).name} to {hostname}")
-
-            utils.mm_send(mm, hostname, src, dst)
-
-        iface = self.metadata.get("sniffInterface", "eth0")
+            utils.mm_send(self.mm, hostname, config.src, config.dst)
 
         logger.info(f"ensuring {iface} is up in {hostname}")
 
-        mm.cc_filter(f"name={hostname}")
-        mm.cc_exec(f"ip link set {iface} up")
+        with utils.mm_cc_filter(self.mm, f"name={hostname}"):
+            self.mm.cc_exec(f"ip link set {iface} up")
 
         logger.info(f"Configured user component: {self.name}")
 
     def start(self):
         logger.info(f"Starting user component: {self.name}")
 
-        hostname = self.metadata.get("hostname", "detector")
-        iface = self.metadata.get("sniffInterface", "eth0")
-
-        mm = self.mm_init()
+        hostname = self.config.hostname
+        iface = self.config.interface
 
         logger.info(f"clearing existing Snort logs in {hostname}")
 
-        mm.cc_filter(f"name={hostname}")
-        mm.cc_exec("rm -rf /var/log/snort")
-        mm.cc_exec("mkdir -p /var/log/snort")
+        with utils.mm_cc_filter(self.mm, f"name={hostname}"):
+            self.mm.cc_exec("rm -rf /var/log/snort")
+            self.mm.cc_exec("mkdir -p /var/log/snort")
 
         logger.info(f"starting Snort in {hostname}")
 
-        mm.cc_filter(f"name={hostname}")
-        mm.cc_background(f"snort -i {iface} -c /etc/snort/snort.conf")
+        with utils.mm_cc_filter(self.mm, f"name={hostname}"):
+            self.mm.cc_background(f"snort -i {iface} -c /etc/snort/snort.conf")
 
         logger.info(f"Started user component: {self.name}")
 
     def stop(self):
         logger.info(f"Stopping user component: {self.name}")
 
-        hostname = self.metadata.get("hostname", "detector")
-        wait = self.metadata.get("waitDuration", 30)
-
-        mm = self.mm_init()
+        hostname = self.config.hostname
+        wait = self.config.waitDuration
 
         logger.info(f"waiting {wait} seconds before stopping Snort in {hostname}")
 
@@ -94,8 +124,8 @@ class Snort(ComponentBase):
 
         logger.info(f"stopping Snort in {hostname} (be patient... it may take a while)")
 
-        mm.cc_filter(f"name={hostname}")
-        mm.cc_exec("pkill -INT snort")
+        with utils.mm_cc_filter(self.mm, f"name={hostname}"):
+            self.mm.cc_exec("pkill -INT snort")
 
         logfiles = ["alert", "snort.log", "snort.stats"]
 
@@ -103,15 +133,18 @@ class Snort(ComponentBase):
             log_path = self.base_dir / log
 
             logger.info(f"copying /var/log/snort/{log} from {hostname}")
-            utils.mm_recv(mm, hostname, f"/var/log/snort/{log}", str(log_path))
+            utils.mm_recv(self.mm, hostname, f"/var/log/snort/{log}", str(log_path))
 
             if log == "snort.stats" and log_path.is_file():
-                logger.info("converting snort.stats to JSON")
-
-                lines = []
-
                 with log_path.open() as f:
                     lines = f.readlines()
+
+                # a comment line, then the header; nothing to convert without both
+                if len(lines) < 2:
+                    logger.info("snort.stats has no header, skipping JSON conversion")
+                    continue
+
+                logger.info("converting snort.stats to JSON")
 
                 # get rid of comment in file
                 lines.pop(0)
@@ -134,16 +167,14 @@ class Snort(ComponentBase):
     def cleanup(self):
         logger.info(f"Cleaning up user component: {self.name}")
 
-        hostname = self.metadata.get("hostname", "detector")
+        hostname = self.config.hostname
         logfiles = ["snort.log", "snort.err", "snort.stats"]
 
-        mm = self.mm_init()
+        with utils.mm_cc_filter(self.mm, f"name={hostname}"):
+            for log in logfiles:
+                logger.info(f"deleting /var/log/snort/{log} from {hostname}")
 
-        for log in logfiles:
-            logger.info(f"deleting /var/log/snort/{log} from {hostname}")
-
-            mm.cc_filter(f"name={hostname}")
-            mm.cc_exec(f"rm /var/log/snort/{log}")
+                self.mm.cc_exec(f"rm /var/log/snort/{log}")
 
         logger.info(f"Cleaned up user component: {self.name}")
 
