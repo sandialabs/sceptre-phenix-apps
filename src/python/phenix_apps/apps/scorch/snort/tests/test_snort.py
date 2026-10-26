@@ -79,10 +79,15 @@ def test_bad_metadata_is_rejected(md, message):
         parse_metadata(SnortMetadata, md, "s")
 
 
-def test_sniff_interface_is_accepted_with_a_deprecation_warning():
+def test_sniff_interface_is_an_alias_for_interface():
     config, warnings = validate_metadata(SnortMetadata, {"sniffInterface": "eth2"}, "s")
     assert config.interface == "eth2"
-    assert warnings == ["sniffInterface is deprecated, use interface instead"]
+    assert warnings == []
+
+
+def test_interface_wins_over_sniff_interface():
+    md = {"interface": "eth1", "sniffInterface": "eth2"}
+    assert parse_metadata(SnortMetadata, md, "s").interface == "eth1"
 
 
 def test_unknown_key_in_a_config_entry_only_warns():
