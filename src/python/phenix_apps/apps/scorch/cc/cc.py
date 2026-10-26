@@ -9,6 +9,46 @@ from phenix_apps.common.logger import logger
 from phenix_apps.common.settings import SCORCH_HOST_VALIDATORS
 
 
+def _windows_script(cmd: str) -> str:
+    """Wrap a command in a PowerShell script whose exit code means what it does
+    on Linux.
+
+    `powershell -File` exits 0 even when the script's last native command fails,
+    so end the script with that command's exit code. A terminating PowerShell
+    error already makes `-File` exit 1.
+    """
+    return f"$global:LASTEXITCODE = 0\n{cmd}\nexit $LASTEXITCODE\n"
+
+
+def _check_windows_result(args: str, hostname: str, results: dict) -> None:
+    """Judge a Windows command by its exit code, as on Linux.
+
+    Windows commands used to fail on any STDERR output instead. During the
+    transition nothing that passed before starts failing: a non-zero exit with no
+    STDERR only warns (a later release will fail it), and STDERR with exit 0,
+    which used to fail, now passes with a warning.
+    """
+    code, stderr = results["exitcode"], results["stderr"]
+
+    if code and stderr:
+        logger.error(f"command '{args}' returned a non-zero exit code of '{code}'")
+        logger.info(f"STDERR Output: {stderr}")
+        raise RuntimeError(f"command '{args}' failed on Windows")
+
+    if code:
+        logger.warning(
+            f"command '{args}' on Windows VM {hostname} exited {code} without "
+            "writing to STDERR; it passes for now, but a later release will fail "
+            "it, as on Linux"
+        )
+    elif stderr:
+        logger.warning(
+            f"command '{args}' on Windows VM {hostname} wrote to STDERR but exited "
+            "0; Windows commands no longer fail on STDERR alone"
+        )
+        logger.info(f"STDERR Output: {stderr}")
+
+
 class CC(ComponentBase):
     def __init__(self):
         ComponentBase.__init__(self, "cc")
@@ -87,18 +127,8 @@ class CC(ComponentBase):
                             f"command '{cmd.args}' executed in VM {vm.hostname} using cc"
                         )
 
-                        # HACK: If Windows, use presence of stderr to determine
-                        # success/failure instead of exit code. Ugh...
                         if self.extract_node_os_type(vm.hostname) == "windows":
-                            if results["stderr"]:
-                                logger.error(
-                                    f"command '{cmd.args}' resulted in output to STDERR (assuming failure)"
-                                )
-                                logger.info(f"STDERR Output: {results['stderr']}")
-
-                                raise RuntimeError(
-                                    f"command '{cmd.args}' failed on Windows"
-                                )
+                            _check_windows_result(cmd.args, vm.hostname, results)
                         elif results["exitcode"]:
                             logger.error(
                                 f"command '{cmd.args}' returned a non-zero exit code of '{results['exitcode']}'"
@@ -247,25 +277,21 @@ class CC(ComponentBase):
 
     def __send_cmd_as_file(self, hostname, cmd):
         cmd_file = f"run-{self.extract_run_name()}_{uuid.uuid4()!s}"
-        os_type = self.extract_node_os_type(hostname)
-
-        if os_type == "windows":
-            cmd_file += ".ps1"
-        else:
-            cmd_file += ".sh"
+        windows = self.extract_node_os_type(hostname) == "windows"
+        cmd_file += ".ps1" if windows else ".sh"
 
         cmd_src = str(Path(self.root_dir) / self.exp_name / cmd_file)
         cmd_dst = str(PurePath("/tmp/miniccc/files") / self.exp_name / cmd_file)
 
         with Path(cmd_src).open("w") as f:
-            f.write(cmd)
+            f.write(_windows_script(cmd) if windows else cmd)
 
         utils.mm_cc_send_wait(self.mm, hostname, cmd_src, self.exp_name)
         self.mm.clear_cc_filter()
 
         Path(cmd_src).unlink()
 
-        if os_type == "windows":
+        if windows:
             return f"powershell.exe -ExecutionPolicy Bypass -File {cmd_dst}"
         return f"bash {cmd_dst}"
 

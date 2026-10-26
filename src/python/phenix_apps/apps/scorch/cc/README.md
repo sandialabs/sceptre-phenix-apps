@@ -64,6 +64,25 @@ of this component. The `once` setting can be used to limit the execution of an
 exec or background command to only one time (and this is the default for this
 setting).
 
+### Success and failure of a waited `exec`
+
+A waited `exec` fails the stage when the command exits non-zero. On Windows the
+command runs as a PowerShell script (`powershell -File`) that exits with the
+last native command's exit code; a terminating PowerShell error exits 1.
+
+Windows commands used to fail on any STDERR output instead. While that changes,
+nothing that passed before fails:
+
+| Windows result | Outcome |
+|---|---|
+| non-zero exit and STDERR | fails: `command '<args>' failed on Windows` |
+| non-zero exit, no STDERR | passes with a warning (`exited N without writing to STDERR`); a later release will fail it |
+| exit 0 with STDERR | passes with a warning (`no longer fail on STDERR alone`) |
+
+A tool whose success codes are non-zero (`robocopy` exits 1-7 on success) will
+fail once the transition ends; end its command with `exit 0` when its code is a
+success, for example `robocopy C:\a C:\b; if ($LASTEXITCODE -lt 8) { exit 0 }`.
+
 ## Notes on Stage-Level `args` and `filter`
 
 A stage-level `exec` hands `args` and `filter` to minimega as written, so
