@@ -2,8 +2,9 @@ import csv
 import json
 import time
 from pathlib import PurePath
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from phenix_apps.apps.scorch import ComponentBase
 from phenix_apps.apps.scorch.app import (
@@ -13,6 +14,7 @@ from phenix_apps.apps.scorch.app import (
     MetadataBlock,
     Name,
     Seconds,
+    rename_deprecated,
 )
 from phenix_apps.common import utils
 from phenix_apps.common.logger import logger
@@ -43,6 +45,12 @@ class SnortMetadata(BaseModel):
     waitDuration: Seconds = 30.0
     configs: list[ConfigFile] = Field(default_factory=list)
     scripts: Scripts = Field(default_factory=Scripts)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_deprecated_keys(cls, data: Any) -> Any:
+        # sniffInterface was renamed to interface; keep old configs working
+        return rename_deprecated(data, "sniffInterface", "interface")
 
 
 class Snort(ComponentBase):

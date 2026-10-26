@@ -33,6 +33,9 @@ metadata:
       script: <path on the phenix server>
 ```
 
+`interface` was once `sniffInterface`. The old name still works but logs a
+deprecation warning; switch to `interface`.
+
 Every field is validated before the stage runs; a bad value fails the stage.
 `hostname`, `interface`, the file paths and the `executor` are restricted
 to safe characters because they are used in minimega commands. Check a config before an experiment without running it:
