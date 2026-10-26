@@ -107,7 +107,7 @@ def test_resolve_uuid_skips_lookup():
     a = make_app()
     with mock.patch.object(Caldera, "_api") as api:
         assert (
-            a._resolve(None, "planners", "planner", PHENIX_PLANNER_ID)
+            a._resolve("planners", "planner", PHENIX_PLANNER_ID)
             == PHENIX_PLANNER_ID
         )
     api.assert_not_called()
@@ -125,15 +125,15 @@ def test_resolve_looks_up_name(model, item, want):
     with mock.patch.object(
         Caldera, "_api", return_value=[{"name": "x", "id": "no"}, item]
     ) as api:
-        assert app._resolve("mm", model, "thing", "n") == want
-    api.assert_called_once_with("mm", "api_call.mako", model, model=model)
+        assert app._resolve(model, "thing", "n") == want
+    api.assert_called_once_with("api_call.mako", model, model=model)
 
 
 def test_resolve_unknown_name_raises():
     app = make_app()
     with mock.patch.object(Caldera, "_api", return_value=[]):
         with pytest.raises(ValueError, match="unable to find 'bogus' planner"):
-            app._resolve("mm", "planners", "planner", "bogus")
+            app._resolve("planners", "planner", "bogus")
 
 
 def test_run_wires_lookups_into_the_operation():
@@ -144,7 +144,7 @@ def test_run_wires_lookups_into_the_operation():
     )
     calls = []
 
-    def fake_api(mm, template, what, **kw):
+    def fake_api(template, what, **kw):
         calls.append((template, kw))
         return {
             "api_call.mako": [
