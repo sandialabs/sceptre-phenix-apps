@@ -39,7 +39,7 @@ class SnortMetadata(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     hostname: Hostname = "detector"
-    sniffInterface: Interface = "eth0"
+    interface: Interface = "eth0"
     waitDuration: Seconds = 30.0
     configs: list[ConfigFile] = Field(default_factory=list)
     scripts: Scripts = Field(default_factory=Scripts)
@@ -58,9 +58,7 @@ class Snort(ComponentBase):
         logger.info(f"Configuring user component: {self.name}")
 
         hostname = self.config.hostname
-        iface = self.config.sniffInterface
-
-        mm = self.mm_init()
+        iface = self.config.interface
 
         config_snort = self.config.scripts.configSnort
 
@@ -74,22 +72,22 @@ class Snort(ComponentBase):
             # Copies script to root directory of VM. For example, if script is
             # /phenix/topologies/snort-test/scripts/configure-snort.sh, then it
             # will be copied to /configure-snort.sh in the VM.
-            utils.mm_send(mm, hostname, script, script_name)
+            utils.mm_send(self.mm, hostname, script, script_name)
 
             logger.info(f"running {script_name} on {hostname}")
 
-            mm.cc_filter(f"name={hostname}")
-            mm.cc_exec(f"{executor} /{script_name}")
+            with utils.mm_cc_filter(self.mm, f"name={hostname}"):
+                self.mm.cc_exec(f"{executor} /{script_name}")
 
         for config in self.config.configs:
             logger.info(f"copying {PurePath(config.src).name} to {hostname}")
 
-            utils.mm_send(mm, hostname, config.src, config.dst)
+            utils.mm_send(self.mm, hostname, config.src, config.dst)
 
         logger.info(f"ensuring {iface} is up in {hostname}")
 
-        mm.cc_filter(f"name={hostname}")
-        mm.cc_exec(f"ip link set {iface} up")
+        with utils.mm_cc_filter(self.mm, f"name={hostname}"):
+            self.mm.cc_exec(f"ip link set {iface} up")
 
         logger.info(f"Configured user component: {self.name}")
 
@@ -97,20 +95,18 @@ class Snort(ComponentBase):
         logger.info(f"Starting user component: {self.name}")
 
         hostname = self.config.hostname
-        iface = self.config.sniffInterface
-
-        mm = self.mm_init()
+        iface = self.config.interface
 
         logger.info(f"clearing existing Snort logs in {hostname}")
 
-        mm.cc_filter(f"name={hostname}")
-        mm.cc_exec("rm -rf /var/log/snort")
-        mm.cc_exec("mkdir -p /var/log/snort")
+        with utils.mm_cc_filter(self.mm, f"name={hostname}"):
+            self.mm.cc_exec("rm -rf /var/log/snort")
+            self.mm.cc_exec("mkdir -p /var/log/snort")
 
         logger.info(f"starting Snort in {hostname}")
 
-        mm.cc_filter(f"name={hostname}")
-        mm.cc_background(f"snort -i {iface} -c /etc/snort/snort.conf")
+        with utils.mm_cc_filter(self.mm, f"name={hostname}"):
+            self.mm.cc_background(f"snort -i {iface} -c /etc/snort/snort.conf")
 
         logger.info(f"Started user component: {self.name}")
 
@@ -120,16 +116,14 @@ class Snort(ComponentBase):
         hostname = self.config.hostname
         wait = self.config.waitDuration
 
-        mm = self.mm_init()
-
         logger.info(f"waiting {wait} seconds before stopping Snort in {hostname}")
 
         time.sleep(wait)
 
         logger.info(f"stopping Snort in {hostname} (be patient... it may take a while)")
 
-        mm.cc_filter(f"name={hostname}")
-        mm.cc_exec("pkill -INT snort")
+        with utils.mm_cc_filter(self.mm, f"name={hostname}"):
+            self.mm.cc_exec("pkill -INT snort")
 
         logfiles = ["alert", "snort.log", "snort.stats"]
 
@@ -137,7 +131,7 @@ class Snort(ComponentBase):
             log_path = self.base_dir / log
 
             logger.info(f"copying /var/log/snort/{log} from {hostname}")
-            utils.mm_recv(mm, hostname, f"/var/log/snort/{log}", str(log_path))
+            utils.mm_recv(self.mm, hostname, f"/var/log/snort/{log}", str(log_path))
 
             if log == "snort.stats" and log_path.is_file():
                 with log_path.open() as f:
@@ -174,13 +168,11 @@ class Snort(ComponentBase):
         hostname = self.config.hostname
         logfiles = ["snort.log", "snort.err", "snort.stats"]
 
-        mm = self.mm_init()
+        with utils.mm_cc_filter(self.mm, f"name={hostname}"):
+            for log in logfiles:
+                logger.info(f"deleting /var/log/snort/{log} from {hostname}")
 
-        for log in logfiles:
-            logger.info(f"deleting /var/log/snort/{log} from {hostname}")
-
-            mm.cc_filter(f"name={hostname}")
-            mm.cc_exec(f"rm /var/log/snort/{log}")
+                self.mm.cc_exec(f"rm /var/log/snort/{log}")
 
         logger.info(f"Cleaned up user component: {self.name}")
 

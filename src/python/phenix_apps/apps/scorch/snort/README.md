@@ -21,7 +21,7 @@ component only places the per-experiment config/rules and runs it.
 ```yaml
 metadata:
   hostname: detector      # VM to run Snort in; defaults to `detector`
-  sniffInterface: eth0    # interface to sniff; defaults to `eth0`
+  interface: eth0    # interface to sniff; defaults to `eth0`
   waitDuration: 30        # seconds to run before stopping; defaults to 30
   configs:                # files copied into the VM at configure
     - src: <path on the phenix server>
@@ -34,9 +34,9 @@ metadata:
 ```
 
 Every field is validated before the stage runs; a bad value fails the stage.
-`hostname`, `sniffInterface`, the file paths and the `executor` are restricted
-to safe characters because they are used in minimega commands. Check a config
-without running it with `phenix-scorch-validate`.
+`hostname`, `interface`, the file paths and the `executor` are restricted
+to safe characters because they are used in minimega commands. Check a config before an experiment without running it:
+`phenix-scorch-validate scenario.yaml`.
 
 ## Examples
 
@@ -48,7 +48,7 @@ components:
     type: snort
     metadata:
       hostname: detector
-      sniffInterface: eth0
+      interface: eth0
       waitDuration: 30
       configs:
         - name: snort
@@ -80,7 +80,7 @@ components:
 | Message | Cause |
 | --- | --- |
 | `hostname: ...` | the detector hostname is malformed |
-| `sniffInterface: ...` | the interface name is missing or malformed |
+| `interface: ...` | the interface name is missing or malformed |
 | `waitDuration: Input should be greater than or equal to 0` | a negative wait |
 | `configs.0.src: ...` / `configs.0.dst: ...` | a config path is missing or has characters outside a file path |
 | `scripts.configSnort.executor: ...` | the executor is missing or malformed |

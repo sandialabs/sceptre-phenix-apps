@@ -28,7 +28,7 @@ def test_defaults_match_the_old_code():
     config = parse_metadata(SnortMetadata, {}, "s")
 
     assert config.hostname == "detector"
-    assert config.sniffInterface == "eth0"
+    assert config.interface == "eth0"
     assert config.waitDuration == 30.0
     assert config.configs == []
     assert config.scripts.configSnort is None
@@ -62,7 +62,7 @@ def test_configsnort_script_parses():
     ("md", "message"),
     [
         ({"hostname": "a;reboot"}, "hostname"),
-        ({"sniffInterface": "x" * 16}, "sniffInterface"),
+        ({"interface": "x" * 16}, "interface"),
         ({"waitDuration": -1}, "waitDuration"),
         ({"waitDuration": "soon"}, "waitDuration"),
         ({"configs": [{"dst": "/x"}]}, r"configs\.0\.src"),
@@ -100,6 +100,9 @@ class FakeMM:
     def cc_background(self, cmd):
         self.calls.append(("background", cmd))
 
+    def clear_cc_filter(self):
+        self.calls.append(("clear",))
+
 
 @pytest.fixture
 def stage(monkeypatch, tmp_path):
@@ -127,7 +130,7 @@ def test_configure_sends_script_and_configs_then_raises_the_interface(stage):
         SnortMetadata,
         {
             "hostname": "ids",
-            "sniffInterface": "eth1",
+            "interface": "eth1",
             "configs": [{"src": "/a/snort.conf", "dst": "/etc/snort/snort.conf"}],
             "scripts": {"configSnort": {"executor": "bash", "script": "/a/setup.sh"}},
         },
@@ -140,15 +143,17 @@ def test_configure_sends_script_and_configs_then_raises_the_interface(stage):
         ("send", "ids", "/a/setup.sh", "setup.sh"),
         ("filter", "name=ids"),
         ("exec", "bash /setup.sh"),
+        ("clear",),
         ("send", "ids", "/a/snort.conf", "/etc/snort/snort.conf"),
         ("filter", "name=ids"),
         ("exec", "ip link set eth1 up"),
+        ("clear",),
     ]
 
 
 def test_start_clears_logs_then_runs_snort_in_the_background(stage):
     comp, calls = stage
-    comp.config = parse_metadata(SnortMetadata, {"sniffInterface": "eth1"}, "s")
+    comp.config = parse_metadata(SnortMetadata, {"interface": "eth1"}, "s")
 
     comp.start()
 
@@ -156,8 +161,10 @@ def test_start_clears_logs_then_runs_snort_in_the_background(stage):
         ("filter", "name=detector"),
         ("exec", "rm -rf /var/log/snort"),
         ("exec", "mkdir -p /var/log/snort"),
+        ("clear",),
         ("filter", "name=detector"),
         ("background", "snort -i eth1 -c /etc/snort/snort.conf"),
+        ("clear",),
     ]
 
 
@@ -167,12 +174,13 @@ def test_stop_waits_signals_snort_and_pulls_the_logs(stage, tmp_path):
 
     comp.stop()
 
-    assert calls[:3] == [
+    assert calls[:4] == [
         ("sleep", 5.0),
         ("filter", "name=detector"),
         ("exec", "pkill -INT snort"),
+        ("clear",),
     ]
-    assert [c[2] for c in calls[3:]] == [
+    assert [c[2] for c in calls if c[0] == "recv"] == [
         f"/var/log/snort/{n}" for n in ("alert", "snort.log", "snort.stats")
     ]
 
