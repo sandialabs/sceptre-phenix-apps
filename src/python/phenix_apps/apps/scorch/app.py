@@ -1,3 +1,4 @@
+import contextvars
 import difflib
 import io
 import json
@@ -106,6 +107,33 @@ def _unknown_keys(model: BaseModel, path: str = "") -> list[str]:
     return found
 
 
+# Deprecation warnings collected during one validate_metadata call. A model's
+# `rename_deprecated` before-validator appends to the list set here, so the
+# warnings surface through the same channel as unknown-key warnings regardless
+# of how deeply the renamed field is nested.
+_deprecations: contextvars.ContextVar[list[str] | None] = contextvars.ContextVar(
+    "_deprecations", default=None
+)
+
+
+def rename_deprecated(data: Any, old: str, new: str) -> Any:
+    """Accept a renamed metadata key, for a `model_validator(mode="before")`.
+
+    Moves `old` to `new` (an explicit `new` wins) and records a deprecation
+    warning that `validate_metadata` surfaces. The old key is removed so it
+    does not also warn as an unknown key. Keeps old configs working for now;
+    remove the alias once they are migrated.
+    """
+    if isinstance(data, dict) and old in data:
+        data = dict(data)
+        value = data.pop(old)
+        data.setdefault(new, value)
+        pending = _deprecations.get()
+        if pending is not None:
+            pending.append(f"{old} is deprecated, use {new} instead")
+    return data
+
+
 def validate_metadata[M: BaseModel](
     model: type[M], metadata: dict[str, Any] | None, component: str
 ) -> tuple[M, list[str]]:
@@ -115,8 +143,10 @@ def validate_metadata[M: BaseModel](
     out of messages so nothing sensitive reaches the status file or logs.
     """
 
+    token = _deprecations.set([])
     try:
         config = model.model_validate({} if metadata is None else metadata, strict=True)
+        deprecations = list(_deprecations.get() or [])
     except ValidationError as ex:
         problems = "\n".join(
             f"  {'.'.join(str(p) for p in err['loc']) or '(metadata)'}: {err['msg']}"
@@ -126,7 +156,9 @@ def validate_metadata[M: BaseModel](
             f"invalid metadata for component '{component}' "
             f"({ex.error_count()} problem(s)):\n{problems}"
         ) from None
-    return config, _unknown_keys(config)
+    finally:
+        _deprecations.reset(token)
+    return config, deprecations + _unknown_keys(config)
 
 
 def parse_metadata[M: BaseModel](

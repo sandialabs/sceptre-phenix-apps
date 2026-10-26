@@ -10,6 +10,13 @@ from phenix_apps.testing.readme import readme_components
 README = Path(__file__).parents[1] / "README.md"
 
 
+def test_iface_is_accepted_with_a_deprecation_warning():
+    md = {"vms": [{"hostname": "aa", "iface": "eth0", "targets": "/10.0.0.1//"}]}
+    config, warnings = validate_metadata(EttercapMetadata, md, "e")
+    assert config.vms[0].interface == "eth0"
+    assert warnings == ["iface is deprecated, use interface instead"]
+
+
 def readme_examples() -> list[dict]:
     return readme_components(README, "ettercap")
 

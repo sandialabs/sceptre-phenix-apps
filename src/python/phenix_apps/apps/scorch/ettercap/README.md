@@ -26,6 +26,9 @@ metadata:
       method: <MITM method>     # optional, defaults to `arp`
 ```
 
+`interface` was once `iface`. The old name still works but logs a deprecation
+warning; switch to `interface`.
+
 Every field is validated before the stage runs; a bad value fails the stage
 rather than reaching the VM. `targets` and `method` are restricted to the
 characters ettercap accepts so they cannot carry shell syntax:
