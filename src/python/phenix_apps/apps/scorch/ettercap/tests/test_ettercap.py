@@ -27,7 +27,7 @@ def test_readme_examples_are_valid_and_clean(cmp):
 def test_method_defaults_to_arp():
     config = parse_metadata(
         EttercapMetadata,
-        {"vms": [{"hostname": "attacker", "iface": "eth0", "targets": "/10.0.0.1//"}]},
+        {"vms": [{"hostname": "attacker", "interface": "eth0", "targets": "/10.0.0.1//"}]},
         "e",
     )
     assert config.vms[0].method == "arp"
@@ -52,7 +52,7 @@ def test_valid_methods(method):
         "vms": [
             {
                 "hostname": "aa",
-                "iface": "eth0",
+                "interface": "eth0",
                 "targets": "/10.0.0.1//",
                 "method": method,
             }
@@ -66,23 +66,23 @@ def test_valid_methods(method):
     [
         ({}, "vms: Field required"),
         ({"vms": []}, "vms: List should have at least 1 item"),
-        ({"vms": [{"iface": "eth0", "targets": "/10.0.0.1//"}]}, r"vms\.0\.hostname"),
-        ({"vms": [{"hostname": "aa", "targets": "/10.0.0.1//"}]}, r"vms\.0\.iface"),
-        ({"vms": [{"hostname": "aa", "iface": "eth0"}]}, r"vms\.0\.targets"),
+        ({"vms": [{"interface": "eth0", "targets": "/10.0.0.1//"}]}, r"vms\.0\.hostname"),
+        ({"vms": [{"hostname": "aa", "targets": "/10.0.0.1//"}]}, r"vms\.0\.interface"),
+        ({"vms": [{"hostname": "aa", "interface": "eth0"}]}, r"vms\.0\.targets"),
         (
             {
                 "vms": [
-                    {"hostname": "a;reboot", "iface": "eth0", "targets": "/10.0.0.1//"}
+                    {"hostname": "a;reboot", "interface": "eth0", "targets": "/10.0.0.1//"}
                 ]
             },
             r"vms\.0\.hostname",
         ),
         (
-            {"vms": [{"hostname": "aa", "iface": "x" * 16, "targets": "/10.0.0.1//"}]},
-            r"vms\.0\.iface",
+            {"vms": [{"hostname": "aa", "interface": "x" * 16, "targets": "/10.0.0.1//"}]},
+            r"vms\.0\.interface",
         ),
         (
-            {"vms": [{"hostname": "aa", "iface": "eth0", "targets": ""}]},
+            {"vms": [{"hostname": "aa", "interface": "eth0", "targets": ""}]},
             r"vms\.0\.targets",
         ),
         (
@@ -90,7 +90,7 @@ def test_valid_methods(method):
                 "vms": [
                     {
                         "hostname": "aa",
-                        "iface": "eth0",
+                        "interface": "eth0",
                         "targets": "/10.0.0.1//",
                         "method": "evil",
                     }
@@ -119,7 +119,7 @@ def test_bad_metadata_is_rejected(md, message):
     ],
 )
 def test_targets_that_carry_shell_syntax_are_rejected(bad):
-    md = {"vms": [{"hostname": "aa", "iface": "eth0", "targets": bad}]}
+    md = {"vms": [{"hostname": "aa", "interface": "eth0", "targets": bad}]}
     with pytest.raises(ValueError, match=r"vms\.0\.targets"):
         parse_metadata(EttercapMetadata, md, "e")
 
@@ -127,8 +127,8 @@ def test_targets_that_carry_shell_syntax_are_rejected(bad):
 def test_same_host_interface_twice_is_rejected():
     md = {
         "vms": [
-            {"hostname": "aa", "iface": "eth0", "targets": "/10.0.0.1//"},
-            {"hostname": "aa", "iface": "eth0", "targets": "/10.0.0.2//"},
+            {"hostname": "aa", "interface": "eth0", "targets": "/10.0.0.1//"},
+            {"hostname": "aa", "interface": "eth0", "targets": "/10.0.0.2//"},
         ]
     }
     with pytest.raises(ValueError, match="started more than once on: aa eth0"):
@@ -138,8 +138,8 @@ def test_same_host_interface_twice_is_rejected():
 def test_same_host_different_interface_is_allowed():
     md = {
         "vms": [
-            {"hostname": "aa", "iface": "eth0", "targets": "/10.0.0.1//"},
-            {"hostname": "aa", "iface": "eth1", "targets": "/10.0.0.2//"},
+            {"hostname": "aa", "interface": "eth0", "targets": "/10.0.0.1//"},
+            {"hostname": "aa", "interface": "eth1", "targets": "/10.0.0.2//"},
         ]
     }
     assert len(parse_metadata(EttercapMetadata, md, "e").vms) == 2
@@ -150,7 +150,7 @@ def test_unknown_vm_key_only_warns():
         "vms": [
             {
                 "hostname": "aa",
-                "iface": "eth0",
+                "interface": "eth0",
                 "targets": "/10.0.0.1//",
                 "bogus": "arp",
             }
@@ -159,7 +159,7 @@ def test_unknown_vm_key_only_warns():
     _, warnings = validate_metadata(EttercapMetadata, md, "e")
     assert warnings == [
         "vms.0.bogus: unknown key, ignored. Fix: remove it "
-        "(known: hostname, iface, targets, method)"
+        "(known: hostname, interface, targets, method)"
     ]
 
 
@@ -174,10 +174,10 @@ def _component(vms):
 def test_start_and_stop_emit_expected_commands():
     cmp, mm, mock = _component(
         [
-            {"hostname": "aa", "iface": "eth0", "targets": "/10.0.0.1//"},
+            {"hostname": "aa", "interface": "eth0", "targets": "/10.0.0.1//"},
             {
                 "hostname": "bb",
-                "iface": "eth1",
+                "interface": "eth1",
                 "targets": "/10.0.0.2// /10.0.0.3//",
                 "method": "arp:remote,oneway",
             },
@@ -189,17 +189,21 @@ def test_start_and_stop_emit_expected_commands():
             call.cc_filter("name=aa"),
             call.cc_exec("ip link set eth0 up"),
             call.cc_background("ettercap -Tq -i eth0 -M arp /10.0.0.1//"),
+            call.clear_cc_filter(),
             call.cc_filter("name=bb"),
             call.cc_exec("ip link set eth1 up"),
             call.cc_background(
                 "ettercap -Tq -i eth1 -M arp:remote,oneway /10.0.0.2// /10.0.0.3//"
             ),
+            call.clear_cc_filter(),
         ]
         mm.reset_mock()
         cmp.stop()
         assert mm.method_calls == [
             call.cc_filter("name=aa"),
             call.cc_exec("pkill ettercap"),
+            call.clear_cc_filter(),
             call.cc_filter("name=bb"),
             call.cc_exec("pkill ettercap"),
+            call.clear_cc_filter(),
         ]

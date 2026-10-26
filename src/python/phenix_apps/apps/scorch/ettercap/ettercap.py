@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_vali
 
 from phenix_apps.apps.scorch import ComponentBase
 from phenix_apps.apps.scorch.app import Hostname, Interface, MetadataBlock
+from phenix_apps.common import utils
 from phenix_apps.common.logger import logger
 
 # ettercap's -M method: one of its MITM attacks, optionally with an argument
@@ -34,7 +35,7 @@ Targets = Annotated[
 
 class EttercapVM(MetadataBlock):
     hostname: Hostname
-    iface: Interface
+    interface: Interface
     targets: Targets
     method: Method = "arp"
 
@@ -48,7 +49,7 @@ class EttercapMetadata(BaseModel):
 
     @model_validator(mode="after")
     def _check_vms(self) -> Self:
-        seen = [(vm.hostname, vm.iface) for vm in self.vms]
+        seen = [(vm.hostname, vm.interface) for vm in self.vms]
         if dupes := sorted({f"{h} {i}" for h, i in seen if seen.count((h, i)) > 1}):
             raise ValueError(
                 f"vms: ettercap started more than once on: {', '.join(dupes)}; "
@@ -69,33 +70,31 @@ class Ettercap(ComponentBase):
     def start(self):
         logger.info(f"Starting user component: {self.name}")
 
-        mm = self.mm_init()
-
         for vm in self.config.vms:
-            logger.info(f"ensuring interface {vm.iface} is up in VM {vm.hostname}")
+            logger.info(f"ensuring interface {vm.interface} is up in VM {vm.hostname}")
 
-            mm.cc_filter(f"name={vm.hostname}")
-            mm.cc_exec(f"ip link set {vm.iface} up")
+            with utils.mm_cc_filter(self.mm, f"name={vm.hostname}"):
+                self.mm.cc_exec(f"ip link set {vm.interface} up")
 
-            logger.info(
-                f"starting ettercap using {vm.method} against {vm.targets} "
-                f"in VM {vm.hostname}"
-            )
+                logger.info(
+                    f"starting ettercap using {vm.method} against {vm.targets} "
+                    f"in VM {vm.hostname}"
+                )
 
-            mm.cc_background(f"ettercap -Tq -i {vm.iface} -M {vm.method} {vm.targets}")
+                self.mm.cc_background(
+                    f"ettercap -Tq -i {vm.interface} -M {vm.method} {vm.targets}"
+                )
 
         logger.info(f"Started user component: {self.name}")
 
     def stop(self):
         logger.info(f"Stopping user component: {self.name}")
 
-        mm = self.mm_init()
-
         for vm in self.config.vms:
             logger.info(f"stopping ettercap in VM {vm.hostname}")
 
-            mm.cc_filter(f"name={vm.hostname}")
-            mm.cc_exec("pkill ettercap")
+            with utils.mm_cc_filter(self.mm, f"name={vm.hostname}"):
+                self.mm.cc_exec("pkill ettercap")
 
         logger.info(f"Stopped user component: {self.name}")
 
