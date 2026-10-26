@@ -15,7 +15,7 @@ from phenix_apps.common import utils
 from phenix_apps.common.logger import logger
 
 Rate = Annotated[int, Field(gt=0, strict=True)]
-Probability = Annotated[float, Field(ge=0, allow_inf_nan=False)]
+Probability = Annotated[float, Field(ge=0, le=100, allow_inf_nan=False)]
 # whole seconds: the client's --duration is a plain integer
 Duration = Annotated[int, Field(ge=0, strict=True)]
 
@@ -87,7 +87,6 @@ class TrafficGen(ComponentBase):
         logger.info(f"Configuring user component: {self.name}")
 
         scripts = self.config.scripts
-        mm = self.mm_init()
 
         for target in self.config.targets:
             # Copies script to root directory of VM. For example, if script is
@@ -96,7 +95,7 @@ class TrafficGen(ComponentBase):
             for hostname, script in self._scripts(target, scripts):
                 logger.info(f"copying {_name(script)} to {hostname}")
 
-                utils.mm_send(mm, hostname, script, _name(script))
+                utils.mm_send(self.mm, hostname, script, _name(script))
 
         logger.info(f"Configured user component: {self.name}")
 
@@ -104,7 +103,6 @@ class TrafficGen(ComponentBase):
         logger.info(f"Starting user component: {self.name}")
 
         scripts = self.config.scripts
-        mm = self.mm_init()
 
         for target in self.config.targets:
             target_host = target.hostname
@@ -114,8 +112,8 @@ class TrafficGen(ComponentBase):
 
             logger.info(f"running {target_script_name} on {target_host}")
 
-            mm.cc_filter(f"name={target_host}")
-            mm.cc_background(f"python3 /{target_script_name}")
+            self.mm.cc_filter(f"name={target_host}")
+            self.mm.cc_background(f"python3 /{target_script_name}")
 
             for client, script in (
                 (target.backgroundClient, scripts.backgroundGen),
@@ -126,8 +124,8 @@ class TrafficGen(ComponentBase):
 
                 logger.info(f"running {_name(script)} on {client.hostname}")
 
-                mm.cc_filter(f"name={client.hostname}")
-                mm.cc_background(
+                self.mm.cc_filter(f"name={client.hostname}")
+                self.mm.cc_background(
                     f"python3 /{_name(script)} --ip {target_ip} "
                     f"--rate {client.rate} --duration {duration} "
                     f"--probability {client.probability}"
@@ -144,28 +142,24 @@ class TrafficGen(ComponentBase):
     def stop(self):
         logger.info(f"Stopping user component: {self.name}")
 
-        mm = self.mm_init()
-
         for target in self.config.targets:
             for hostname, script in self._scripts(target, self.config.scripts):
                 logger.info(f"killing {_name(script)} on {hostname}")
 
-                mm.cc_filter(f"name={hostname}")
-                mm.cc_exec(f"pkill -f {_name(script)}")
+                self.mm.cc_filter(f"name={hostname}")
+                self.mm.cc_exec(f"pkill -f {_name(script)}")
 
         logger.info(f"Stopped user component: {self.name}")
 
     def cleanup(self):
         logger.info(f"Cleaning up user component: {self.name}")
 
-        mm = self.mm_init()
-
         for target in self.config.targets:
             for hostname, script in self._scripts(target, self.config.scripts):
                 logger.info(f"deleting /{_name(script)} on {hostname}")
 
-                mm.cc_filter(f"name={hostname}")
-                mm.cc_exec(f"rm /{_name(script)}")
+                self.mm.cc_filter(f"name={hostname}")
+                self.mm.cc_exec(f"rm /{_name(script)}")
 
         logger.info(f"Cleaned up user component: {self.name}")
 

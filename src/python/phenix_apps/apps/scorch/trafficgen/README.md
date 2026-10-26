@@ -70,10 +70,10 @@ components:
 | `targets[].duration` | whole seconds | no | `5` | Passed to clients as `--duration`. |
 | `targets[].backgroundClient.hostname` | hostname | no | `background-gen` | VM running the background script. |
 | `targets[].backgroundClient.rate` | integer | no | `10000` | Passed as `--rate`. |
-| `targets[].backgroundClient.probability` | number | no | `0.01` | Passed as `--probability`. |
+| `targets[].backgroundClient.probability` | number 0-100 | no | `0.01` | Passed as `--probability`. |
 | `targets[].malwareClient.hostname` | hostname | no | `malware-gen` | VM running the malware script. |
 | `targets[].malwareClient.rate` | integer | no | `20` | Passed as `--rate`. |
-| `targets[].malwareClient.probability` | number | no | `1.25` | Passed as `--probability`. |
+| `targets[].malwareClient.probability` | number 0-100 | no | `1.25` | Passed as `--probability`. |
 
 Script paths may use letters, digits and `_ . / + @ -` only. Unknown keys in
 `scripts` and the target blocks are ignored with a warning.

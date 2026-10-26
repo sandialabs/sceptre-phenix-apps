@@ -93,6 +93,13 @@ def test_clients_are_optional():
             "probability",
         ),
         (
+            {
+                "scripts": SCRIPTS,
+                "targets": [{"backgroundClient": {"probability": 100.1}}],
+            },
+            "probability",
+        ),
+        (
             {"scripts": SCRIPTS, "targets": [{"backgroundClient": {"rate": "x"}}]},
             "rate",
         ),
