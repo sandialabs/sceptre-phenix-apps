@@ -97,6 +97,7 @@ components:
 | `testIndex` | integer >= 0 | - | Index of the technique test. Required if `testName` is not set. |
 | `goartPath` | path | `/phenix/art/goart` (Linux), `C:/phenix/art/goart.exe` (Windows) | Path to the goart executable on the VM. Forward slashes only. |
 | `env` | map | `{}` | Environment variables merged into the environment Atomic tests run in, for every VM. |
+| `settleSeconds` | number >= 0 | `5` | Seconds to wait after a test runs, before retrieving its results file, so goart finishes writing it. |
 | `validator` | string | - | Shell script that validates the results (see below). |
 | `abortOnError` | bool | `false` | Fail the component when the validator exits non-zero. |
 | `vms` | list | required | VMs to run the test on (at least one). |
