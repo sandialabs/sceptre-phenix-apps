@@ -18,7 +18,7 @@ in order, then each `vms` entry's commands for that stage, in order.
 
 There are two separate command vocabularies: **stage-level** commands run
 against a `cc` filter (or every connected VM), while **VM-level** commands run
-against the one VM named by `hostname`.
+against the one VM whose `hostname` they name.
 
 ## Metadata
 

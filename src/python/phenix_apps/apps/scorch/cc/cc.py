@@ -2,7 +2,7 @@ import subprocess
 import tempfile
 import uuid
 from pathlib import Path, PurePath
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Final, Literal
 
 from pydantic import (
     AfterValidator,
@@ -112,7 +112,7 @@ VMCommand = Annotated[
 
 
 Stage = Literal["configure", "start", "stop", "cleanup"]
-_LIST_KEYS = {"configure", "start", "stop", "cleanup", "vms"}
+_LIST_KEYS: Final = {"configure", "start", "stop", "cleanup", "vms"}
 
 
 def _nulls_to_lists(data: Any) -> Any:
