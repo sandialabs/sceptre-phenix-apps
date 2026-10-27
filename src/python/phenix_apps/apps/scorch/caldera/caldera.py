@@ -29,7 +29,7 @@ class CalderaMetadata(BaseModel):
     facts: CalderaRef
     planner: CalderaRef = PHENIX_PLANNER_ID
     # how often to poll Caldera for the operation's state while it runs
-    pollSeconds: Seconds = 10.0
+    poll_seconds: Seconds = 10.0
 
 
 class Caldera(ComponentBase):
@@ -121,7 +121,7 @@ class Caldera(ComponentBase):
         op["id"] = operation["id"]
 
         while True:
-            time.sleep(self.config.pollSeconds)
+            time.sleep(self.config.poll_seconds)
 
             operation = self._api(
                 "get_operation.mako", "existing operation", op=op["id"]
