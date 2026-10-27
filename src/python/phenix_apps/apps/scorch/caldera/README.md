@@ -51,7 +51,7 @@ components:
 | `adversary` | yes | none | Adversary name or UUID; must already be in Caldera. |
 | `facts` | yes | none | Fact source name or UUID; must already be in Caldera. |
 | `planner` | no | the `phenix` planner UUID | Planner name or UUID (`atomic` and `batch` are common). |
-| `pollSeconds` | no | `10` | Seconds between polls of the running operation's state. |
+| `poll_seconds` | no | `10` | Seconds between polls of the running operation's state. |
 
 Names and UUIDs may contain any printable characters except `'`, which is
 rejected because the REST API JSON body is written inside a single-quoted shell
