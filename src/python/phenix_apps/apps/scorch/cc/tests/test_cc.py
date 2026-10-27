@@ -131,6 +131,18 @@ def test_burger_cc_item_shapes_validate(shape):
             {"vms": [{"hostname": "aa", "start": [{"type": "send", "args": "a:b:c"}]}]},
             "at most one",
         ),
+        (
+            {"vms": [{"hostname": "aa", "start": [{"type": "send", "args": ":"}]}]},
+            "neither side empty",
+        ),
+        (
+            {"vms": [{"hostname": "aa", "start": [{"type": "send", "args": "src:"}]}]},
+            "neither side empty",
+        ),
+        (
+            {"vms": [{"hostname": "aa", "start": [{"type": "recv", "args": ":dst"}]}]},
+            "neither side empty",
+        ),
         ({"vms": [{"hostname": "a"}]}, r"vms\.0\.hostname"),
         ({"vms": [{"hostname": "a;reboot"}]}, r"vms\.0\.hostname"),
         ({"start": [{"type": "exec", "args": "a\nb"}]}, "args"),

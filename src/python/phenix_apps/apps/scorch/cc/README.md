@@ -201,7 +201,7 @@ To check a config before an experiment: `phenix-scorch-validate scenario.yaml`
 | `vms.0.start.0: Input tag 'foo' found using 'type' does not match any of the expected tags: 'exec', 'background', 'send', 'recv', 'reset'` | Unknown VM-level command `type`. Use one of the listed types. |
 | `start.0.exec.args: Field required` (or `vms.0.start.0.exec.args`) | An `exec` with no `args`. `send` and `recv` need `args` the same way. |
 | `start.0.exec.args: String should match pattern '^[^\x00\r\n]*$'` | A stage-level `exec`/`filter` with a newline or NUL. Write it on one line. |
-| `vms.0.start.0.send.args: Value error, expected 'src' or 'src:dst' (at most one ':')` | A `send`/`recv` `args` with more than one `:`. Use `src` or `src:dst`. |
+| `vms.0.start.0.send.args: Value error, expected 'src' or 'src:dst' (at most one ':', neither side empty)` | A `send`/`recv` `args` with more than one `:`, or an empty side (`:`, `src:`, `:dst`). Use `src` or `src:dst`. |
 | `vms.0.hostname: Value error, not a valid hostname: 2 to 63 letters, digits and interior hyphens` | `hostname` is not a topology node name. |
 | `<hostname> is not in the topology` (logged) | A `vms` entry names a VM that is not in the experiment; its commands are skipped. Fix the hostname. |
 | `command '<args>' failed` / `command '<args>' failed on Windows` | A waited `exec` exited non-zero (on Windows, wrote to stderr). The logged STDERR says why. |

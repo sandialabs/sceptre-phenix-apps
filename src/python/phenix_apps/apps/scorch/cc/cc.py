@@ -31,17 +31,19 @@ MinimegaRaw = Annotated[str, StringConstraints(min_length=1, pattern=r"^[^\x00\r
 ScriptArgs = Annotated[str, StringConstraints(min_length=1)]
 
 
-def _at_most_one_colon(value: str) -> str:
-    # send/recv args are "src" or "src:dst"; a second colon is ambiguous.
-    if value.count(":") > 1:
-        raise ValueError("expected 'src' or 'src:dst' (at most one ':')")
+def _src_dst(value: str) -> str:
+    # send/recv args are "src" or "src:dst"; a second colon is ambiguous, and an
+    # empty side would expand to the bare /phenix/ directory.
+    parts = value.split(":")
+    if len(parts) > 2 or not all(parts):
+        raise ValueError(
+            "expected 'src' or 'src:dst' (at most one ':', neither side empty)"
+        )
     return value
 
 
 # A send/recv file argument: a source path, optionally ':' and a destination.
-FileArg = Annotated[
-    str, StringConstraints(min_length=1), AfterValidator(_at_most_one_colon)
-]
+FileArg = Annotated[str, StringConstraints(min_length=1), AfterValidator(_src_dst)]
 
 
 # Each command type gets its own model holding only the fields it uses. The two
