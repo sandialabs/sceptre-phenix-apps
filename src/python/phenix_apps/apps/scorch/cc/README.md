@@ -68,7 +68,9 @@ setting).
 
 A waited `exec` fails the stage when the command exits non-zero. On Windows the
 command runs as a PowerShell script (`powershell -File`) that exits with the
-last native command's exit code; a terminating PowerShell error exits 1.
+last native command's exit code; a failed last cmdlet (`$?` false) or a
+terminating PowerShell error exits 1. Nothing is added before the command, so it
+may start with `using` or `param()`.
 
 Windows commands used to fail on any STDERR output instead. While that changes,
 nothing that passed before fails:

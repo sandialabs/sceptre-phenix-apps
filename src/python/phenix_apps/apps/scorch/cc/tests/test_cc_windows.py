@@ -19,9 +19,21 @@ def test_script_exits_with_the_last_native_exit_code():
     script = _windows_script("robocopy C:\\a C:\\b")
 
     lines = script.splitlines()
-    assert lines[0] == "$global:LASTEXITCODE = 0"
-    assert lines[1] == "robocopy C:\\a C:\\b"
-    assert lines[-1] == "exit $LASTEXITCODE"
+    assert lines[0] == "robocopy C:\\a C:\\b"
+    assert lines[-1] == "exit ([int]$LASTEXITCODE)"
+
+
+def test_script_checks_the_command_status_first():
+    # a failed cmdlet sets only $?, which the next statement overwrites
+    lines = _windows_script("Get-Item C:\\nope").splitlines()
+
+    assert lines[1].startswith("if (-not $?)")
+
+
+@pytest.mark.parametrize("first", ["using namespace System.IO", "param($x = 1)"])
+def test_script_leaves_the_command_first(first):
+    # `using` and `param()` must be the first statements in a script
+    assert _windows_script(f"{first}\nWrite-Output hi").startswith(first + "\n")
 
 
 def result(code, stderr):

@@ -14,10 +14,16 @@ def _windows_script(cmd: str) -> str:
     on Linux.
 
     `powershell -File` exits 0 even when the script's last native command fails,
-    so end the script with that command's exit code. A terminating PowerShell
-    error already makes `-File` exit 1.
+    so end the script with that command's exit code. A failed last cmdlet sets
+    only `$?`, so it exits 1; a terminating PowerShell error already does.
+    Nothing goes before `cmd`, which may start with `using` or `param()`, and
+    `$?` must be read by the first statement after it.
     """
-    return f"$global:LASTEXITCODE = 0\n{cmd}\nexit $LASTEXITCODE\n"
+    return (
+        f"{cmd}\n"
+        "if (-not $?) { if ($LASTEXITCODE) { exit $LASTEXITCODE }; exit 1 }\n"
+        "exit ([int]$LASTEXITCODE)\n"
+    )
 
 
 def _check_windows_result(args: str, hostname: str, results: dict) -> None:
