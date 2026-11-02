@@ -1,11 +1,4 @@
 % if os == 'linux':
-    % for interface in ips:
-        % if interface['vlan']:
-echo 'ListenAddress ${interface['address']}' >> /etc/ssh/sshd_config
-        % endif
-    % endfor
-service ssh restart
-sleep 10s
     % if 'simulink-provider' in name.lower() or metadata.get('simulator', '').lower() == 'simulink':
 cd /etc/sceptre/
         % if 'helics-federate' in metadata.get('labels', []):
