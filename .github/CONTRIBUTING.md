@@ -60,7 +60,7 @@ We welcome suggestions for improvements! Please open an issue to discuss your id
 
 1. **Create a Branch**: Create a new branch (on your fork of the repository) for your feature or bug fix using [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) notation. The branch name should follow this format:
     ```bash
-    type/description
+    type-description
     ```
     Where `type` can be one of the following:
     - `feat`: A new feature
@@ -71,9 +71,11 @@ We welcome suggestions for improvements! Please open an issue to discuss your id
     - `test`: Adding missing tests or correcting existing tests
     - `chore`: Changes to the build process or auxiliary tools and libraries
 
+    The branch name must not contain `/`; separate the type from the description with a hyphen.
+
     Example:
     ```bash
-    git checkout -b feat/add-user-authentication
+    git checkout -b feat-add-user-authentication
     ```
 
 2. **Make Your Changes**: Implement your changes.
@@ -132,7 +134,7 @@ We welcome suggestions for improvements! Please open an issue to discuss your id
     
     Example:
     ```bash
-    git push origin feat/add-user-authentication --force
+    git push origin feat-add-user-authentication --force
     ```
     
 6. **Open a Pull Request**: Go to the original repository and open a [pull request](https://github.com/sandialabs/sceptre-phenix-apps/pulls). Provide a clear description of your changes and reference any related issues. Once your pull request is submitted, github actions will run automated tests based on the files that are changed, and GitHub will request reviews from the code owners of those files. Ensure that the CI checks pass before assigning a reviewer, or clearly explain why the failures are expected.
