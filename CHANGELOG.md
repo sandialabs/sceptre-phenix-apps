@@ -1,3 +1,25 @@
+# [2026.11.03](https://github.com/sandialabs/sceptre-phenix-apps/compare/v2026.10.30...v2026.11.03) - 2026-11-03
+
+### 🚀 Features
+
+- _(caldera)_ validate component metadata with a pydantic model [_(9864f10)_](https://github.com/sandialabs/sceptre-phenix-apps/commit/9864f10dcddfb04747b74560cb683cd9e6b866a0) ([PR 207](https://github.com/sandialabs/sceptre-phenix-apps/pull/207))
+
+### 🐛 Bug Fixes
+
+- _(caldera)_ use self.mm, Final planner id, configurable poll interval [_(adca08a)_](https://github.com/sandialabs/sceptre-phenix-apps/commit/adca08a20a0ea3c05361112077ae670d7f79d3e1) ([PR 207](https://github.com/sandialabs/sceptre-phenix-apps/pull/207))
+
+- _(sceptre)_ stop restricting sshd to VLAN interface addresses [_(fd6a65c)_](https://github.com/sandialabs/sceptre-phenix-apps/commit/fd6a65c4a4c3212930b3f6ae05f62d05d547a61a) ([PR 211](https://github.com/sandialabs/sceptre-phenix-apps/pull/211))
+
+### 🚜 Refactor
+
+- _(caldera)_ rename pollSeconds to poll_seconds [_(e432da7)_](https://github.com/sandialabs/sceptre-phenix-apps/commit/e432da786538446473ae7b51fffb5ef8777a4143) ([PR 207](https://github.com/sandialabs/sceptre-phenix-apps/pull/207))
+
+### 📚 Documentation
+
+- _(contributing)_ branch names must not contain a slash [_(6226abd)_](https://github.com/sandialabs/sceptre-phenix-apps/commit/6226abda4d1dc6a6cdb936e7b6c15a6fb5cfdeca) ([PR 211](https://github.com/sandialabs/sceptre-phenix-apps/pull/211))
+
+- _(agents)_ point documentation references at sceptre-phenix [_(c27adea)_](https://github.com/sandialabs/sceptre-phenix-apps/commit/c27adea6f374cbc49168cfc0b6643bde0f0d5666) ([PR 151](https://github.com/sandialabs/sceptre-phenix-apps/pull/151))
+
 # [2026.10.30](https://github.com/sandialabs/sceptre-phenix-apps/compare/v2026.03.04...v2026.10.30) - 2026-10-30
 
 ### 🚀 Features
