@@ -1,18 +1,142 @@
-from pathlib import PurePath
+import re
+from pathlib import PureWindowsPath
 from time import sleep
+from typing import Annotated, Any, Self
 
 import requests
 from elasticsearch import Elasticsearch
+from pydantic import (
+    AfterValidator,
+    AnyHttpUrl,
+    Field,
+    StringConstraints,
+    model_validator,
+)
 
 from phenix_apps.apps.scorch import ComponentBase
+from phenix_apps.apps.scorch.app import (
+    FilePath,
+    Hostname,
+    MetadataBlock,
+    PositiveSeconds,
+    Seconds,
+    Token,
+)
 from phenix_apps.common import utils
 from phenix_apps.common.logger import logger
+
+
+def _deletable_dir(path: str) -> str:
+    # cleanup runs `rm -rf <path>` in a shell on the provider, so it must be an
+    # absolute directory below / (FilePath already rules out shell syntax and
+    # globs): no '.' or '..' segments, and not / itself.
+    segments = path.split("/")
+    if not path.startswith("/") or not path.strip("/") or {".", ".."} & set(segments):
+        raise ValueError(
+            "must be an absolute directory below / with no '.' or '..' segments"
+        )
+    return path
+
+
+CsvDir = Annotated[FilePath, AfterValidator(_deletable_dir)]
+
+
+# The case file is named after the case, and the RSCAD automation server runs
+# on Windows. The component compares the name to the stem of the started
+# case_file, so it must be a bare Windows file name without the extension.
+_CASE_FORBIDDEN = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+_CASE_EXTENSIONS = (".rtfx", ".rtf")
+
+
+def _case_name(name: str) -> str:
+    if _CASE_FORBIDDEN.search(name):
+        raise ValueError(
+            'must be a bare file name without path separators or any of < > : " | ? *'
+        )
+    if name.lower().endswith(_CASE_EXTENSIONS):
+        raise ValueError("must not include the file extension")
+    if name != name.rstrip(". "):
+        raise ValueError("must not end with a space or '.'")
+    return name
+
+
+CaseName = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=255),
+    AfterValidator(_case_name),
+]
+
+
+# AnyHttpUrl gives a bare host a trailing slash; store the URL without one.
+RscadUrl = Annotated[AnyHttpUrl, AfterValidator(lambda u: str(u).rstrip("/"))]
+
+
+class RscadAutomation(MetadataBlock):
+    enabled: bool = False
+    url: RscadUrl | None = None
+    case_name: CaseName | None = None
+    timeout: PositiveSeconds = 30.0
+
+    @model_validator(mode="after")
+    def _url_when_enabled(self) -> Self:
+        if self.enabled and self.url is None:
+            raise ValueError("url is required when enabled is true")
+        return self
+
+
+class ElasticsearchConfig(MetadataBlock):
+    verify: bool = False
+    server: AnyHttpUrl | None = None
+    index: Token | None = None
+    acceptable_time_drift: float | None = Field(None, gt=0, allow_inf_nan=False)
+    # Seconds between the two document counts; at least (doc_count_wait - 1) *
+    # 1440 new documents must arrive, so it must be more than 1.
+    doc_count_wait: float = Field(3.0, gt=1, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def _server_and_index_when_verifying(self) -> Self:
+        if self.verify:
+            missing = [f for f in ("server", "index") if getattr(self, f) is None]
+            if missing:
+                raise ValueError(
+                    f"{' and '.join(missing)} required when verify is true"
+                )
+        return self
+
+
+class CsvFiles(MetadataBlock):
+    path: CsvDir = "/root/rtds_data"
+    export: bool = False
+
+
+class RTDSMetadata(MetadataBlock):
+    """Metadata for the rtds component; see README.md for each field."""
+
+    hostname: Hostname
+    export_logs: bool = False
+    export_config: bool = True
+    provider_start_wait: Seconds = 8.0
+    rscad_automation: RscadAutomation = RscadAutomation()
+    elasticsearch: ElasticsearchConfig = ElasticsearchConfig()
+    csv_files: CsvFiles | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _empty_csv_files_means_off(cls, data: Any) -> Any:
+        # An empty csv_files block always meant "no CSV handling"; without this
+        # it would become CsvFiles() and cleanup would delete the default path.
+        if isinstance(data, dict) and data.get("csv_files") == {}:
+            data = {**data, "csv_files": None}
+        return data
 
 
 class RTDS(ComponentBase):
     """
     SCORCH component for the Real-Time Dynamic Simulator (RTDS) bennu provider.
     """
+
+    metadata_model = RTDSMetadata
+    config: RTDSMetadata
 
     def __init__(self):
         ComponentBase.__init__(self, "rtds")
@@ -24,18 +148,23 @@ class RTDS(ComponentBase):
 
         self.execute_stage()
 
+    def _rscad_endpoint(self, name: str) -> str:
+        return f"{self.config.rscad_automation.url}/{name}"
+
     def _start_case(self):
         """
         Start simulation on the RTDS. This sends a POST request to the GUI automation script running on the
         computer running RSCAD FX.
         """
-        url = f"{self.metadata.rscad_automation.url.rstrip('/')}/start_case"
+        url = self._rscad_endpoint("start_case")
         logger.info(f"Starting RSCAD case, url={url}")
 
-        resp = self.session.post(url)
+        resp = self.session.post(url, timeout=self.config.rscad_automation.timeout)
 
         if not resp:
-            raise RuntimeError("Starting RSCAD case failed: no response from server")
+            raise RuntimeError(
+                f"Starting RSCAD case failed: HTTP {resp.status_code} from {url}"
+            )
 
         data = resp.json()
         if not data["success"]:
@@ -44,15 +173,16 @@ class RTDS(ComponentBase):
         # TODO: if status == "already_running", stop case, then start again?
 
         # validation that correct case name started/stopped via case_file in the response
-        if self.metadata.get("case_name"):
-            case_name = PurePath(data["case_file"]).stem  # minus extension
-            if self.metadata.case_name != case_name:
+        expected = self.config.rscad_automation.case_name
+        if expected:
+            case_name = PureWindowsPath(data["case_file"]).stem  # minus extension
+            if expected != case_name:
                 logger.error(
-                    f"Expected RSCAD case '{self.metadata.case_name}', but '{case_name}' was started. Stopping case and exiting..."
+                    f"Expected RSCAD case '{expected}', but '{case_name}' was started. Stopping case and exiting..."
                 )
                 self._stop_case(allow_failure=True)
                 raise RuntimeError(
-                    f"Expected RSCAD case '{self.metadata.case_name}', but '{case_name}' was started"
+                    f"Expected RSCAD case '{expected}', but '{case_name}' was started"
                 )
 
         logger.info(
@@ -60,31 +190,33 @@ class RTDS(ComponentBase):
         )
 
     def _stop_case(self, allow_failure: bool = False):
-        url = f"{self.metadata.rscad_automation.url.rstrip('/')}/stop_case"
+        url = self._rscad_endpoint("stop_case")
         logger.info(f"Stopping RSCAD case, url={url}")
 
-        resp = self.session.post(url)
-
-        if not resp:
-            if not allow_failure:
+        try:
+            resp = self.session.post(url, timeout=self.config.rscad_automation.timeout)
+            if not resp:
                 raise RuntimeError(
-                    "Stopping RSCAD case failed: no response from server"
+                    f"Stopping RSCAD case failed: HTTP {resp.status_code} from {url}"
                 )
-
-        data = resp.json()
-        if not data["success"]:
-            if not allow_failure:
+            data = resp.json()
+            if not data["success"]:
                 raise RuntimeError(f"Stopping RSCAD case failed: {data['status']}")
+        except Exception as ex:
+            if not allow_failure:
+                raise
+            logger.warning(f"{ex} (ignored, allow_failure=True)")
+            return
 
         logger.info(
             f"Stopped RSCAD case '{data['case_file']}' (title='{data['case_title']}', status='{data['status']}')"
         )
 
     def _stop_provider_if_running(self):
-        if self.check_process_running(self.metadata.hostname, "pybennu-power-solver"):
+        if self.check_process_running(self.config.hostname, "pybennu-power-solver"):
             logger.info("Stopping pybennu-power-solver")
             cmd = "/usr/local/bin/pybennu-power-solver stop"
-            self.run_and_check_command(self.metadata.hostname, cmd)
+            self.run_and_check_command(self.config.hostname, cmd)
 
     def _verify_frequency(self, index: str, time_range: str = "now-5s") -> None:
         logger.info("Verifying frequency is expected in Elasticsearch")
@@ -100,7 +232,7 @@ class RTDS(ComponentBase):
 
         if not response["hits"]["hits"]:
             raise RuntimeError(
-                "no data in response from elasticsearch! the provider might have be having issues."
+                "no data in response from elasticsearch! the provider might be having issues."
             )
 
         measurements = response["hits"]["hits"][0]["_source"]["measurement"]
@@ -116,14 +248,12 @@ class RTDS(ComponentBase):
     def configure(self):
         logger.info(f"Configuring user component: {self.name}")
 
-        host = self.metadata.hostname  # type: str
-
-        self.ensure_vm_running(host)
+        self.ensure_vm_running(self.config.hostname)
 
         # Copy provider configs
-        if self.metadata.get("export_config", True):
+        if self.config.export_config:
             self.recv_file(
-                vm=host,
+                vm=self.config.hostname,
                 src=[
                     "/etc/sceptre/config.ini",
                     "/etc/sceptre/rtds_config.yaml",
@@ -131,77 +261,80 @@ class RTDS(ComponentBase):
             )
 
         logger.info("verifying NTP is ok")
-        ntp_output = self.run_and_check_command(host, "ntpq -p")["stdout"]
+        ntp_output = self.run_and_check_command(self.config.hostname, "ntpq -p")[
+            "stdout"
+        ]
         if ntp_output is None or ".INIT." in ntp_output:
             raise RuntimeError(
                 f"ntp on provider in INIT state, not synced. ntpq output: {ntp_output}"
             )
 
         # Start simulation on the RTDS
-        if self.metadata.get("rscad_automation", {}).get("enabled"):
+        if self.config.rscad_automation.enabled:
             self._start_case()
 
         # Start provider
         logger.info("ensuring provider is started")
-        if not self.check_process_running(host, "pybennu-power-solver"):
+        if not self.check_process_running(self.config.hostname, "pybennu-power-solver"):
             logger.info("Starting pybennu-power-solver")
             cmd = "/usr/local/bin/pybennu-power-solver start -d"
-            self.run_and_check_command(host, cmd)
+            self.run_and_check_command(self.config.hostname, cmd)
 
-            sleep_for = 8.0
             logger.info(
-                f"sleeping for {sleep_for} seconds to give provider time to start and reconnect to PMUs..."
+                f"sleeping for {self.config.provider_start_wait} seconds to give provider time to start and reconnect to PMUs..."
             )
-            sleep(sleep_for)
+            sleep(self.config.provider_start_wait)
 
         logger.info(f"Configured user component: {self.name}")
 
     def start(self):
         logger.info(f"Starting user component: {self.name}")
 
-        host = self.metadata.hostname  # type: str
-
         logger.info("checking if provider is running")
-        if not self.check_process_running(host, "pybennu-power-solver"):
+        if not self.check_process_running(self.config.hostname, "pybennu-power-solver"):
             raise RuntimeError("provider is not running!")
 
         # Verify CSV files
-        if self.metadata.get("csv_files"):
+        if self.config.csv_files:
             logger.info("checking if CSV files exist")
-            csv_path = self.metadata.csv_files.get("path", "/root/rtds_data")
             # TODO: check file sizes in output of ls to ensure they're being written to
-            self.run_and_check_command(host, f"ls -lh {csv_path}")
+            self.run_and_check_command(
+                self.config.hostname, f"ls -lh {self.config.csv_files.path}"
+            )
 
         # Verify elasticsearch
-        if self.metadata.get("elasticsearch", {}).get("verify"):
+        if self.config.elasticsearch.verify:
             logger.info("Verifying data in Elasticsearch (elasticsearch.verify=true)")
-            index = utils.get_dated_index(self.metadata.elasticsearch.index)
+            if (
+                self.config.elasticsearch.index is None
+            ):  # the model requires it when verifying
+                raise ValueError("elasticsearch.index is required when verifying")
+            index = utils.get_dated_index(self.config.elasticsearch.index)
 
             # ** ground truth data being collected **
             logger.info(
                 f"Verifying ground truth data is being collected in Elasticsearch (index={index})"
             )
-            sleep_for = 3.0
             logger.info("Getting index doc count")
             doc_count_1 = self.es.indices.stats(index=index)["indices"][index]["total"][
                 "docs"
-            ]["count"]  # type: int
+            ]["count"]
 
             logger.info(
-                f"Sleeping for {sleep_for} seconds to wait for data to be generated..."
+                f"Sleeping for {self.config.elasticsearch.doc_count_wait} seconds to wait for data to be generated..."
             )
-            sleep(sleep_for)  # wait 3 seconds
+            sleep(self.config.elasticsearch.doc_count_wait)
 
             logger.info("Getting index doc count")
             doc_count_2 = self.es.indices.stats(index=index)["indices"][index]["total"][
                 "docs"
-            ]["count"]  # type: int
+            ]["count"]
 
             logger.info("Comparing doc counts")
             # 8 PMUs * 6 points * 30 updates/sec = 1440 docs/second
             # 3 seconds * 1440 = 4,320
             # There seems to be some delay though, so let's subtract 1 second
-            expected_count_diff = (sleep_for - 1) * 1440
+            expected_count_diff = (self.config.elasticsearch.doc_count_wait - 1) * 1440
             count_diff = doc_count_2 - doc_count_1
             if count_diff < expected_count_diff:
                 raise RuntimeError(
@@ -214,17 +347,16 @@ class RTDS(ComponentBase):
             self._verify_frequency(index=index)
 
             # ** time drift between provider and RTDS is within acceptable limits **
-            if self.metadata.elasticsearch.get("acceptable_time_drift"):
-                acceptable = self.metadata.elasticsearch.acceptable_time_drift
+            if self.config.elasticsearch.acceptable_time_drift is not None:
                 logger.info(
-                    f"Verifying time drift between RTDS and SCEPTRE environment is within an acceptable range (acceptable={acceptable})"
+                    f"Verifying time drift between RTDS and SCEPTRE environment is within an acceptable range (acceptable={self.config.elasticsearch.acceptable_time_drift})"
                 )
 
                 time_drift = get_time_drift(self.es, index, time_range="now-2m")
-                if time_drift > acceptable:
+                if time_drift > self.config.elasticsearch.acceptable_time_drift:
                     raise RuntimeError(
                         f"time drift of {time_drift} ms > configured acceptable drift "
-                        f"of {acceptable} ms (index={index})"
+                        f"of {self.config.elasticsearch.acceptable_time_drift} ms (index={index})"
                     )
                 logger.info("time drift verified")
 
@@ -233,23 +365,22 @@ class RTDS(ComponentBase):
     def stop(self):
         logger.info(f"Stopping user component: {self.name}")
 
-        host = self.metadata.hostname  # type: str
-
         self._stop_provider_if_running()
 
-        if self.metadata.get("rscad_automation", {}).get("enabled"):
+        if self.config.rscad_automation.enabled:
             self._stop_case(allow_failure=False)
 
         # Copy CSV files
-        if self.metadata.get("csv_files", {}).get("export"):
-            src = self.metadata.csv_files.get("path", "/root/rtds_data")
-            logger.info(f"Saving CSV files from provider (src={src})")
-            self.recv_file(host, src)
+        if self.config.csv_files and self.config.csv_files.export:
+            logger.info(
+                f"Saving CSV files from provider (src={self.config.csv_files.path})"
+            )
+            self.recv_file(self.config.hostname, self.config.csv_files.path)
 
         # Copy provider log files
-        if self.metadata.get("export_logs"):
+        if self.config.export_logs:
             self.recv_file(
-                vm=host,
+                vm=self.config.hostname,
                 src=[
                     "/var/log/bennu-pybennu.out",
                     "/var/log/bennu-pybennu.err",
@@ -257,44 +388,42 @@ class RTDS(ComponentBase):
             )
 
         # Copy provider configs
-        if self.metadata.get("export_config", True):
+        if self.config.export_config:
             self.recv_file(
-                vm=host,
+                vm=self.config.hostname,
                 src=[
                     "/etc/sceptre/config.ini",
                     "/etc/sceptre/rtds_config.yaml",
                 ],
             )
 
-        # # Verify Elasticsearch data
-        # if self.metadata.get("elasticsearch", {}).get("verify"):
-        #     index = utils.get_dated_index(self.metadata.elasticsearch.index)
-        #     # TODO: configurable frequency check on stop
-        #     # This doubles as a check for the data in Elastic
-        #     self._verify_frequency(index=index, time_range="now-20s")
-
         logger.info(f"Stopped user component: {self.name}")
 
     def cleanup(self):
         logger.info(f"Cleaning up user component: {self.name}")
 
-        host = self.metadata.hostname  # type: str
-
         self._stop_provider_if_running()
 
         # Delete CSV files
-        if self.metadata.get("csv_files"):
-            csv_path = self.metadata.csv_files.get("path", "/root/rtds_data")
-            logger.info(f"Deleting provider CSV files (path={csv_path})")
-            utils.mm_exec_wait(self.mm, host, f"rm -rf {csv_path}")
+        if self.config.csv_files:
+            logger.info(
+                f"Deleting provider CSV files (path={self.config.csv_files.path})"
+            )
+            utils.mm_exec_wait(
+                self.mm, self.config.hostname, f"rm -rf {self.config.csv_files.path}"
+            )
 
         # Delete log files
         logger.info("Deleting provider log files")
-        utils.mm_delete_file(self.mm, f"name={host}", "/var/log/bennu-pybennu.out")
-        utils.mm_delete_file(self.mm, f"name={host}", "/var/log/bennu-pybennu.err")
+        utils.mm_delete_file(
+            self.mm, f"name={self.config.hostname}", "/var/log/bennu-pybennu.out"
+        )
+        utils.mm_delete_file(
+            self.mm, f"name={self.config.hostname}", "/var/log/bennu-pybennu.err"
+        )
 
         # Ensure RSCAD is stopped, even if stop stage didn't get hit
-        if self.metadata.get("rscad_automation", {}).get("enabled"):
+        if self.config.rscad_automation.enabled:
             self._stop_case(allow_failure=True)
 
         logger.info(f"Cleaned up user component: {self.name}")
@@ -319,7 +448,13 @@ return Math.abs(differenceInMillis);
         },
     )
 
-    return response["aggregations"]["timestamp_diff"]["value"]
+    drift = response["aggregations"]["timestamp_diff"]["value"]
+    if drift is None:
+        raise RuntimeError(
+            f"no documents with rtds_time and sceptre_time in {index} since "
+            f"{time_range}, cannot check time drift"
+        )
+    return drift
 
 
 def main():
