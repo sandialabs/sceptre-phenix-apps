@@ -106,10 +106,7 @@ def make_app(**cfg):
 def test_resolve_uuid_skips_lookup():
     a = make_app()
     with mock.patch.object(Caldera, "_api") as api:
-        assert (
-            a._resolve("planners", "planner", PHENIX_PLANNER_ID)
-            == PHENIX_PLANNER_ID
-        )
+        assert a._resolve("planners", "planner", PHENIX_PLANNER_ID) == PHENIX_PLANNER_ID
     api.assert_not_called()
 
 

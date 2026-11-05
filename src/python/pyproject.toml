@@ -97,7 +97,7 @@ dev = [
     "pytest",  # testing framework
     "pytest-cov",  # coverage reporting
     "pytest-mock",  # mocking framework
-    "ruff",  # powerful linter
+    "ruff==0.17.3",  # powerful linter, pinned so format output stays stable
     "types-python-dateutil",  # mypy stubs
     "types-PyYAML",  # mypy stubs
     "types-requests",  # mypy stubs

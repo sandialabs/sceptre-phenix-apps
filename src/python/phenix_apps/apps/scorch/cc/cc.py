@@ -9,6 +9,11 @@ from phenix_apps.common.logger import logger
 from phenix_apps.common.settings import SCORCH_HOST_VALIDATORS
 
 
+def _one_line(text: str) -> str:
+    """Return text with its line breaks escaped, so one log message stays on one line."""
+    return str(text).replace("\r", "\\r").replace("\n", "\\n")
+
+
 class CC(ComponentBase):
     def __init__(self):
         ComponentBase.__init__(self, "cc")
@@ -47,7 +52,7 @@ class CC(ComponentBase):
                     self.mm.cc_exec(cmd.args)
 
                 logger.info(
-                    f"command '{cmd.args}' executed with filter '{filter_}' using cc"
+                    f"command '{_one_line(cmd.args)}' executed with filter '{filter_}' using cc"
                 )
             else:
                 raise ValueError(
@@ -74,7 +79,9 @@ class CC(ComponentBase):
                     if validator:
                         wait = True  # force waiting so validation can occur
 
-                    logger.info(f"executing command '{cmd.args}' in VM {vm.hostname}")
+                    logger.info(
+                        f"executing command '{_one_line(cmd.args)}' in VM {vm.hostname}"
+                    )
 
                     script = self.__send_cmd_as_file(vm.hostname, cmd.args)
 
@@ -84,7 +91,7 @@ class CC(ComponentBase):
                         )
 
                         logger.info(
-                            f"command '{cmd.args}' executed in VM {vm.hostname} using cc"
+                            f"command '{_one_line(cmd.args)}' executed in VM {vm.hostname} using cc"
                         )
 
                         # HACK: If Windows, use presence of stderr to determine
@@ -92,33 +99,37 @@ class CC(ComponentBase):
                         if self.extract_node_os_type(vm.hostname) == "windows":
                             if results["stderr"]:
                                 logger.error(
-                                    f"command '{cmd.args}' resulted in output to STDERR (assuming failure)"
+                                    f"command '{_one_line(cmd.args)}' resulted in output to STDERR (assuming failure)"
                                 )
                                 logger.info(f"STDERR Output: {results['stderr']}")
 
                                 raise RuntimeError(
-                                    f"command '{cmd.args}' failed on Windows"
+                                    f"command '{_one_line(cmd.args)}' failed on Windows"
                                 )
                         elif results["exitcode"]:
                             logger.error(
-                                f"command '{cmd.args}' returned a non-zero exit code of '{results['exitcode']}'"
+                                f"command '{_one_line(cmd.args)}' returned a non-zero exit code of '{results['exitcode']}'"
                             )
 
                             if results["stderr"]:
                                 logger.info(f"STDERR Output: {results['stderr']}")
 
-                            raise RuntimeError(f"command '{cmd.args}' failed")
+                            raise RuntimeError(
+                                f"command '{_one_line(cmd.args)}' failed"
+                            )
 
                         if results["stdout"]:
                             logger.info(f"STDOUT Output: {results['stdout']}")
 
                         if validator and not SCORCH_HOST_VALIDATORS:
                             logger.warning(
-                                f"skipping host-side validator for command '{cmd.args}' on VM {vm.hostname}: "
+                                f"skipping host-side validator for command '{_one_line(cmd.args)}' on VM {vm.hostname}: "
                                 "host-side commands are disabled by PHENIX_SCORCH_HOST_VALIDATORS=0"
                             )
                         elif validator:
-                            logger.info(f"validating results from '{cmd.args}'")
+                            logger.info(
+                                f"validating results from '{_one_line(cmd.args)}'"
+                            )
 
                             with tempfile.NamedTemporaryFile("w", suffix=".sh") as tf:
                                 tf.write(validator)
@@ -148,13 +159,13 @@ class CC(ComponentBase):
                             self.mm.cc_exec(script)
 
                         logger.info(
-                            f"command '{cmd.args}' executed in VM {vm.hostname} using cc"
+                            f"command '{_one_line(cmd.args)}' executed in VM {vm.hostname} using cc"
                         )
                 elif cmd.type == "background":
                     once = cmd.get("once", True)
 
                     logger.info(
-                        f"backgrounding command '{cmd.args}' in VM {vm.hostname} using cc"
+                        f"backgrounding command '{_one_line(cmd.args)}' in VM {vm.hostname} using cc"
                     )
 
                     script = self.__send_cmd_as_file(vm.hostname, cmd.args)
@@ -168,7 +179,7 @@ class CC(ComponentBase):
 
                     self.mm.clear_cc_filter()
                     logger.info(
-                        f"command '{cmd.args}' backgrounded in VM {vm.hostname}"
+                        f"command '{_one_line(cmd.args)}' backgrounded in VM {vm.hostname}"
                     )
                 elif cmd.type == "send":
                     args = cmd.args.split(":")
@@ -182,7 +193,7 @@ class CC(ComponentBase):
                         dst = args[1]
                     else:
                         raise ValueError(
-                            f"too many files provided for send command for VM {vm.hostname}: {cmd.args}"
+                            f"too many files provided for send command for VM {vm.hostname}: {_one_line(cmd.args)}"
                         )
 
                     if not PurePath(src).is_absolute():
@@ -222,7 +233,7 @@ class CC(ComponentBase):
                         dst = str(utils.safe_join(self.base_dir, dst_path))
                     else:
                         raise ValueError(
-                            f"too many files provided for recv command for VM {vm.hostname}: {cmd.args}"
+                            f"too many files provided for recv command for VM {vm.hostname}: {_one_line(cmd.args)}"
                         )
 
                     logger.info(
