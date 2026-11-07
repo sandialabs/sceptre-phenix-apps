@@ -33,3 +33,16 @@ or firewalls, using the GRE tunnel as the destination port for the mirrored
 traffic, except for the cluster host the `monitor` VM is scheduled on, which
 will instead use the tap of the `IF0` interface for the `monitor` VM as the
 mirror destination.
+
+#### Mirror limit
+
+Open vSwitch applies at most 32 mirrors on one bridge, and it ignores a 33rd
+mirror without an error. Before each cluster host creates its mirror, the app
+counts the mirrors on the bridge. If the bridge already has 32, the stage fails
+with `no Open vSwitch mirror left: bridge <bridge> on cluster host <host> has
+32 of 32 Open vSwitch mirrors`. Packet captures of minimega and other mirrors
+use the same limit. Remove a mirror, or use another bridge.
+
+Each mirror has the Open vSwitch tags `external_ids:minimega-namespace` (the
+experiment name) and `external_ids:minimega-kind=app-mirror`. phēnix uses them
+to count the mirror for the experiment.

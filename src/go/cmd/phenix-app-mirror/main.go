@@ -524,12 +524,20 @@ func setupTunnelAndMirror(
 	// building the mirror command uses info about VMs actually deployed
 	if !dryrun {
 		// Create mirror, using GRE tunnel as the output port
-		command = buildMirrorCommand(log, exp, name, amd.MirrorBridge, name, vms, hmd)
+		command, err = buildMirrorCommand(log, exp, name, amd.MirrorBridge, name, vms, hmd)
+		if err != nil {
+			return err
+		}
 
 		if command == nil {
 			// Likely means no VMs scheduled on this cluster host have interfaces in
 			// VLANs being mirrored to the target VM.
 			return nil
+		}
+
+		err = checkMirrorBudget(mm.MeshShellResponse, amd.MirrorBridge, clusterHost)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -890,7 +898,7 @@ func buildMirrorCommand(
 	name, bridge, port string,
 	vms []string,
 	hmd MirrorHostMetadata,
-) []string {
+) ([]string, error) {
 	var (
 		vlans   []string
 		command = []string{"ovs-vsctl"}
@@ -911,7 +919,7 @@ func buildMirrorCommand(
 	taps = append(taps, hmd.HIL...)
 
 	if len(taps) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	ids := make([]string, len(taps))
@@ -923,19 +931,70 @@ func buildMirrorCommand(
 		command = append(command, fmt.Sprintf(`--id=%s get port %s`, id, tap))
 	}
 
+	create, err := createMirrorArg(name, exp.Spec.ExperimentName(), ids, vlans)
+	if err != nil {
+		return nil, err
+	}
+
 	command = append(command, "--id=@o get port "+port)
-	command = append(
-		command,
-		fmt.Sprintf(
-			`--id=@m create mirror name=%s select-dst-port=%s select-vlan=%s output-port=@o`,
-			name,
-			strings.Join(ids, ","),
-			strings.Join(vlans, ","),
-		),
-	)
+	command = append(command, create)
 	command = append(command, fmt.Sprintf(`add bridge %s mirrors @m`, bridge))
 
-	return command
+	return command, nil
+}
+
+// createMirrorArg returns the ovs-vsctl argument that creates the mirror. The
+// minimega tags let phenix count the mirror in the budget of the experiment.
+func createMirrorArg(name, experiment string, ids, vlans []string) (string, error) {
+	err := validateToken("experiment name", experiment, vlanAliasRegex)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf(
+		`--id=@m create mirror name=%s select-dst-port=%s select-vlan=%s output-port=@o `+
+			`external_ids:minimega-namespace=%s external_ids:minimega-kind=%s`,
+		name,
+		strings.Join(ids, ","),
+		strings.Join(vlans, ","),
+		experiment,
+		mirrorKind,
+	), nil
+}
+
+// checkMirrorBudget fails when the bridge on the cluster host already has the
+// most mirrors that Open vSwitch applies. It ignores one more without an error.
+func checkMirrorBudget(
+	shell func(host, cmd string) (string, error),
+	bridge, clusterHost string,
+) error {
+	out, err := shell(clusterHost, "ovs-vsctl get bridge "+bridge+" mirrors")
+	if err != nil {
+		return fmt.Errorf(
+			"counting mirrors on bridge %s of cluster host %s: %w",
+			bridge,
+			clusterHost,
+			err,
+		)
+	}
+
+	count, err := countMirrors(out)
+	if err != nil {
+		return fmt.Errorf("counting mirrors on bridge %s of cluster host %s: %w", bridge, clusterHost, err)
+	}
+
+	if count >= ovsMirrorLimit {
+		return fmt.Errorf(
+			"%w: bridge %s on cluster host %s has %d of %d Open vSwitch mirrors",
+			errMirrorBudget,
+			bridge,
+			clusterHost,
+			count,
+			ovsMirrorLimit,
+		)
+	}
+
+	return nil
 }
 
 func vlanTaps(log *slog.Logger, ns string, vms, vlans []string) []string {

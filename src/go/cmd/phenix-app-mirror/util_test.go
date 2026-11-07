@@ -49,3 +49,50 @@ func TestExtractMetadataRejectsUnsafeTokens(t *testing.T) {
 	_, err = extractHostMetadata(map[string]any{"hilInterfaces": []any{"eth1", "eth2 eth3"}})
 	require.Error(t, err)
 }
+
+func TestCountMirrors(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]int{
+		"[]":                       0,
+		" [] \n":                   0,
+		"[1b2c]":                   1,
+		"[1b2c, 3d4e]":             2,
+		"[1b2c,3d4e,5f60]":         3,
+		"[1b2c, 3d4e, 5f60, 7182]": 4,
+	}
+
+	for out, want := range tests {
+		got, err := countMirrors(out)
+		require.NoError(t, err, out)
+		assert.Equal(t, want, got, out)
+	}
+
+	for _, out := range []string{"", "ovs-vsctl: no row", "1b2c, 3d4e"} {
+		_, err := countMirrors(out)
+		require.ErrorIs(t, err, errMirrorList, out)
+	}
+}
+
+func TestCreateMirrorArgTagsTheMirror(t *testing.T) {
+	t.Parallel()
+
+	arg, err := createMirrorArg("abc123", "exp1", []string{"@i0", "@i1"}, []string{"101", "102"})
+	require.NoError(t, err)
+
+	assert.Equal(
+		t,
+		"--id=@m create mirror name=abc123 select-dst-port=@i0,@i1 select-vlan=101,102 output-port=@o "+
+			"external_ids:minimega-namespace=exp1 external_ids:minimega-kind=app-mirror",
+		arg,
+	)
+}
+
+func TestCreateMirrorArgRejectsUnsafeExperimentName(t *testing.T) {
+	t.Parallel()
+
+	for _, name := range []string{"", "exp 1", "exp1 -- del-br phenix", "$(id)", "--"} {
+		_, err := createMirrorArg("abc123", name, []string{"@i0"}, []string{"101"})
+		require.Error(t, err, name)
+	}
+}
