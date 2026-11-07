@@ -68,7 +68,7 @@ The record's `end` is the start plus `run_duration`, not the actual stop time
 | `collect_iperf` | bool | `false` | Copy the `iperf` component's results into `iperf/` (empty `.log` files removed) and use them in the CSV |
 | `collect_miniccc` | bool | `false` | Copy each VM's miniccc log into `miniccc/` (`/miniccc.log` from Linux VMs except `Router` nodes, `/minimega/miniccc.log` from Windows VMs). Every such VM must be running and have the log |
 | `generate_csv` | bool | `false` | Write `experiment_results.csv` from Elasticsearch (needs `rtds` with `elasticsearch.server` and `elasticsearch.index`) |
-| `pcap_duration_margin` | seconds | `6.0` | How much shorter the merged capture may be than the disruption's `run_duration` before the stage fails |
+| `pcap_duration_margin` | seconds | `6.0` | How much shorter the merged capture (`merged.pcap` or `merged.pcapng`) may be than the disruption's `run_duration` before the stage fails |
 
 ## Examples
 

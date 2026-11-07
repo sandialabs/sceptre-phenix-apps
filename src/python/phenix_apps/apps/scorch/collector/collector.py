@@ -430,11 +430,13 @@ class Collector(ComponentBase):
             dis_configured_duration = float(
                 self.enabled_components["disruption"].metadata.run_duration
             )
-            merged = pcap_metadata.get("merged.pcap")
+            merged = pcap_metadata.get("merged.pcap") or pcap_metadata.get(
+                "merged.pcapng"
+            )
             if merged is None:
                 logger.warning(
-                    "no merged.pcap (pcap's create_merged_pcap is off), "
-                    "skipping the capture duration check"
+                    "no merged.pcap or merged.pcapng (pcap's create_merged_pcap "
+                    "is off), skipping the capture duration check"
                 )
                 return pcap_metadata
             expected_cap_duration = float(merged["Capture duration (seconds)"])
