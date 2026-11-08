@@ -2,13 +2,14 @@ from types import SimpleNamespace
 
 import pytest
 
-from phenix_apps.apps.scorch.collector.collector import Collector
+from phenix_apps.apps.scorch.collector.collector import Collector, CollectorMetadata
 
 
 @pytest.mark.parametrize("annotations", [{}, {"topology": "t"}, {"scenario": "s"}])
 def test_stop_names_missing_topology_or_scenario_annotations(tmp_path, annotations):
     collector = SimpleNamespace(
         name="c",
+        config=CollectorMetadata(),
         results_dir=tmp_path / "results",
         meta_dir=tmp_path / "meta",
         get_annotation=annotations.get,

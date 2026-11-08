@@ -43,17 +43,19 @@ class Collector(ComponentBase):
 
         # Determine what scorch components are enabled, and enable lookups
         # by component type (for cases when name and type differ).
-        components = self.extract_app("scorch").metadata.components
-        self.all_components = {c.type: c for c in components}
+        self.components = self.extract_app("scorch").metadata.components
+        self.all_components = {c.type: c for c in self.components}
         self.run_config = self.extract_app("scorch").metadata.runs[self.run]
-        self.enabled_components = enabled_by_type(components, self.run_config)
-        if self.config.collect_iperf:
-            check_iperf_before_collector(components, self.run_config)
+        self.enabled_components = enabled_by_type(self.components, self.run_config)
 
         self.execute_stage()
 
     def stop(self):
         logger.info(f"Stopping user component: {self.name}")
+
+        # execute_stage parses the metadata into self.config before this runs
+        if self.config.collect_iperf:
+            check_iperf_before_collector(self.components, self.run_config)
 
         record = {}
 
