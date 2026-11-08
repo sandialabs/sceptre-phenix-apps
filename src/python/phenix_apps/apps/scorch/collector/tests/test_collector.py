@@ -200,10 +200,10 @@ def test_iperf_must_precede_collector_in_stop(run, fails):
         check_iperf_before_collector(comps, Box(run))
 
 
-def test_init_checks_iperf_order(monkeypatch):
+def test_stop_checks_iperf_order_after_parsing_the_config(monkeypatch):
+    # ComponentBase parses self.config in execute_stage, after __init__ ran.
     def fake_base_init(self, name):
-        self.run, self.base_dir = 0, "/x"
-        self.config = CollectorMetadata(collect_iperf=True)
+        self.run, self.base_dir, self.name = 0, "/x", name
         self.extract_app = lambda _: Box(
             metadata={
                 "components": [
@@ -214,7 +214,12 @@ def test_init_checks_iperf_order(monkeypatch):
             }
         )
 
+    def fake_execute_stage(self):
+        self.config = CollectorMetadata(collect_iperf=True)
+        self.stop()
+
     monkeypatch.setattr(ComponentBase, "__init__", fake_base_init)
+    monkeypatch.setattr(ComponentBase, "execute_stage", fake_execute_stage)
     with pytest.raises(ValueError, match="list iperf first"):
         Collector()
 
