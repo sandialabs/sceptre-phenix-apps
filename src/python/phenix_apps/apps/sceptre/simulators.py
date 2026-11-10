@@ -42,6 +42,7 @@ class ProviderConfig(TypedDict, total=False):
     pwds_endpoint: str
     config_helics: str
     config_file: str
+    matlab_host: str
 
 
 # Provider metadata each simulator dereferences directly; validation enforces
@@ -52,6 +53,7 @@ REQUIRED_METADATA: Final[dict[Simulator, tuple[str, ...]]] = {
     Simulator.PYPOWER: ("case",),
     Simulator.SIMULINK: ("solver", "publish_points"),
     Simulator.GENERIC_PYTHON: ("simulation_file",),
+    Simulator.SPEEDGOAT: ("simulink_file", "publish_points", "matlab_host"),
 }
 
 
@@ -214,6 +216,37 @@ def generic_python_injections(
     )
 
 
+# ----------------------------------------------------------------- Speedgoat
+
+
+def speedgoat_injections(
+    stage: "ConfigureStage", host: str, vm_directory: Path, provider: Box
+) -> None:
+    stage.inject(
+        host,
+        vm_directory / "config.ini",
+        NIX_CONFIG,
+        "Speedgoat provider config",
+        override="config.ini",
+    )
+    stage.inject(
+        host,
+        provider.metadata.simulink_file,
+        "/etc/sceptre/speedgoat.slx",
+        "Simulink simulation file",
+    )
+    stage.inject(
+        host,
+        provider.metadata.publish_points,
+        "/etc/sceptre/publishPoints.txt",
+        "Publish Points file",
+    )
+
+
+def speedgoat_kwargs(provider: Box) -> ProviderConfig:
+    return {"matlab_host": provider.metadata.matlab_host}
+
+
 # -------------------------------------------------- Helics (and *Helics)
 
 
@@ -326,4 +359,5 @@ INJECTIONS: Final[dict[Simulator, Callable[..., None]]] = {
     Simulator.SIMULINK: simulink_injections,
     Simulator.PYPOWER: pypower_injections,
     Simulator.GENERIC_PYTHON: generic_python_injections,
+    Simulator.SPEEDGOAT: speedgoat_injections,
 }

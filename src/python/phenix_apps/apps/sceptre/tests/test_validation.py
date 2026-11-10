@@ -10,7 +10,7 @@ row was a silent no-op.
 
 import pytest
 
-from phenix_apps.apps.sceptre import validation
+from phenix_apps.apps.sceptre import simulators, validation
 from phenix_apps.apps.sceptre.configs import configs
 from phenix_apps.apps.sceptre.configs.infrastructures import INFRASTRUCTURES
 from phenix_apps.apps.sceptre.metadata import (
@@ -423,6 +423,15 @@ def test_protocol_fields_match_the_parser():
     assert set(validation.PROTOCOL_FIELDS) == set(SceptreMetadataParser.protocols)
     for key, field in validation.PROTOCOL_FIELDS.items():
         assert validation.FdServerMeta.model_fields[field].alias in (None, key)
+
+
+def test_required_metadata_are_provider_fields():
+    """Every key REQUIRED_METADATA names must be a ProviderMeta field, or the
+    check's getattr fails instead of flagging the host."""
+
+    for sim, keys in simulators.REQUIRED_METADATA.items():
+        for key in keys:
+            assert key in validation.ProviderMeta.model_fields, (sim, key)
 
 
 class TestSimulator:

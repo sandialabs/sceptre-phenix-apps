@@ -49,6 +49,7 @@ class Simulator(StrEnum):
     PYPOWER = "PyPower"
     SIMULINK = "Simulink"
     GENERIC_PYTHON = "GenericPython"
+    SPEEDGOAT = "Speedgoat"
     HELICS = "Helics"
     OPALRT = "OPALRT"
     RTDS = "RTDS"
