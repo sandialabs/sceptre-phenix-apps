@@ -82,7 +82,7 @@ exec or background command to only one time (and this is the default for this
 setting).
 
 A VM-level `exec` can `wait` for the command to finish; the stage then fails if
-the command exits non-zero (on Windows, if it writes anything to stderr). A
+the command exits non-zero (for Windows, see below). A
 `validator` is a bash script run **on the phenix host** (not in the VM) with the
 command's stdout on its stdin and the VM's hostname as its first argument; a
 non-zero exit fails the stage, and whatever the script writes to stderr is shown
@@ -92,6 +92,27 @@ to the user. Setting a `validator` forces `wait`.
 > Validators run as shell scripts on the phenix host, not in the VM. To lock
 > this down, set `PHENIX_SCORCH_HOST_VALIDATORS=0` in the phenix environment;
 > each validator is then skipped with a warning and the result is not validated.
+
+### Success and failure of a waited `exec`
+
+A waited `exec` fails the stage when the command exits non-zero. On Windows the
+command runs as a PowerShell script (`powershell -File`) that exits with the
+last native command's exit code; a failed last cmdlet (`$?` false) or a
+terminating PowerShell error exits 1. Nothing is added before the command, so it
+may start with `using` or `param()`.
+
+Windows commands used to fail on any STDERR output instead. While that changes,
+nothing that passed before fails:
+
+| Windows result | Outcome |
+|---|---|
+| non-zero exit and STDERR | fails: `command '<args>' failed on Windows` |
+| non-zero exit, no STDERR | passes with a warning (`exited N without writing to STDERR`); a later release will fail it |
+| exit 0 with STDERR | passes with a warning (`no longer fail on STDERR alone`) |
+
+A tool whose success codes are non-zero (`robocopy` exits 1-7 on success) will
+fail once the transition ends; end its command with `exit 0` when its code is a
+success, for example `robocopy C:\a C:\b; if ($LASTEXITCODE -lt 8) { exit 0 }`.
 
 ## Notes on Stage-Level `args` and `filter`
 
