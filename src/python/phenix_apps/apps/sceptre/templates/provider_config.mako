@@ -1,4 +1,4 @@
-<%page args="solver, server_endpoint, publish_endpoint, debug='False', config_helics=None, case_file=None, oneline_file=None, pwds_endpoint=None, config_file=None, **kwargs"/>
+<%page args="solver, server_endpoint, publish_endpoint, debug='False', config_helics=None, case_file=None, oneline_file=None, pwds_endpoint=None, config_file=None, matlab_host=None, **kwargs"/>
 [power-solver-service]
 solver-type       = ${solver}
 debug             = ${debug}
@@ -31,4 +31,9 @@ config-file       = ${config_file}
 % endif
 % if solver == 'GenericPython':
 simulation-file = /etc/sceptre/simulation.py
+% endif
+% if solver == 'Speedgoat':
+matlab-host       = ${matlab_host}
+simulink-file     = /etc/sceptre/speedgoat.slx
+publish-points    = /etc/sceptre/publishPoints.txt
 % endif
