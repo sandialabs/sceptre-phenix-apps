@@ -1,8 +1,74 @@
+from typing import Annotated, Self
+
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    model_validator,
+)
+
 from phenix_apps.apps.scorch import ComponentBase
+from phenix_apps.apps.scorch.app import Hostname, Interface, MetadataBlock
+from phenix_apps.common import utils
 from phenix_apps.common.logger import logger
+
+# ettercap's -M method: one of its MITM attacks, optionally with an argument
+# (arp:remote, icmp:MAC/IP, dhcp:ip_pool/netmask/dns). It goes straight into the
+# command line, so the argument is restricted to safe characters.
+Method = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        pattern=r"^(arp|icmp|dhcp|port|ndp)(:[A-Za-z0-9_.:,/-]+)?$",
+    ),
+]
+
+# ettercap TARGET definitions: space-separated /MAC/IPs/PORTs/ triples (ranges
+# with '-', lists with ','). These are appended to the shell command, so the
+# pattern allows only the characters a target can contain and nothing a shell
+# would act on. No token may start with '-', or it would reach ettercap as an
+# option (e.g. "-D /10.0.0.1//").
+Targets = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        min_length=1,
+        pattern=r"^[0-9A-Fa-f:.,/][0-9A-Fa-f:.,/-]*( [0-9A-Fa-f:.,/][0-9A-Fa-f:.,/-]*)*$",
+    ),
+]
+
+
+class EttercapVM(MetadataBlock):
+    hostname: Hostname
+    interface: Interface = Field(validation_alias=AliasChoices("interface", "iface"))
+    targets: Targets
+    method: Method = "arp"
+
+
+class EttercapMetadata(BaseModel):
+    """Metadata for the ettercap component; see README.md for each field."""
+
+    model_config = ConfigDict(extra="allow")
+
+    vms: Annotated[list[EttercapVM], Field(min_length=1)]
+
+    @model_validator(mode="after")
+    def _check_vms(self) -> Self:
+        seen = [(vm.hostname, vm.interface) for vm in self.vms]
+        if dupes := sorted({f"{h} {i}" for h, i in seen if seen.count((h, i)) > 1}):
+            raise ValueError(
+                f"vms: ettercap started more than once on: {', '.join(dupes)}; "
+                "one MITM per host interface"
+            )
+        return self
 
 
 class Ettercap(ComponentBase):
+    metadata_model = EttercapMetadata
+    config: EttercapMetadata
+
     def __init__(self):
         ComponentBase.__init__(self, "ettercap")
 
@@ -11,61 +77,31 @@ class Ettercap(ComponentBase):
     def start(self):
         logger.info(f"Starting user component: {self.name}")
 
-        vms = self.metadata.get("vms", None)
+        for vm in self.config.vms:
+            logger.info(f"ensuring interface {vm.interface} is up in VM {vm.hostname}")
 
-        mm = self.mm_init()
+            with utils.mm_cc_filter(self.mm, f"name={vm.hostname}"):
+                self.mm.cc_exec(f"ip link set {vm.interface} up")
 
-        for vm in vms:
-            hostname = vm.get("hostname", None)
-            iface = vm.get("iface", None)
-            method = vm.get("method", "arp")
-            targets = vm.get("targets", None)
+                logger.info(
+                    f"starting ettercap using {vm.method} against {vm.targets} "
+                    f"in VM {vm.hostname}"
+                )
 
-            if not hostname:
-                continue
-
-            if not iface:
-                logger.error(f"missing interface name for VM {hostname}")
-                continue
-
-            if not targets:
-                logger.error(f"missing targets for VM {hostname}")
-                continue
-
-            logger.info(f"ensuring interface {iface} is up in VM {hostname}")
-
-            cmd = f"ip link set {iface} up"
-
-            mm.cc_filter(f"name={hostname}")
-            mm.cc_exec(cmd)
-
-            logger.info(
-                f"starting ettercap using {method} against {targets} in VM {hostname}"
-            )
-
-            cmd = f"ettercap -Tq -i {iface} -M {method} {targets}"
-
-            mm.cc_background(cmd)
+                self.mm.cc_background(
+                    f"ettercap -Tq -i {vm.interface} -M {vm.method} {vm.targets}"
+                )
 
         logger.info(f"Started user component: {self.name}")
 
     def stop(self):
         logger.info(f"Stopping user component: {self.name}")
 
-        vms = self.metadata.get("vms", None)
+        for vm in self.config.vms:
+            logger.info(f"stopping ettercap in VM {vm.hostname}")
 
-        mm = self.mm_init()
-
-        for vm in vms:
-            hostname = vm.get("hostname", None)
-
-            if not hostname:
-                continue
-
-            logger.info(f"stopping ettercap in VM {hostname}")
-
-            mm.cc_filter(f"name={hostname}")
-            mm.cc_exec("pkill ettercap")
+            with utils.mm_cc_filter(self.mm, f"name={vm.hostname}"):
+                self.mm.cc_exec("pkill ettercap")
 
         logger.info(f"Stopped user component: {self.name}")
 
