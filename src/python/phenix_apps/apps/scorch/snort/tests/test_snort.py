@@ -1,67 +1,267 @@
-from unittest.mock import MagicMock
+from pathlib import Path
 
 import pytest
-from box import Box
-from pydantic import ValidationError
 
-from phenix_apps.apps.scorch.snort.snort import Snort
+from phenix_apps.apps.scorch.app import parse_metadata, validate_metadata
+from phenix_apps.apps.scorch.snort import snort as snort_mod
+from phenix_apps.apps.scorch.snort.snort import Snort, SnortMetadata
+from phenix_apps.testing.readme import readme_components
+
+README = Path(__file__).parents[1] / "README.md"
 
 
-def component(mocker, iface="eth1", running=True, link_ok=True) -> Snort:
-    sn = Snort.__new__(Snort)
-    sn.name = "snort"
-    sn.metadata = Box({"hostname": "ids", "sniffInterface": iface, "startupWait": 0})
-    sn.mm = mm = MagicMock()
-    mocker.patch.object(sn, "mm_init", return_value=mm)
+def readme_examples() -> list[dict]:
+    return readme_components(README, "snort")
+
+
+def test_readme_has_examples():
+    assert len(readme_examples()) == 2
+
+
+@pytest.mark.parametrize("cmp", readme_examples(), ids=lambda c: c["name"])
+def test_readme_examples_are_valid_and_clean(cmp):
+    _, warnings = validate_metadata(SnortMetadata, cmp["metadata"], cmp["name"])
+    assert warnings == []
+
+
+def test_defaults_match_the_old_code():
+    config = parse_metadata(SnortMetadata, {}, "s")
+
+    assert config.hostname == "detector"
+    assert config.interface == "eth0"
+    assert config.waitDuration == 30.0
+    assert config.configs == []
+    assert config.scripts.configSnort is None
+
+
+def test_a_config_entry_parses():
+    md = {"configs": [{"src": "/a/b.conf", "dst": "/etc/snort/snort.conf"}]}
+    config = parse_metadata(SnortMetadata, md, "s")
+
+    assert config.configs[0].src == "/a/b.conf"
+    assert config.configs[0].dst == "/etc/snort/snort.conf"
+    assert config.configs[0].name is None
+
+
+def test_config_name_label_is_accepted():
+    md = {"configs": [{"name": "rules", "src": "/a/b.rules", "dst": "/c.rules"}]}
+    config = parse_metadata(SnortMetadata, md, "s")
+    assert config.configs[0].name == "rules"
+
+
+def test_configsnort_script_parses():
+    md = {"scripts": {"configSnort": {"executor": "bash", "script": "/a/setup.sh"}}}
+    script = parse_metadata(SnortMetadata, md, "s").scripts.configSnort
+
+    assert script is not None
+    assert script.executor == "bash"
+    assert script.script == "/a/setup.sh"
+
+
+@pytest.mark.parametrize(
+    ("md", "message"),
+    [
+        ({"hostname": "a;reboot"}, "hostname"),
+        ({"interface": "x" * 16}, "interface"),
+        ({"waitDuration": -1}, "waitDuration"),
+        ({"waitDuration": "soon"}, "waitDuration"),
+        ({"configs": [{"dst": "/x"}]}, r"configs\.0\.src"),
+        ({"configs": [{"src": "/x"}]}, r"configs\.0\.dst"),
+        ({"configs": [{"src": "a b", "dst": "/x"}]}, r"configs\.0\.src"),
+        (
+            {"scripts": {"configSnort": {"script": "/a.sh"}}},
+            r"scripts\.configSnort\.executor",
+        ),
+    ],
+)
+def test_bad_metadata_is_rejected(md, message):
+    with pytest.raises(ValueError, match=message):
+        parse_metadata(SnortMetadata, md, "s")
+
+
+def test_sniff_interface_is_an_alias_for_interface():
+    config, warnings = validate_metadata(SnortMetadata, {"sniffInterface": "eth2"}, "s")
+    assert config.interface == "eth2"
+    assert warnings == []
+
+
+def test_interface_wins_over_sniff_interface():
+    md = {"interface": "eth1", "sniffInterface": "eth2"}
+    assert parse_metadata(SnortMetadata, md, "s").interface == "eth1"
+
+
+def test_unknown_key_in_a_config_entry_only_warns():
+    md = {"configs": [{"src": "/a", "dst": "/b", "bogus": 1}]}
+    _, warnings = validate_metadata(SnortMetadata, md, "s")
+    assert warnings == [
+        "configs.0.bogus: unknown key, ignored. Fix: remove it (known: src, dst, name)"
+    ]
+
+
+class FakeMM:
+    def __init__(self, calls):
+        self.calls = calls
+
+    def cc_filter(self, f):
+        self.calls.append(("filter", f))
+
+    def cc_exec(self, cmd):
+        self.calls.append(("exec", cmd))
+
+    def cc_background(self, cmd):
+        self.calls.append(("background", cmd))
+
+    def clear_cc_filter(self):
+        self.calls.append(("clear",))
+
+
+@pytest.fixture
+def stage(monkeypatch, tmp_path):
+    """Build a Snort with a recording mm; returns (component, calls)."""
+    calls: list[tuple] = []
+    comp = object.__new__(Snort)
+    comp.name, comp.base_dir = "snort", tmp_path
+    comp.mm = FakeMM(calls)
+    comp.link_ok, comp.running = True, True
 
     def run(vm, cmd, **_):
-        if cmd.startswith("ip link show") and not link_ok:
-            raise RuntimeError(
-                f"failed to run '{cmd}'\nstderr: Device \"{iface}\" does not exist."
-            )
+        calls.append(("run", vm, cmd))
+        if cmd.startswith("ip link show") and not comp.link_ok:
+            raise RuntimeError(f"failed to run '{cmd}'\nstderr: no such device")
         return {
             "stdout": "ERROR: cannot parse snort.conf\n"
             if cmd.startswith("cat")
             else ""
         }
 
-    mocker.patch.object(sn, "run_and_check_command", side_effect=run)
-    mocker.patch.object(sn, "check_process_running", return_value=running)
-    return sn
+    comp.run_and_check_command = run
+    comp.check_process_running = lambda vm, proc: comp.running
+
+    def send(mm, vm, src, dst):
+        calls.append(("send", vm, src, dst))
+
+    def recv(mm, vm, src, dst):
+        calls.append(("recv", vm, src, str(dst)))
+
+    monkeypatch.setattr(snort_mod.utils, "mm_send", send)
+    monkeypatch.setattr(snort_mod.utils, "mm_recv", recv)
+    monkeypatch.setattr(snort_mod.time, "sleep", lambda s: calls.append(("sleep", s)))
+    return comp, calls
 
 
-def test_start_runs_snort_with_stderr_captured(mocker):
-    sn = component(mocker)
-    sn.start()
-
-    (cmd,), _ = sn.mm.cc_background.call_args
-    assert cmd == (
-        "bash -c 'snort -i eth1 -c /etc/snort/snort.conf 2> /var/log/snort/snort.err'"
+def test_configure_sends_script_and_configs_then_raises_the_interface(stage):
+    comp, calls = stage
+    comp.config = parse_metadata(
+        SnortMetadata,
+        {
+            "hostname": "ids",
+            "interface": "eth1",
+            "configs": [{"src": "/a/snort.conf", "dst": "/etc/snort/snort.conf"}],
+            "scripts": {"configSnort": {"executor": "bash", "script": "/a/setup.sh"}},
+        },
+        "s",
     )
-    sn.check_process_running.assert_called_once_with("ids", "snort")
+
+    comp.configure()
+
+    assert calls == [
+        ("send", "ids", "/a/setup.sh", "setup.sh"),
+        ("filter", "name=ids"),
+        ("exec", "bash /setup.sh"),
+        ("clear",),
+        ("send", "ids", "/a/snort.conf", "/etc/snort/snort.conf"),
+        ("filter", "name=ids"),
+        ("exec", "ip link set eth1 up"),
+        ("clear",),
+    ]
 
 
-def test_start_fails_on_missing_interface(mocker):
-    sn = component(mocker, link_ok=False)
+def test_start_runs_snort_with_stderr_captured_then_checks_it_is_up(stage):
+    comp, calls = stage
+    comp.config = parse_metadata(SnortMetadata, {"interface": "eth1"}, "s")
 
-    with pytest.raises(RuntimeError, match="sniffInterface eth1 not found on ids"):
-        sn.start()
+    comp.start()
 
-    sn.mm.cc_background.assert_not_called()
+    assert calls == [
+        ("run", "detector", "ip link show eth1"),
+        ("filter", "name=detector"),
+        ("exec", "rm -rf /var/log/snort"),
+        ("exec", "mkdir -p /var/log/snort"),
+        ("clear",),
+        ("filter", "name=detector"),
+        (
+            "background",
+            "bash -c 'snort -i eth1 -c /etc/snort/snort.conf"
+            " 2> /var/log/snort/snort.err'",
+        ),
+        ("clear",),
+        ("sleep", 5.0),
+    ]
 
 
-def test_start_fails_with_stderr_when_snort_dies(mocker):
-    sn = component(mocker, running=False)
+def test_start_fails_on_missing_interface(stage):
+    comp, calls = stage
+    comp.config = parse_metadata(SnortMetadata, {"hostname": "ids"}, "s")
+    comp.link_ok = False
+
+    with pytest.raises(RuntimeError, match="interface eth0 not found on ids"):
+        comp.start()
+
+    assert not [c for c in calls if c[0] == "background"]
+
+
+def test_start_fails_with_stderr_when_snort_dies(stage):
+    comp, _ = stage
+    comp.config = parse_metadata(SnortMetadata, {}, "s")
+    comp.running = False
 
     with pytest.raises(RuntimeError, match=r"cannot parse snort\.conf"):
-        sn.start()
+        comp.start()
 
 
-@pytest.mark.parametrize("iface", ["any'; reboot; '", "eth0 eth1", ""])
-def test_start_rejects_unsafe_interface(mocker, iface):
-    sn = component(mocker, iface=iface)
+def test_startup_wait_is_configurable(stage):
+    comp, calls = stage
+    comp.config = parse_metadata(SnortMetadata, {"startupWait": 2}, "s")
 
-    with pytest.raises(ValidationError):
-        sn.start()
+    comp.start()
 
-    sn.mm.cc_background.assert_not_called()
+    assert ("sleep", 2.0) in calls
+
+
+def test_stop_waits_signals_snort_and_pulls_the_logs(stage, tmp_path):
+    comp, calls = stage
+    comp.config = parse_metadata(SnortMetadata, {"waitDuration": 5}, "s")
+
+    comp.stop()
+
+    assert calls[:4] == [
+        ("sleep", 5.0),
+        ("filter", "name=detector"),
+        ("exec", "pkill -INT snort"),
+        ("clear",),
+    ]
+    assert [c[2] for c in calls if c[0] == "recv"] == [
+        f"/var/log/snort/{n}" for n in ("alert", "snort.log", "snort.stats")
+    ]
+
+
+def test_stop_converts_snort_stats_to_jsonl(stage, tmp_path):
+    comp, _ = stage
+    comp.config = parse_metadata(SnortMetadata, {}, "s")
+    (tmp_path / "snort.stats").write_text("# comment\n#time,pkts\n1,2\n3,4\n")
+
+    comp.stop()
+
+    out = (tmp_path / "snort-stats.jsonl").read_text().splitlines()
+    assert out == ['{"time": "1", "pkts": "2"}', '{"time": "3", "pkts": "4"}']
+
+
+@pytest.mark.parametrize("content", ["", "# only a comment\n"])
+def test_stop_skips_conversion_for_a_short_snort_stats(stage, tmp_path, content):
+    comp, _ = stage
+    comp.config = parse_metadata(SnortMetadata, {}, "s")
+    (tmp_path / "snort.stats").write_text(content)
+
+    comp.stop()  # used to raise IndexError
+
+    assert not (tmp_path / "snort-stats.jsonl").exists()
