@@ -228,13 +228,21 @@ def test_exec_wait_nonzero_exit_raises(monkeypatch, tmp_path):
         comp.start()
 
 
-def test_exec_wait_windows_stderr_is_failure(monkeypatch, tmp_path):
-    stub_wait(monkeypatch, stderr="boom")
+def test_exec_wait_windows_failure_with_stderr_raises(monkeypatch, tmp_path):
+    stub_wait(monkeypatch, exitcode=1, stderr="boom")
     comp = component(
         vm_md({"type": "exec", "args": "x", "wait": True}), tmp_path, os_type="windows"
     )
     with pytest.raises(RuntimeError, match="Windows"):
         comp.start()
+
+
+def test_exec_wait_windows_stderr_with_exit_zero_passes(monkeypatch, tmp_path):
+    stub_wait(monkeypatch, stderr="boom")
+    comp = component(
+        vm_md({"type": "exec", "args": "x", "wait": True}), tmp_path, os_type="windows"
+    )
+    comp.start()
 
 
 @pytest.mark.parametrize("enabled", [False, True])
