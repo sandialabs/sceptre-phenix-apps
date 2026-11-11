@@ -5,7 +5,8 @@ from typing import cast
 import minimega
 from box import Box
 
-from phenix_apps.common import utils
+from phenix_apps.common import mmcapture, utils
+from phenix_apps.common.logger import logger
 
 
 class ExperimentBase:
@@ -34,6 +35,27 @@ class ExperimentBase:
         """Connect to minimega, in this experiment's namespace by default."""
 
         return utils._mm_init(self.exp_name if namespaced else None)
+
+    def capture_support(self) -> mmcapture.CaptureSupport:
+        """
+        Whether minimega has the 3.4.0 capture commands. Asks minimega once per
+        run, then reuses the answer.
+        """
+        support = getattr(self, "_capture_support", None)
+
+        if support is None:
+            support = mmcapture.capture_support(self.mm)
+            self._capture_support = support
+            logger.info(
+                "minimega capture commands: "
+                + (
+                    f"available ({support.version})"
+                    if support.available
+                    else support.reason
+                )
+            )
+
+        return support
 
     def extract_node(
         self, hostname: str, wildcard: bool = False

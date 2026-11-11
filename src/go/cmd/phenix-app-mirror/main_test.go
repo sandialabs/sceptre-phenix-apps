@@ -1,10 +1,13 @@
 package main
 
 import (
+	"errors"
 	"log/slog"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFilterVMs(t *testing.T) {
@@ -91,5 +94,45 @@ func testMetadata(vlans []string, routed bool) MirrorHostMetadata {
 		HIL:          nil,
 		SetupOVS:     false,
 		MirrorRouted: routed,
+	}
+}
+
+func TestCheckMirrorBudget(t *testing.T) {
+	t.Parallel()
+
+	full := "[" + strings.Repeat("uuid, ", ovsMirrorLimit-1) + "uuid]"
+	errShell := errors.New("mesh failed")
+
+	tests := []struct {
+		name    string
+		out     string
+		err     error
+		wantErr string
+	}{
+		{name: "empty", out: "[]", err: nil, wantErr: ""},
+		{name: "one left", out: strings.Replace(full, "uuid, ", "", 1), err: nil, wantErr: ""},
+		{name: "full", out: full, err: nil, wantErr: errMirrorBudget.Error()},
+		{name: "unreadable", out: "no row", err: nil, wantErr: errMirrorList.Error()},
+		{name: "command fails", out: "", err: errShell, wantErr: errShell.Error()},
+	}
+
+	for _, tt := range tests {
+		var sent []string
+
+		shell := func(host, cmd string) (string, error) {
+			sent = append(sent, host+": "+cmd)
+
+			return tt.out, tt.err
+		}
+
+		err := checkMirrorBudget(shell, "phenix", "compute1")
+
+		if tt.wantErr == "" {
+			require.NoError(t, err, tt.name)
+		} else {
+			require.ErrorContains(t, err, tt.wantErr, tt.name)
+		}
+
+		assert.Equal(t, []string{"compute1: ovs-vsctl get bridge phenix mirrors"}, sent, tt.name)
 	}
 }

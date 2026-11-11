@@ -7,6 +7,7 @@ from loguru import logger
 
 from phenix_apps.apps.scorch.app import parse_metadata, validate_metadata
 from phenix_apps.apps.scorch.erspan.erspan import ERSPAN, ERSPANMetadata
+from phenix_apps.common.error import AppError
 from phenix_apps.testing.readme import readme_components
 
 README = Path(__file__).parents[1] / "README.md"
@@ -129,6 +130,7 @@ def test_ssh_timeout_defaults_to_none_and_accepts_seconds():
 
 def erspan(vlans: dict, excluded: list[str]) -> ERSPAN:
     component = ERSPAN.__new__(ERSPAN)
+    component.exp_name = "exp1"
     component.experiment = Box({"status": {"vlans": vlans}})
     component.config = ERSPANMetadata.model_validate(
         {**BASE, "excluded_vlans": excluded}
@@ -239,3 +241,41 @@ def test_ssh_timeout_reaches_paramiko(monkeypatch):
     component, ssh = remote(monkeypatch, [0], timeout=7)
     component._run_remote_commands(["a"], "config_remote")
     assert ssh.timeouts == [7, 7]
+
+
+def test_mirror_carries_the_tags_that_count_it_for_the_experiment():
+    cmd = erspan({}, [])._configure_mirror([100], "phenix", "m0", "erspan1")
+
+    assert "external_ids:minimega-namespace=exp1 " in cmd
+    assert "external_ids:minimega-kind=app-erspan " in cmd
+    # the tags belong to the mirror row, so they come before the bridge update
+    assert cmd.index("minimega-kind") < cmd.index("-- add Bridge")
+
+
+def test_experiment_name_is_checked_before_it_reaches_the_command():
+    component = erspan({}, [])
+    component.exp_name = "exp1; shell id"
+
+    with pytest.raises(AppError, match="invalid minimega command token"):
+        component._configure_mirror([100], "phenix", "m0", "erspan1")
+
+
+@pytest.mark.parametrize(("rows", "left"), [(0, True), (31, True), (32, False)])
+def test_configure_fails_clearly_when_the_bridge_has_32_mirrors(rows, left):
+    component = erspan({}, [])
+    listing = "[" + ", ".join(f"uuid-{i}" for i in range(rows)) + "]"
+    component._run_mm = lambda cmd: {"stdout": [listing]}
+
+    if left:
+        component._check_mirror_budget()
+    else:
+        with pytest.raises(RuntimeError, match="has 32 of 32 Open vSwitch mirrors"):
+            component._check_mirror_budget()
+
+
+def test_unreadable_mirror_list_names_the_bridge():
+    component = erspan({}, [])
+    component._run_mm = lambda cmd: {"stderr": "no bridge named phenix"}
+
+    with pytest.raises(RuntimeError, match="bridge phenix: cannot read"):
+        component._check_mirror_budget()

@@ -23,7 +23,8 @@ from phenix_apps.apps.scorch.app import (
 from phenix_apps.common import utils
 from phenix_apps.common.logger import logger
 
-# TODO: merge tcpdump's functionality into the 'pcap' component
+# TODO: merge tcpdump into 'pcap'. minimega 3.4.0 direction= and pcapng cover
+# direction and format, not guest-only interfaces such as lo or tun.
 
 # options and filter are shell-quoted into the launcher script sent to the guest
 # (hence no single quotes); empty means none
