@@ -90,6 +90,22 @@ class TestProviderConfigs:
         assert kwargs["solver"] == "Speedgoat"
         assert kwargs["matlab_host"] == "10.0.0.50"
 
+    def test_ferrofire_passes_model_file(self, sceptre_app):
+        provider = node(
+            "provider-1",
+            {"simulator": "Ferrofire", "model": "/assets/m.yaml"},
+            interfaces=[iface("IF0", "10.0.0.1")],
+        )
+        sceptre_app.extract_nodes_type.return_value = [provider]
+        sceptre_app.extract_nodes_label.return_value = []
+
+        ctx = PreStart(sceptre_app)
+        ctx.provider_configs()
+
+        kwargs = sceptre_app.render.call_args.kwargs
+        assert kwargs["solver"] == "Ferrofire"
+        assert kwargs["model_file"] == "/etc/sceptre/model.yaml"
+
 
 class TestFdServerInterfaceSelection:
     """The tcp address a field device binds to depends on interface type/vlan."""

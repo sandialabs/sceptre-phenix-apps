@@ -1,5 +1,7 @@
 """Tests for SceptreMetadataParser."""
 
+from pathlib import Path
+
 import pytest
 from box import Box
 
@@ -67,3 +69,35 @@ def test_only_collects_known_protocols():
 def test_missing_required_key_raises_app_error():
     with pytest.raises(error.AppError, match="Failed when parsing metadata"):
         SceptreMetadataParser(Box({"provider": "provider-1"}))  # no infrastructure
+
+
+def test_ferrofire_templates_render():
+    """The provider config names the model; the start script launches ferrofire,
+    not the pybennu daemon that a 'provider' hostname would otherwise select."""
+
+    from mako.template import Template
+
+    base = Path(__file__).parent.parent / "templates"
+    ini = Template(filename=str(base / "provider_config.mako")).render(
+        solver="Ferrofire",
+        server_endpoint="tcp://10.0.0.1:5555",
+        publish_endpoint="udp://*;239.0.0.1:40000",
+        model_file="/etc/sceptre/model.yaml",
+    )
+    assert "solver-type       = Ferrofire" in ini
+    assert "model-file        = /etc/sceptre/model.yaml" in ini
+
+    start = Template(filename=str(base / "sceptre_start.mako")).render(
+        os="linux",
+        ips=[],
+        name="provider",
+        metadata={"simulator": "Ferrofire"},
+        server_endpoint="tcp://10.0.0.1:5555",
+        publish_endpoint="udp://*;239.0.0.1:40000",
+        needsleep=False,
+        needrestart=False,
+    )
+    assert (
+        "ferrofire run /etc/sceptre/model.yaml --server 'tcp://10.0.0.1:5555'" in start
+    )
+    assert "pybennu" not in start

@@ -43,6 +43,7 @@ class ProviderConfig(TypedDict, total=False):
     config_helics: str
     config_file: str
     matlab_host: str
+    model_file: str
 
 
 # Provider metadata each simulator dereferences directly; validation enforces
@@ -54,6 +55,7 @@ REQUIRED_METADATA: Final[dict[Simulator, tuple[str, ...]]] = {
     Simulator.SIMULINK: ("solver", "publish_points"),
     Simulator.GENERIC_PYTHON: ("simulation_file",),
     Simulator.SPEEDGOAT: ("simulink_file", "publish_points", "matlab_host"),
+    Simulator.FERROFIRE: ("model",),
 }
 
 
@@ -247,6 +249,33 @@ def speedgoat_kwargs(provider: Box) -> ProviderConfig:
     return {"matlab_host": provider.metadata.matlab_host}
 
 
+# ------------------------------------------------------------------ Ferrofire
+
+FERROFIRE_MODEL: Final[str] = "/etc/sceptre/model.yaml"
+
+
+def ferrofire_injections(
+    stage: "ConfigureStage", host: str, vm_directory: Path, provider: Box
+) -> None:
+    stage.inject(
+        host,
+        vm_directory / "config.ini",
+        NIX_CONFIG,
+        "Ferrofire provider config",
+        override="config.ini",
+    )
+    stage.inject(
+        host,
+        provider.metadata.model,
+        FERROFIRE_MODEL,
+        "Ferrofire model file",
+    )
+
+
+def ferrofire_kwargs() -> ProviderConfig:
+    return {"model_file": FERROFIRE_MODEL}
+
+
 # -------------------------------------------------- Helics (and *Helics)
 
 
@@ -360,4 +389,5 @@ INJECTIONS: Final[dict[Simulator, Callable[..., None]]] = {
     Simulator.PYPOWER: pypower_injections,
     Simulator.GENERIC_PYTHON: generic_python_injections,
     Simulator.SPEEDGOAT: speedgoat_injections,
+    Simulator.FERROFIRE: ferrofire_injections,
 }
