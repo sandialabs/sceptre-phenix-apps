@@ -50,6 +50,7 @@ class Simulator(StrEnum):
     SIMULINK = "Simulink"
     GENERIC_PYTHON = "GenericPython"
     SPEEDGOAT = "Speedgoat"
+    FERROFIRE = "Ferrofire"
     HELICS = "Helics"
     OPALRT = "OPALRT"
     RTDS = "RTDS"

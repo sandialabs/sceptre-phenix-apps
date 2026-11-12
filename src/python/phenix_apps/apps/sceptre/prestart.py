@@ -178,6 +178,8 @@ class PreStart(FieldDevices, Scada, Stage):
                 kwargs |= simulators.power_world_dynamics_kwargs(provider)
             elif sim == Simulator.PYPOWER:
                 kwargs |= simulators.pypower_kwargs(provider)
+            elif sim == Simulator.FERROFIRE:
+                kwargs |= simulators.ferrofire_kwargs()
             elif sim == Simulator.SPEEDGOAT:
                 kwargs |= simulators.speedgoat_kwargs(provider)
             elif sim in simulators.YAML_CONFIGURED:

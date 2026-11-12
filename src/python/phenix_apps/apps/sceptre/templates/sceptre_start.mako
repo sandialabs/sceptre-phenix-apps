@@ -10,6 +10,8 @@ bennu-simulink-provider --server-endpoint '${server_endpoint}' --publish-endpoin
         % if metadata.get('gt'):
 ./simulinkgt -addr :8080 -file groundTruth.txt -tmpl main.tmpl 2>&1 > /etc/sceptre/log/gt.log &
         % endif
+    % elif metadata.get('simulator', '').lower() == 'ferrofire':
+ferrofire run /etc/sceptre/model.yaml --server '${server_endpoint}' --publish '${publish_endpoint}' > /etc/sceptre/log/provider.log 2>&1 &
     % elif metadata.get('simulator','').lower() == 'alicanto':
 pybennu-alicanto -c /etc/sceptre/alicanto.json -d DEBUG > /etc/sceptre/log/alicanto.log 2>&1 &
     % elif 'provider' in name.lower() or metadata.get('simulator', '').lower().startswith('powerworld') or metadata.get('simulator', '').lower() in ['pypower', 'siren', 'opalrt', 'rtds', 'genericpython']:

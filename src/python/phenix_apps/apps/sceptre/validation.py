@@ -159,6 +159,7 @@ class ProviderMeta(Meta):
     publish_points: str | None = None
     simulation_file: str | None = None
     simulink_file: str | None = None
+    model: str | None = None
     matlab_host: str | None = None
     gt: str | None = None
     gt_template: str | None = None

@@ -138,6 +138,7 @@ class TestProviders:
             ("PyPower", "/etc/sceptre/config.ini"),
             ("GenericPython", "/etc/sceptre/config.ini"),
             ("Speedgoat", "/etc/sceptre/config.ini"),
+            ("Ferrofire", "/etc/sceptre/config.ini"),
             ("", "/etc/sceptre/config.ini"),  # unknown -> default branch
         ],
     )
@@ -152,6 +153,7 @@ class TestProviders:
             "simulink_file": "/assets/model.slx",
             "publish_points": "/assets/points.txt",
             "matlab_host": "10.0.0.50",
+            "model": "/assets/model.yaml",
         }
         sceptre_app.extract_nodes_type.return_value = [
             node("provider-1", metadata, interfaces=[iface("IF0", "10.0.0.1")])
@@ -211,6 +213,19 @@ class TestProviders:
         result = injects(sceptre_app)
         assert result["/etc/sceptre/speedgoat.slx"] == "/assets/model.slx"
         assert result["/etc/sceptre/publishPoints.txt"] == "/assets/points.txt"
+        assert "/etc/sceptre/config.ini" in result
+
+    def test_ferrofire_injects_model(self, sceptre_app):
+        metadata = {"simulator": "Ferrofire", "model": "/assets/pump-station.yaml"}
+        sceptre_app.extract_nodes_type.return_value = [
+            node("provider-1", metadata, interfaces=[iface("IF0", "10.0.0.1")])
+        ]
+        sceptre_app.find_override.return_value = None
+
+        ConfigureStage(sceptre_app).providers()
+
+        result = injects(sceptre_app)
+        assert result["/etc/sceptre/model.yaml"] == "/assets/pump-station.yaml"
         assert "/etc/sceptre/config.ini" in result
 
 
