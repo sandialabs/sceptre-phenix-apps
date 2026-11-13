@@ -1,3 +1,47 @@
+# [2026.11.13](https://github.com/sandialabs/sceptre-phenix-apps/compare/v2026.10.30...v2026.11.13) - 2026-11-13
+
+### 🚀 Features
+
+- _(sceptre)_ add ferrofire simulator type [_(6ce9fc4)_](https://github.com/sandialabs/sceptre-phenix-apps/commit/6ce9fc482699ef6597eedc2d8b4ae3f6bbc95c85) ([PR 217](https://github.com/sandialabs/sceptre-phenix-apps/pull/217))
+
+- _(cc)_ validate component metadata with a pydantic model [_(7c2b286)_](https://github.com/sandialabs/sceptre-phenix-apps/commit/7c2b286fab6511ceeea8c414a065c5f55296834f) ([PR 209](https://github.com/sandialabs/sceptre-phenix-apps/pull/209))
+
+- _(trafficgen)_ validate component metadata with a pydantic model [_(ab9d869)_](https://github.com/sandialabs/sceptre-phenix-apps/commit/ab9d869206689a6bc183a0b1e079c3bb40ef34ed) ([PR 206](https://github.com/sandialabs/sceptre-phenix-apps/pull/206))
+
+- _(opcexport)_ validate component metadata with a pydantic model [_(464c655)_](https://github.com/sandialabs/sceptre-phenix-apps/commit/464c6550c91cba3f7d964636752d1679d633fdb6) ([PR 205](https://github.com/sandialabs/sceptre-phenix-apps/pull/205))
+
+- _(snort)_ validate component metadata with a pydantic model [_(18206a8)_](https://github.com/sandialabs/sceptre-phenix-apps/commit/18206a86d946be66fd91e922755ef41f52c1a168) ([PR 204](https://github.com/sandialabs/sceptre-phenix-apps/pull/204))
+
+- _(ettercap)_ validate component metadata with a pydantic model [_(0ce5a18)_](https://github.com/sandialabs/sceptre-phenix-apps/commit/0ce5a186d845ca0ef39b7ed70750ab66283374ea) ([PR 203](https://github.com/sandialabs/sceptre-phenix-apps/pull/203))
+
+- _(sceptre)_ add speedgoat provider [_(0538372)_](https://github.com/sandialabs/sceptre-phenix-apps/commit/05383721f8c1083f735ee6fc8fbb2e6bd42da4d5) ([PR 216](https://github.com/sandialabs/sceptre-phenix-apps/pull/216))
+
+- _(art)_ validate component metadata with a pydantic model [_(b00e296)_](https://github.com/sandialabs/sceptre-phenix-apps/commit/b00e29607b9c140e9045be1856b4eccaa7f8e1b8) ([PR 208](https://github.com/sandialabs/sceptre-phenix-apps/pull/208))
+
+- _(caldera)_ validate component metadata with a pydantic model [_(9864f10)_](https://github.com/sandialabs/sceptre-phenix-apps/commit/9864f10dcddfb04747b74560cb683cd9e6b866a0) ([PR 207](https://github.com/sandialabs/sceptre-phenix-apps/pull/207))
+
+### 🐛 Bug Fixes
+
+- _(collector)_ check the iperf order after parsing the metadata [_(88643cc)_](https://github.com/sandialabs/sceptre-phenix-apps/commit/88643cc0ea9f5d503207dcd65a23bf8e83099b2a) ([PR 215](https://github.com/sandialabs/sceptre-phenix-apps/pull/215))
+
+- _(art)_ use self.mm and self.config, make the settle wait configurable [_(e2402f9)_](https://github.com/sandialabs/sceptre-phenix-apps/commit/e2402f9ac4505dd8c278e54907d59497675aae9d) ([PR 208](https://github.com/sandialabs/sceptre-phenix-apps/pull/208))
+
+- _(scorch)_ log multi-line cc commands on one line [_(12d33c1)_](https://github.com/sandialabs/sceptre-phenix-apps/commit/12d33c1911165a199b757db87e786ca8a9190f0a) ([PR 213](https://github.com/sandialabs/sceptre-phenix-apps/pull/213))
+
+- _(caldera)_ use self.mm, Final planner id, configurable poll interval [_(adca08a)_](https://github.com/sandialabs/sceptre-phenix-apps/commit/adca08a20a0ea3c05361112077ae670d7f79d3e1) ([PR 207](https://github.com/sandialabs/sceptre-phenix-apps/pull/207))
+
+- _(sceptre)_ stop restricting sshd to VLAN interface addresses [_(fd6a65c)_](https://github.com/sandialabs/sceptre-phenix-apps/commit/fd6a65c4a4c3212930b3f6ae05f62d05d547a61a) ([PR 211](https://github.com/sandialabs/sceptre-phenix-apps/pull/211))
+
+### 🚜 Refactor
+
+- _(caldera)_ rename pollSeconds to poll_seconds [_(e432da7)_](https://github.com/sandialabs/sceptre-phenix-apps/commit/e432da786538446473ae7b51fffb5ef8777a4143) ([PR 207](https://github.com/sandialabs/sceptre-phenix-apps/pull/207))
+
+### 📚 Documentation
+
+- _(contributing)_ branch names must not contain a slash [_(6226abd)_](https://github.com/sandialabs/sceptre-phenix-apps/commit/6226abda4d1dc6a6cdb936e7b6c15a6fb5cfdeca) ([PR 211](https://github.com/sandialabs/sceptre-phenix-apps/pull/211))
+
+- _(agents)_ point documentation references at sceptre-phenix [_(c27adea)_](https://github.com/sandialabs/sceptre-phenix-apps/commit/c27adea6f374cbc49168cfc0b6643bde0f0d5666) ([PR 151](https://github.com/sandialabs/sceptre-phenix-apps/pull/151))
+
 # [2026.10.30](https://github.com/sandialabs/sceptre-phenix-apps/compare/v2026.03.04...v2026.10.30) - 2026-10-30
 
 ### 🚀 Features
