@@ -121,6 +121,15 @@ every override it applies, and warns about files in the directory that matched
 nothing, since a typo'd hostname would otherwise silently fall back to the
 generated file.
 
+## ferrofire RTU images
+
+An fd-server whose scenario metadata sets `firmware: ferrofire` (case-insensitive)
+gets a one-line start script, `/usr/sbin/ferrofire-rtu-start /etc/sceptre/config.xml`,
+instead of the bennu watcher script. Use it with the ferrofire RTU image, a read-only
+Buildroot image that has no python3, `service` or bennu binaries; its own entry point
+seeds and supervises the field device from the injected `config.xml`. Without the key,
+fd-servers render exactly as before.
+
 ## The pre-start dependency chain
 
 `ConfigureStage` methods may run in any order. **`PreStart` methods may not** —

@@ -29,6 +29,8 @@ cd /root/OpenPLC_v2
 ./iec2c st_files/openplc.st
 mv -f POUS.c POUS.h LOCATED_VARIABLES.h VARIABLES.csv Config0.c Config0.h Res0.c ./core/
 ./build_core.sh
+    % elif name.lower() == 'field-device' and metadata.get('firmware', '').lower() == 'ferrofire':
+/usr/sbin/ferrofire-rtu-start /etc/sceptre/config.xml
     % elif name.lower() == 'field-device':
 echo "[Hashes]
 reghash = `sha256sum /usr/bin/bennu-field-deviced | awk '{print $1}'`
