@@ -857,3 +857,14 @@ def test_mm_get_cc_responses_one_result_per_client(monkeypatch):
     assert result["stderr"] == "warn: x"
     assert result["stdout"] == "tcp 0.0.0.0:22 sshd/1"
     assert result["exitcode"] == 0
+
+
+def test_annotation_true():
+    def node(value):
+        return {"annotations": {"phenix/flag": value}}
+
+    on = (True, "true", "1", "", 1, None, [])
+    off = (False, "false", " False ", "0", 0)
+    assert all(utils.annotation_true(node(value), "phenix/flag") for value in on)
+    assert not any(utils.annotation_true(node(value), "phenix/flag") for value in off)
+    assert not utils.annotation_true({"annotations": None}, "phenix/flag")

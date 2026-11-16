@@ -19,9 +19,10 @@ contracts. These rules apply to all work under `src/python/`.
 - `phenix_apps/apps/scorch/`: `ComponentBase` in `app.py` plus one directory per
   SCORCH component, each with its own `README.md`.
 - `phenix_apps/common/`: shared settings, structured logging, minimega helpers,
-  and error types. Reuse these instead of re-implementing protocol or command
-  handling. `common/base.py` holds `ExperimentBase`, the topology lookups and
-  `mm` connection that `AppBase` and `ComponentBase` share.
+  pydantic metadata validation, and error types. Reuse these instead of
+  re-implementing protocol or command handling. `common/base.py` holds
+  `ExperimentBase`, the topology lookups and `mm` connection that `AppBase` and
+  `ComponentBase` share.
 - `phenix_apps/schedulers/`: `SchedulerBase` and the `single-node` scheduler.
 - `phenix_apps/testing/`: the auto-loaded pytest plugin. See its
   [`README.md`](phenix_apps/testing/README.md).
@@ -68,10 +69,13 @@ the class's `metadata_model`; `execute_stage()` then parses it into
 `self.config` and reports every bad field at once. Use `self.config` directly
 rather than copying its fields onto the component. `metadata_model` is opt-in:
 a component without one, including out-of-tree components, reads the raw
-`self.metadata` Box as before, and the base never assigns its `config`. Shared
-field types (`Name`, `Token`, `Args`, `FilterExpr`, `Seconds`, `Hostname`,
-`Interface`, `FilePath`) live in `scorch/app.py` (#160); use them for every
-hostname, interface and path. `Token` and `Args` are plain-character
+`self.metadata` Box as before, and the base never assigns its `config`. The
+validation helpers and the shared field types (`Name`, `Token`, `Args`,
+`FilterExpr`, `Seconds`, `Hostname`, `Interface`, `FilePath`) live in
+`common/metadata.py` (#160), re-exported from `scorch/app.py`; use them for
+every hostname, interface and path. An `AppBase` app has no `metadata_model`
+hook: it calls `parse_metadata(Model, self.metadata, self.name, "app")` in
+`__init__` (see `apps/harden/`). `Token` and `Args` are plain-character
 allowlists, safe in a minimega command or a `bash -c '...'`; `FilterExpr` also
 takes the `( ) [ ] ! & | < >` of a tcpdump filter, so only pass it to a program
 as arguments, never to a shell.

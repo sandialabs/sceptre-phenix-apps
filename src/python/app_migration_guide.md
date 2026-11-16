@@ -114,6 +114,12 @@ by hand:
 - `self.mm`: a minimega connection in the experiment's namespace, opened on
   first use.
 
+For OS comparisons, use `extract_node_os_type(hostname)` with `LINUX_OS_TYPES`
+(`linux`, `rhel`, `centos`) and `WINDOWS_OS_TYPE` (`windows`) from
+`phenix_apps.common.base`; `OsType` there is the matching `Literal` for a
+pydantic field. Changes to the shared OS definitions need regression tests
+across their consumers.
+
 `extract_node_interface_ip`, which returns `None` when nothing matches, is
 deprecated. Replace it with `extract_node_ip`, and replace the `None` check
 with an `except ValueError`. To split `host:port` strings, use
