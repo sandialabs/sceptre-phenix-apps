@@ -1,0 +1,49 @@
+# Dry-run input: make dry-run APP=harden STAGE=pre-start INPUT=<this file>
+metadata:
+  annotations:
+    topology: minihard
+spec:
+  experimentName: minihard
+  baseDir: /tmp/phenix/minihard
+  topology:
+    nodes:
+      - general:
+          hostname: web
+        hardware:
+          os_type: linux
+      - general:
+          hostname: win
+        hardware:
+          os_type: windows
+      - general:
+          hostname: router
+        type: Router
+        hardware:
+          os_type: vyos
+      - general:
+          hostname: kali
+        hardware:
+          os_type: linux
+  scenario:
+    apps:
+      - name: harden
+        metadata:
+          seed: minihard-macroharder
+          exclude: [kali]
+          linux:
+            users:
+              root:
+                generate: true
+            ssh:
+              root_login: prohibit-password
+          windows:
+            users:
+              Administrator:
+                generate: true
+            remove_users: [vagrant]
+        hosts:
+          - hostname: win
+            metadata:
+              users:
+                engineer:
+                  password: "Tr0ub4dor&3!!"

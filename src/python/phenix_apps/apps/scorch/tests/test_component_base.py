@@ -124,15 +124,17 @@ class Outer(BaseModel):
     flag: bool = True
     blocks: list[Block] = []
     single: Block = Block()
+    named: dict[str, Block] = {}
 
 
 def test_unknown_keys_warn_with_the_full_path_and_a_hint():
-    md = {"blocks": [{}, {"prot": 2}], "single": {"other": 1}}
+    md = {"blocks": [{}, {"prot": 2}], "single": {"other": 1}, "named": {"a": {"x": 1}}}
     _, warnings = validate_metadata(Outer, md, "c")
 
     assert warnings == [
         "blocks.1.prot: unknown key, ignored. Fix: remove it (did you mean 'port'?)",
         "single.other: unknown key, ignored. Fix: remove it (known: port)",
+        "named.a.x: unknown key, ignored. Fix: remove it (known: port)",
     ]
 
 

@@ -67,6 +67,18 @@ def validate_hostname(name: str) -> str:
     return name
 
 
+def annotation_true(node: dict, key: str) -> bool:
+    """
+    Read a node annotation as a flag the way phenix core does: unset is off, and
+    a set value is on unless it is false, 0, or the string "false" or "0".
+    """
+    value = (node.get("annotations") or {}).get(key, False)
+
+    if isinstance(value, str):
+        return value.strip().lower() not in {"false", "0"}
+    return value not in (False, 0)
+
+
 def split_host_port(value: str) -> tuple[str, int | None]:
     """
     Split 'host', 'host:port', '[ipv6]:port' or a bare IPv6 address into the

@@ -1,11 +1,17 @@
 import re
 import warnings
-from typing import cast
+from typing import Final, Literal, cast, get_args
 
 import minimega
 from box import Box
 
 from phenix_apps.common import utils
+
+LinuxOsType = Literal["linux", "rhel", "centos"]
+OsType = Literal[LinuxOsType, "windows"]
+
+LINUX_OS_TYPES: Final[frozenset[str]] = frozenset(get_args(LinuxOsType))
+WINDOWS_OS_TYPE: Final[str] = "windows"
 
 
 class ExperimentBase:

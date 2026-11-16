@@ -49,6 +49,7 @@
 /src/python/phenix_apps/apps/__init__.py    @activeshadow @GhostofGoes @glattercj
 /src/python/phenix_apps/common/             @nblair2 @GhostofGoes @activeshadow @glattercj
 /src/python/phenix_apps/common/error.py     @activeshadow @GhostofGoes
+/src/python/phenix_apps/common/metadata.py  @GhostofGoes @nblair2
 /src/python/phenix_apps/common/logger.py    @glattercj @nblair2 @GhostofGoes
 /src/python/phenix_apps/common/settings.py  @nblair2 @activeshadow @GhostofGoes
 /src/python/phenix_apps/common/utils.py     @nblair2 @GhostofGoes @activeshadow @mgaliar
@@ -58,6 +59,7 @@
 
 # Apps
 /src/python/phenix_apps/apps/caldera/       @activeshadow
+/src/python/phenix_apps/apps/harden/        @nblair2
 /src/python/phenix_apps/apps/helics/        @activeshadow @glattercj @Astarry
 /src/python/phenix_apps/apps/ignition/      @nblair2
 /src/python/phenix_apps/apps/mgmt_tap/      @mgaliar @cmulk
