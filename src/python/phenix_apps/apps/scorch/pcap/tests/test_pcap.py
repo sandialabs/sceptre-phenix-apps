@@ -205,15 +205,8 @@ def component(mm):
     return comp
 
 
-def test_active_captures_lists_each_row():
-    mm = FakeMM([["1", "vm", "a-0"], ["2", "bridge", "b"]])
-    assert component(mm)._active_captures() == ["1 vm a-0", "2 bridge b"]
-
-
-@pytest.mark.parametrize(
-    ("left", "clears"), [([], [("clear", "pcap")]), ([["9", "other"]], [])]
-)
-def test_stop_ends_only_our_interface_and_clears_only_when_idle(left, clears, tmp_path):
+@pytest.mark.parametrize("left", [[], [["9", "bridge", "phenix"]]])
+def test_stop_ends_only_our_interface_and_never_clears(left, tmp_path):
     mm = FakeMM(left)
     comp = component(mm)
     comp.base_dir = tmp_path
@@ -224,7 +217,8 @@ def test_stop_ends_only_our_interface_and_clears_only_when_idle(left, clears, tm
 
     paths, host_of = comp._stop_captures()
 
-    assert mm.calls == [("delete", "aa", 1), *clears]
+    # "clear capture pcap" would also stop other components' captures
+    assert mm.calls == [("delete", "aa", 1)]
     assert paths == [tmp_path / "aa-1.pcap"]
     assert host_of == {"aa-1.pcap": "aa"}
 
@@ -249,7 +243,9 @@ def test_start_applies_per_vm_options_then_resets_them(tmp_path):
     comp.start()
 
     assert mm.calls == [
-        ("clear", "pcap"),
+        # only our own VMs' leftover captures, never the whole namespace
+        ("delete", "aa", 0),
+        ("delete", "bb", 0),
         ("filter", "'port 80'"),
         ("snaplen", 128),
         ("capture", "aa", 0),
@@ -267,3 +263,21 @@ def test_start_applies_per_vm_options_then_resets_them(tmp_path):
 def test_filter_minimega_would_misread_is_rejected(bad):
     with pytest.raises(ValidationError):
         PCAPMetadata.model_validate({"vms": [{"hostname": "aa"}], "filter": bad})
+
+
+def test_start_ignores_no_capture_error_on_leftover_delete(tmp_path):
+    class NoCapture(FakeMM):
+        def capture_pcap_delete_vm(self, vm, interface=None):
+            raise RuntimeError("no pcap capture on vm")
+
+    mm = NoCapture([["9", "bridge", "phenix"]])
+    comp = component(mm)
+    comp.name, comp.base_dir = "pcap", tmp_path
+    comp._check_run_order = lambda: None
+    comp.get_host_and_iface = lambda cfg: (cfg["hostname"], cfg["interface"])
+    comp.config = PCAPMetadata.model_validate({"vms": [{"hostname": "aa"}]})
+
+    comp.start()
+
+    assert ("capture", "aa", 0) in mm.calls
+    assert ("clear", "pcap") not in mm.calls
