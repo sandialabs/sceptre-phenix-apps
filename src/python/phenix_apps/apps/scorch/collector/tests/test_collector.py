@@ -1,4 +1,5 @@
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -126,6 +127,28 @@ def test_pcap_without_merged_capture_is_collected(tmp_path):
     c.results_dir.mkdir()
 
     assert c._collect_pcap() == meta
+
+
+@pytest.mark.parametrize("name", ["merged.pcap", "merged.pcapng"])
+def test_pcap_duration_is_checked_on_either_merged_capture(tmp_path, name):
+    components = [
+        {"name": "d", "type": "disruption", "metadata": {"run_duration": 60}},
+        {"name": "p", "type": "pcap"},
+    ]
+    src = out_dir(tmp_path, "p")
+    c = collector(tmp_path, components, ["d", "p"])
+    c.config, _ = validate_metadata(CollectorMetadata, {}, "c")
+    c.results_dir.mkdir()
+
+    short = {name: {"Capture duration (seconds)": "10"}}
+    (src / "pcap_metadata.json").write_text(json.dumps(short))
+    with pytest.raises(RuntimeError, match=r"Capture duration 10\.0 seconds"):
+        c._collect_pcap()
+
+    shutil.rmtree(c.results_dir / "pcaps")
+    full = {name: {"Capture duration (seconds)": "60"}}
+    (src / "pcap_metadata.json").write_text(json.dumps(full))
+    assert c._collect_pcap() == full
 
 
 def test_provider_with_pmus_is_collected(tmp_path):

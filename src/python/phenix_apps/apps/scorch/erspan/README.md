@@ -14,7 +14,7 @@ stages: configure, cleanup
 
 | Stage | On the phenix host (through minimega's `shell`) | On the receiver (with `remote_config`, over SSH) |
 |---|---|---|
-| `configure` | Adds tunnel port `local_interface` to `local_bridge` and sets mirror `scorch-<local_interface>` on every VLAN except `excluded_vlans`. Mirrors already on the bridge are left alone (with a warning). | Creates ERSPAN interface `remote_interface` and brings it up; with `remote_bridge`, adds it there and floods to every other port. First failure stops the rest. |
+| `configure` | Adds tunnel port `local_interface` to `local_bridge` and sets mirror `scorch-<local_interface>` on every VLAN except `excluded_vlans`. Mirrors already on the bridge are left alone (with a warning). Fails if the bridge already has 32 mirrors. | Creates ERSPAN interface `remote_interface` and brings it up; with `remote_bridge`, adds it there and floods to every other port. First failure stops the rest. |
 | `cleanup` | Removes mirror `scorch-<local_interface>` from `local_bridge` and deletes `local_interface`. | Removes the flood flow and bridge port, then deletes `remote_interface`. Every command is tried, and every failure is reported. |
 
 Put it in `configure` and `cleanup` of the run, not `start` or `stop`; mirroring
@@ -150,6 +150,7 @@ To check a config before an experiment: `phenix-scorch-validate scenario.yaml`
 | `Remote command failed ...` from `ovs-vsctl` or `ovs-ofctl` (in `configure`) | `remote_bridge` does not exist on the receiver, or OVS is not running there. The interface was already created; run `cleanup` before retrying. |
 | `Remote command failed (exit code 1): Cannot find device "erspan1"` (in `cleanup`) | The receiver's interface is already gone: `cleanup` ran before, or `configure` never created it. Nothing is left to clean up. |
 | `local_ip: value is not a valid IPv4 or IPv6 address` (also `remote_ip`, `remote_config.ssh_ip`) | These must be IP addresses, not hostnames. |
+| `bridge <name> has 32 of 32 Open vSwitch mirrors; remove one before adding scorch-<local_interface>` | Open vSwitch applies at most 32 mirrors on a bridge and ignores one more without an error. Remove a mirror, for example a stopped capture or an old mirror. |
 | warning `bridge <name> already has mirrors ...` | Something else already mirrors on `local_bridge`. It is left alone, but its traffic and this component's may overlap. |
 | warning `excluded_vlans names VLANs this experiment does not have ...` | A name in `excluded_vlans` matches no VLAN, so it excludes nothing. Check the spelling. |
 | `[Errno None] Unable to connect to port 22 on <address>` | Nothing answers SSH at `ssh_ip` from where phenix runs. |
@@ -158,6 +159,9 @@ To check a config before an experiment: `phenix-scorch-validate scenario.yaml`
 
 ## Limitations
 
+- The mirror has the Open vSwitch tags `external_ids:minimega-namespace` (the
+  experiment name) and `external_ids:minimega-kind=app-erspan`. phēnix uses them
+  to count the mirror for the experiment.
 - A failed local command is logged as an error and recorded in
   `erspan_metadata_<stage>.json`, but does not fail the stage. A failed remote
   command does.

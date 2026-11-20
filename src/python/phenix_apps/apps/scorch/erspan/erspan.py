@@ -20,7 +20,7 @@ from pydantic import (
 
 from phenix_apps.apps.scorch import ComponentBase
 from phenix_apps.apps.scorch.app import Interface, MetadataBlock, PositiveSeconds
-from phenix_apps.common import utils
+from phenix_apps.common import mmcapture, utils
 from phenix_apps.common.logger import logger
 
 Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -111,6 +111,7 @@ class ERSPAN(ComponentBase):
         logger.info("Configuring ERSPAN on local server.")
 
         self._warn_about_other_mirrors()
+        self._check_mirror_budget()
 
         # Cmd to set up open vswitch bridge and interface in erspan mode
         cmd_1 = f"ovs-vsctl add-port {self.config.local_bridge} {self.config.local_interface} -- set interface {self.config.local_interface} type=erspan options:remote_ip={self.config.remote_ip} options:key={self.config.session_key} options:erspan_ver=1"
@@ -314,10 +315,31 @@ class ERSPAN(ComponentBase):
         """Names this component's mirror, so cleanup removes only that one."""
         return f"scorch-{self.config.local_interface}"
 
+    def _bridge_mirrors(self) -> str:
+        """The mirror rows of the bridge, as `ovs-vsctl` prints them."""
+        out = self._run_mm(f"ovs-vsctl get Bridge {self.config.local_bridge} mirrors")
+        return " ".join(out.get("stdout", [])).strip()
+
+    def _check_mirror_budget(self) -> None:
+        """Fail when the bridge has no mirror left: Open vSwitch ignores one
+        more without an error, so no traffic would reach the receiver."""
+        try:
+            existing = mmcapture.count_mirrors(self._bridge_mirrors())
+        except ValueError as ex:
+            raise RuntimeError(
+                f"bridge {self.config.local_bridge}: {ex}; check that the bridge exists"
+            ) from ex
+
+        if existing >= mmcapture.OVS_MIRROR_LIMIT:
+            raise RuntimeError(
+                f"bridge {self.config.local_bridge} has {existing} of "
+                f"{mmcapture.OVS_MIRROR_LIMIT} Open vSwitch mirrors; remove one "
+                f"before adding {self._mirror_name}"
+            )
+
     def _warn_about_other_mirrors(self) -> None:
         """Warn if the bridge already has mirrors: they are not ours to remove."""
-        out = self._run_mm(f"ovs-vsctl get Bridge {self.config.local_bridge} mirrors")
-        existing = " ".join(out.get("stdout", [])).strip()
+        existing = self._bridge_mirrors()
         if existing not in ("", "[]"):
             logger.warning(
                 f"bridge {self.config.local_bridge} already has mirrors {existing}; "
@@ -370,6 +392,8 @@ class ERSPAN(ComponentBase):
             f"-- --id=@p get Port {output_port} "
             f"-- --id=@m create Mirror name={mirror_name} "
             f"select_all=true select_vlan={select_vlan} output-port=@p "
+            f"external_ids:minimega-namespace={utils._validate_mm_token(self.exp_name)} "
+            f"external_ids:minimega-kind=app-erspan "
             f"-- add Bridge {bridge_name} mirrors @m"
         )
 

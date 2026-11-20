@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -9,6 +10,38 @@ import (
 
 	"phenix-apps/util"
 )
+
+const (
+	// ovsMirrorLimit is the number of mirrors per bridge that Open vSwitch applies.
+	ovsMirrorLimit = 32
+
+	// mirrorKind tags the mirrors of this app, so that phenix counts them for the experiment.
+	mirrorKind = "app-mirror"
+)
+
+var (
+	errMirrorBudget = errors.New("no Open vSwitch mirror left")
+	errMirrorList   = errors.New("unreadable Open vSwitch mirror list")
+)
+
+// countMirrors returns the number of rows in the output of `ovs-vsctl get
+// bridge <name> mirrors`, such as `[]` or `[uuid1, uuid2]`.
+func countMirrors(out string) (int, error) {
+	text := strings.TrimSpace(out)
+	if !strings.HasPrefix(text, "[") || !strings.HasSuffix(text, "]") {
+		return 0, fmt.Errorf("%w: %q", errMirrorList, out)
+	}
+
+	count := 0
+
+	for row := range strings.SplitSeq(text[1:len(text)-1], ",") {
+		if strings.TrimSpace(row) != "" {
+			count++
+		}
+	}
+
+	return count, nil
+}
 
 // ovsTokenRegex matches a single safe token for interpolation into ovs-vsctl
 // commands run on cluster hosts. Bridge and interface names are capped at 15

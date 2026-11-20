@@ -51,6 +51,7 @@
 /src/python/phenix_apps/common/error.py     @activeshadow @GhostofGoes
 /src/python/phenix_apps/common/metadata.py  @GhostofGoes @nblair2
 /src/python/phenix_apps/common/logger.py    @glattercj @nblair2 @GhostofGoes
+/src/python/phenix_apps/common/mmcapture.py @GhostofGoes
 /src/python/phenix_apps/common/settings.py  @nblair2 @activeshadow @GhostofGoes
 /src/python/phenix_apps/common/utils.py     @nblair2 @GhostofGoes @activeshadow @mgaliar
 /src/python/phenix_apps/common/tests/       @nblair2 @adamsrnmsu

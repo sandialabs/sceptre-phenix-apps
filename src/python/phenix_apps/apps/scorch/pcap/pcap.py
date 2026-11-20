@@ -1,7 +1,7 @@
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Annotated, Any, Self
+from typing import Annotated, Any, Literal, Self
 
 from box import Box
 from pydantic import (
@@ -18,22 +18,21 @@ from phenix_apps.apps.scorch.app import (
     Hostname,
     Interface,
     MetadataBlock,
+    Name,
     PositiveSeconds,
 )
-from phenix_apps.common import utils
+from phenix_apps.common import mmcapture, utils
 from phenix_apps.common.logger import logger
 
-MATCH_ALL_BPF = "len >= 0"
+MATCH_ALL_BPF = "len >= 0"  # for minimega before 3.4.0 only
 
 # TODO: bridge capture functionality from mm.py component
 # The issue with bridge captures in phenix is it will capture MGMT traffic,
 # which includes traffic from providers to simulators and bennu field devices.
-# The workaround for this could be to apply a filter with "capture pcap filter"
-# that excludes the IP address ranges used by MGMT and any other undesirable VLANs.
-# To work around issues with multiple experiments, the 'bridge-mode' argument
-# to phenix can be leveraged.
+# 'mode: namespace' avoids it: it leaves the MGMT VLAN out by default.
 
-# TODO: pcap file retrieval functionality from mm.py component (this assumes one node)
+# TODO: pcap file retrieval functionality from mm.py component (this assumes one
+# node). 'mode: namespace' needs none: the head node writes the file.
 # TODO: netflow capture
 # TODO: allow tcpdump and/or tshark to be used instead of minimega api
 
@@ -64,6 +63,9 @@ class PCAPMetadata(BaseModel):
     vms: Annotated[list[VM], Field(min_length=1)]
     filter: Bpf | None = None
     snaplen: NonNegativeInt | None = None
+    format: Literal["pcap", "pcapng"] = "pcap"
+    mode: Literal["per_vm", "namespace"] = "per_vm"
+    vlans: Annotated[list[Name], Field(min_length=1)] | None = None
     convert_to_json: bool = False
     create_merged_pcap: bool = False
     dedupe: bool = True
@@ -94,6 +96,30 @@ class PCAPMetadata(BaseModel):
             )
         return self
 
+    @model_validator(mode="after")
+    def _check_mode(self) -> Self:
+        if self.mode == "per_vm":
+            if self.vlans is not None:
+                raise ValueError("vlans: only used with mode: namespace")
+            return self
+
+        # one capture sees every selected port, so these have no meaning
+        own = {"interface", "filter", "snaplen"}
+        for i, vm in enumerate(self.vms):
+            if used := sorted(own & vm.model_fields_set):
+                raise ValueError(
+                    f"vms.{i}.{used[0]}: not used with mode: namespace, which "
+                    "captures every port of the listed VMs with the one "
+                    "filter and snaplen"
+                )
+
+        if used := sorted({"create_merged_pcap", "dedupe"} & self.model_fields_set):
+            raise ValueError(
+                f"{used[0]}: not used with mode: namespace, whose capture is "
+                "already one file with each frame once"
+            )
+        return self
+
 
 class PCAP(ComponentBase):
     """
@@ -115,10 +141,63 @@ class PCAP(ComponentBase):
                     f"'{command}' is unavailable on this host, which is required for PCAP processing"
                 )
 
+    @property
+    def _ext(self) -> str:
+        return ".pcapng" if self.config.format == "pcapng" else ".pcap"
+
+    @property
+    def _merged_name(self) -> str:
+        return f"merged{self._ext}"
+
     def start(self):
         logger.info(f"Starting user component: {self.name}")
 
         self._check_run_order()
+        support = self.capture_support()
+
+        if self.config.mode == "namespace":
+            support.require("mode: namespace")
+            self._start_namespace()
+        elif support.available:
+            self._start_vms()
+        else:
+            if self.config.format == "pcapng":
+                support.require("format: pcapng")
+            self._start_vms_legacy()
+
+        logger.info(f"Started user component: {self.name}")
+
+    def _vm_path(self, hostname: str, interface: int) -> Path:
+        return Path(self.base_dir, f"{hostname}-{interface}{self._ext}")
+
+    def _start_vms(self) -> None:
+        """One capture per VM interface, each with its own filter and snaplen.
+        Nothing is cleared or set namespace-wide, so other captures go on."""
+
+        vms = self.config.vms
+        plan = []
+        for vm in vms:
+            hostname, interface = self.get_host_and_iface(Box(vm.model_dump()))
+            options = mmcapture.capture_options(
+                filter=vm.filter or self.config.filter,
+                snaplen=self.config.snaplen if vm.snaplen is None else vm.snaplen,
+                format=self.config.format,
+            )
+            plan.append(
+                (hostname, interface, self._vm_path(hostname, interface), options)
+            )
+
+        logger.info(f"starting capture for {len(vms)} VMs")
+        for i, (hostname, interface, filepath, options) in enumerate(plan):
+            logger.info(
+                f"starting capture on '{hostname}' interface '{interface}' to '{filepath}' ({i + 1} of {len(vms)})"
+            )
+            self.mm.capture_pcap_vm(hostname, interface, str(filepath), option=options)
+
+    def _start_vms_legacy(self) -> None:
+        """For minimega before 3.4.0: clear the namespace's captures, and set
+        its filter and snaplen around each capture."""
+
         for row in self._active_captures():
             logger.warning(
                 f"another capture is active in this minimega namespace: {row}; "
@@ -134,7 +213,7 @@ class PCAP(ComponentBase):
         try:
             for i, vm in enumerate(vms):
                 hostname, interface = self.get_host_and_iface(Box(vm.model_dump()))
-                filepath = Path(self.base_dir, f"{hostname}-{interface}.pcap")
+                filepath = self._vm_path(hostname, interface)
 
                 self._set_capture_options(
                     vm.filter or self.config.filter,
@@ -148,7 +227,30 @@ class PCAP(ComponentBase):
             # unset, so they do not apply to later captures in the namespace
             self._set_capture_options(None, None)
 
-        logger.info(f"Started user component: {self.name}")
+    def _start_namespace(self) -> None:
+        """One capture of every edge port of the listed VMs, written on the
+        head node. A frame between two of the VMs is in the file once."""
+
+        hostnames = [vm.hostname for vm in self.config.vms]
+        for hostname in hostnames:
+            self.require_node(hostname)
+
+        vlans = mmcapture.namespace_vlans(
+            self.config.vlans, self.experiment.status.vlans
+        )
+        options = mmcapture.capture_options(
+            filter=self.config.filter,
+            snaplen=self.config.snaplen,
+            format=self.config.format,
+            vlans=vlans,
+            vms=hostnames,
+        )
+        filepath = Path(self.base_dir, self._merged_name)
+
+        logger.info(
+            f"starting namespace capture of {len(hostnames)} VMs on VLANs {vlans} to '{filepath}'"
+        )
+        self.mm.capture_pcap_namespace(str(filepath), option=options)
 
     def _set_capture_options(self, bpf: str | None, snaplen: int | None) -> None:
         """Set minimega's namespace-wide filter and snaplen, which it copies
@@ -192,12 +294,21 @@ class PCAP(ComponentBase):
             for row in resp.get("Tabular") or []
         ]
 
-    def _stop_captures(self) -> tuple[list[Path], dict[str, str]]:
-        """Stop the capture on each listed interface; return the capture files
-        and which VM each came from, for the DoS special processing."""
+    def _stop_captures(
+        self,
+    ) -> tuple[list[Path], dict[str, str], dict[str, dict[str, Any]]]:
+        """Stop the capture on each listed interface; return the capture files,
+        which VM each came from (for the DoS special processing), and what
+        minimega reports for each file."""
 
         pcap_paths = []
         host_of: dict[str, str] = {}
+        reported: dict[str, dict[str, Any]] = {}
+        modern = self.capture_support().available
+
+        # a stopped capture leaves the list, so read its state first
+        before = mmcapture.rows(self.mm.capture()) if modern else []
+        replies: list[Any] = []
 
         vms = self.config.vms
         logger.info(f"stopping captures for {len(vms)} VMs")
@@ -208,11 +319,20 @@ class PCAP(ComponentBase):
                 f"stopping PCAP capture on interface {interface} for VM {hostname} ({i + 1} of {len(vms)})"
             )
             # only this interface: other captures on the VM are not ours
-            self.mm.capture_pcap_delete_vm(hostname, interface)
+            replies.extend(self.mm.capture_pcap_delete_vm(hostname, interface) or [])
 
-            pcap_path = Path(self.base_dir, f"{hostname}-{interface}.pcap")
+            pcap_path = self._vm_path(hostname, interface)
             pcap_paths.append(pcap_path)
             host_of[pcap_path.name] = hostname
+
+        if modern:
+            reported = self._reported(pcap_paths, before, mmcapture.rows(replies))
+            mmcapture.check_final([row for row in reported.values() if "state" in row])
+            return (
+                pcap_paths,
+                host_of,
+                {k: mmcapture.summarize(v) for k, v in reported.items()},
+            )
 
         # clearing also stops other components' captures, so only reset
         # minimega's filter and snaplen once nothing else is capturing
@@ -222,14 +342,62 @@ class PCAP(ComponentBase):
             logger.info("clearing capture on minimega")
             self.mm.clear_capture("pcap")
 
-        return pcap_paths, host_of
+        return pcap_paths, host_of, reported
+
+    @staticmethod
+    def _reported(
+        paths: list[Path], *listings: list[dict[str, str]]
+    ) -> dict[str, dict[str, str]]:
+        """The last listing row of each file, by file name. Later listings win:
+        the reply to a delete holds the final counters."""
+
+        wanted = {str(p): p.name for p in paths}
+        found: dict[str, dict[str, str]] = {}
+
+        for listing in listings:
+            for row in listing:
+                if row.get("path") in wanted:
+                    found[wanted[row["path"]]] = row
+
+        return found
+
+    def _stop_namespace(self) -> tuple[list[Path], dict[str, dict[str, Any]]]:
+        """Stop the namespace capture this component started."""
+
+        merged = Path(self.base_dir, self._merged_name)
+        listing = mmcapture.rows(self.mm.capture_pcap_namespace())
+        ours = [
+            row
+            for row in listing
+            if not row.get("host") and mmcapture.path_of(row) == merged
+        ]
+        if not ours:
+            raise RuntimeError(
+                f"no minimega namespace capture writes '{merged}'; 'start' did "
+                "not run, or another command cleared it"
+            )
+
+        final: list[dict[str, str]] = []
+        for row in ours:
+            logger.info(f"stopping namespace capture {row.get('id')} to '{merged}'")
+            reply = mmcapture.rows(self.mm.capture_pcap_delete_namespace(row["id"]))
+            final.extend(r for r in reply if not r.get("host"))
+
+        reported = self._reported([merged], ours, final)
+        mmcapture.check_final([row for row in reported.values() if "state" in row])
+
+        return [merged], {k: mmcapture.summarize(v) for k, v in reported.items()}
 
     def stop(self):
         logger.info(f"Stopping user component: {self.name}")
 
         self._check_run_order()
 
-        pcap_paths, host_of = self._stop_captures()
+        host_of: dict[str, str] = {}
+        if self.config.mode == "namespace":
+            pcap_paths, reported = self._stop_namespace()
+        else:
+            pcap_paths, host_of, reported = self._stop_captures()
 
         logger.info(f"verifying {len(pcap_paths)} PCAP files")
         pcap_metadata = {}
@@ -250,11 +418,14 @@ class PCAP(ComponentBase):
                     f"failed validation of PCAP metadata for file {pcap_path}\nraw info: {pcap_info}"
                 )
 
-            pcap_metadata[pcap_path.name] = pcap_info
+            pcap_metadata[pcap_path.name] = {
+                **pcap_info,
+                **reported.get(pcap_path.name, {}),
+            }
 
         # merge pcap files together into a single consolidated PCAP
         # the pcaps that were merged will be moved into "raw" sub-directory
-        if self.config.create_merged_pcap:
+        if self.config.mode == "per_vm" and self.config.create_merged_pcap:
             logger.info(
                 f"merging {len(pcap_paths)} PCAP files into a single file (create_merged_pcap=true)"
             )
@@ -396,8 +567,9 @@ class PCAP(ComponentBase):
         logger.info(f"Stopped user component: {self.name}")
 
     def _merge_pcaps(
-        self, pcap_paths: list[Path], merged_name: str = "merged.pcap"
+        self, pcap_paths: list[Path], merged_name: str | None = None
     ) -> Path:
+        merged_name = merged_name or self._merged_name
         merged_path = Path(self.base_dir, merged_name)
 
         overwriting = bool(merged_path in pcap_paths)
@@ -405,6 +577,8 @@ class PCAP(ComponentBase):
             merged_path = merged_path.with_stem("temp_merged")
 
         mergecap_cmd = ["mergecap", "-w", str(merged_path)]
+        if self.config.format == "pcapng":
+            mergecap_cmd += ["-F", "pcapng"]
         mergecap_cmd += [str(p) for p in pcap_paths]
         utils.run_command(
             mergecap_cmd, timeout=self.config.merge_timeout
@@ -439,7 +613,7 @@ class PCAP(ComponentBase):
         ]
 
     def _dedupe_pcap(self, pcap_path: Path) -> None:
-        dd_path = Path(self.base_dir, "deduped.pcap")
+        dd_path = Path(self.base_dir, f"deduped{self._ext}")
         utils.run_command(
             ["editcap", "-d", str(pcap_path), str(dd_path)],
             timeout=self.config.merge_timeout,
