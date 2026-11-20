@@ -119,17 +119,19 @@ class PCAP(ComponentBase):
         logger.info(f"Starting user component: {self.name}")
 
         self._check_run_order()
-        for row in self._active_captures():
-            logger.warning(
-                f"another capture is active in this minimega namespace: {row}; "
-                "clearing pcap captures to start ours will stop it. Do not run "
-                "pcap alongside other capture components (mm, tcpdump, erspan)"
-            )
-
-        logger.info("clearing capture on minimega")
-        self.mm.clear_capture("pcap")
 
         vms = self.config.vms
+        # Delete only our own leftover captures. "clear capture pcap" stops
+        # every capture in the namespace, including other components' (mm's
+        # bridge capture), so it is never used here.
+        for vm in vms:
+            hostname, interface = self.get_host_and_iface(Box(vm.model_dump()))
+            try:
+                self.mm.capture_pcap_delete_vm(hostname, interface)
+            except Exception as ex:
+                # nothing to delete is the normal case
+                logger.debug(f"no leftover capture on '{hostname}' {interface}: {ex}")
+
         logger.info(f"starting capture for {len(vms)} VMs")
         try:
             for i, vm in enumerate(vms):
@@ -183,15 +185,6 @@ class PCAP(ComponentBase):
         ):
             logger.warning(message)
 
-    def _active_captures(self) -> list[str]:
-        """One string per capture minimega reports in this namespace."""
-
-        return [
-            " ".join(row)
-            for resp in self.mm.capture() or []
-            for row in resp.get("Tabular") or []
-        ]
-
     def _stop_captures(self) -> tuple[list[Path], dict[str, str]]:
         """Stop the capture on each listed interface; return the capture files
         and which VM each came from, for the DoS special processing."""
@@ -213,14 +206,6 @@ class PCAP(ComponentBase):
             pcap_path = Path(self.base_dir, f"{hostname}-{interface}.pcap")
             pcap_paths.append(pcap_path)
             host_of[pcap_path.name] = hostname
-
-        # clearing also stops other components' captures, so only reset
-        # minimega's filter and snaplen once nothing else is capturing
-        if self._active_captures():
-            logger.info("other captures are active, not clearing capture on minimega")
-        else:
-            logger.info("clearing capture on minimega")
-            self.mm.clear_capture("pcap")
 
         return pcap_paths, host_of
 

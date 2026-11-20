@@ -10,7 +10,7 @@ stages: start, stop
 
 | Stage | What it does |
 |---|---|
-| `start` | Clears every `pcap` capture in the minimega namespace, applies `filter` and `snaplen`, and starts a capture on each listed VM interface. |
+| `start` | Deletes leftover captures on the listed VM interfaces, applies `filter` and `snaplen`, and starts a capture on each listed VM interface. |
 | `stop` | Stops the captures, checks every file with `capinfos`, optionally merges and de-duplicates them, writes `pcap_metadata.json`, and optionally converts the files to JSON. |
 
 Capture happens in minimega's virtual switch, so the guests need nothing
@@ -164,11 +164,9 @@ To check a config before an experiment: `phenix-scorch-validate scenario.yaml`
   start later.
 - Bridge captures are not supported here; the [`mm` component](../mm/README.md)
   has them.
-- `start` clears every pcap capture in the minimega namespace, including
-  captures from other components such as `mm`, and logs a warning for each one
-  it finds. Do not run two capturing components at once. `stop` ends only the
-  capture on each listed interface, and clears minimega's capture settings only
-  when no other capture is left.
+- `start` and `stop` end only the captures on the listed VM interfaces, never
+  the namespace's other captures, so the `mm` component's bridge capture can run
+  alongside `pcap`.
 - Captures write for the whole time between `start` and `stop`. Use `filter`
   and `snaplen` for long runs; `create_merged_pcap` needs room for a second copy
   and `convert_to_json` output is many times larger than the capture.
