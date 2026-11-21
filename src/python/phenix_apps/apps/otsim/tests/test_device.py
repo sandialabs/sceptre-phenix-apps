@@ -57,3 +57,60 @@ def test_master_uses_configured_scan_rate(cls, devices):
     master = configure(device, devices)
 
     assert master.findtext("scan-rate") == "10"
+
+
+def chain(fep_md):
+    """A Modbus field device behind a FEP, and a client behind the FEP."""
+
+    rtu = FieldDeviceServer(
+        node("rtu-1", {"modbus": [{"type": "breaker", "name": "brkr-1"}]}, "10.0.0.1")
+    )
+    rtu.process({})
+    known = {"rtu-1": rtu}
+    fep = FEP(node("fep-1", {"connected_rtus": ["rtu-1"], **fep_md}, "10.0.0.2"))
+    fep.process(known)
+    known["fep-1"] = fep
+
+    client = FieldDeviceClient(node("scada", {"connected_rtus": ["fep-1"]}, "10.0.0.3"))
+    config = Config()
+    config.init_xml_root()
+    client.process(known)
+    client.configure(config, known)
+    return config.root
+
+
+def test_client_behind_fep_polls_its_default_dnp3_outstation():
+    """The FEP serves DNP3 downstream by default, whatever it polls upstream."""
+
+    root = chain({})
+
+    assert root.findtext("dnp3[@mode='client']/endpoint") == "10.0.0.2:20000"
+    assert root.find("dnp3[@mode='client']/master/input") is not None
+    assert root.find("modbus[@mode='client']") is None
+
+
+def test_client_behind_fep_follows_its_downstream_protocols():
+    root = chain({"downstream": "modbus"})
+
+    assert root.findtext("modbus[@mode='client']/endpoint") == "10.0.0.2:502"
+    assert root.find("dnp3[@mode='client']") is None
+
+
+def test_fep_behind_fep_polls_what_the_upstream_fep_serves():
+    rtu = FieldDeviceServer(
+        node("rtu-1", {"modbus": [{"type": "breaker", "name": "brkr-1"}]}, "10.0.0.1")
+    )
+    rtu.process({})
+    known = {"rtu-1": rtu}
+    known["fep-1"] = FEP(node("fep-1", {"connected_rtus": ["rtu-1"]}, "10.0.0.2"))
+    fep2 = FEP(
+        node("fep-2", {"upstream": ["fep-1"], "downstream": "modbus"}, "10.0.0.4")
+    )
+    config = Config()
+    config.init_xml_root()
+    fep2.process(known)
+    fep2.configure(config, known)
+
+    assert config.root.findtext("dnp3[@mode='client']/endpoint") == "10.0.0.2:20000"
+    assert config.root.find("modbus[@mode='client']") is None
+    assert config.root.findtext("modbus[@mode='server']/endpoint") == "10.0.0.4:502"

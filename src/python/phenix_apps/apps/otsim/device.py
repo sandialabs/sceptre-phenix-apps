@@ -43,6 +43,10 @@ class Device:
         self.processed = False
         self.configs = configs
 
+    def served(self):
+        """Protocol -> the registers a client of this device reads over it."""
+        return self.registers
+
 
 class FEP(Device):
     def __init__(self, node, configs=None):
@@ -79,26 +83,45 @@ class FEP(Device):
 
         self.processed = True
 
+    def downstream(self):
+        """The protocols this FEP serves downstream; DNP3 when none are set."""
+        downstream = self.md.get("downstream", [])
+
+        if not isinstance(downstream, list):
+            downstream = [downstream]
+
+        if not downstream:
+            return ["dnp3"]
+
+        return [proto for proto in ("dnp3", "modbus") if proto in downstream]
+
+    def served(self):
+        # A client reaches this FEP through its downstream servers, which carry
+        # every register gathered upstream, not through the protocols it polls.
+        registers = [reg for regs in self.registers.values() for reg in regs]
+        return dict.fromkeys(self.downstream(), registers)
+
     def configure(self, config, known):
         protos = {}
 
         # Support legacy `connected_rtus` key if `upstream` key is not present.
         for upstream in self.md.get("upstream", self.md.get("connected_rtus", [])):
             device = known[upstream]
+            served = device.served()
 
-            if "modbus" in device.registers:
+            if "modbus" in served:
                 client = Modbus()
                 client.init_xml_root("client", device.node)
-                client.registers_to_xml(device.registers["modbus"])
+                client.registers_to_xml(served["modbus"])
 
                 config.append_to_root(client.root)
                 protos["modbus"] = True
 
-            if "dnp3" in device.registers:
+            if "dnp3" in served:
                 client = DNP3()
                 client.init_xml_root("client", device.node)
                 client.init_master_xml(self.configs.get("scan-rate"))
-                client.registers_to_xml(device.registers["dnp3"])
+                client.registers_to_xml(served["dnp3"])
 
                 config.append_to_root(client.root)
                 protos["dnp3"] = True
@@ -107,13 +130,9 @@ class FEP(Device):
         for regs in self.registers.values():
             registers += regs
 
-        downstream = self.md.get("downstream", [])
+        downstream = self.downstream()
 
-        if not isinstance(downstream, list):
-            downstream = [downstream]
-
-        # Default to using DNP3 for downstream side.
-        if not downstream or "dnp3" in downstream:
+        if "dnp3" in downstream:
             server = DNP3()
             server.init_xml_root("server", self.node)
             server.init_outstation_xml()
@@ -286,20 +305,21 @@ class FieldDeviceClient(Device):
 
         for downstream in self.md.get("connected_rtus", []):
             device = known[downstream]
+            served = device.served()
 
-            if "modbus" in device.registers:
+            if "modbus" in served:
                 client = Modbus()
                 client.init_xml_root("client", device.node)
-                client.registers_to_xml(device.registers["modbus"])
+                client.registers_to_xml(served["modbus"])
 
                 config.append_to_root(client.root)
                 protos["modbus"] = True
 
-            if "dnp3" in device.registers:
+            if "dnp3" in served:
                 client = DNP3()
                 client.init_xml_root("client", device.node)
                 client.init_master_xml(self.configs.get("scan-rate"))
-                client.registers_to_xml(device.registers["dnp3"])
+                client.registers_to_xml(served["dnp3"])
 
                 config.append_to_root(client.root)
                 protos["dnp3"] = True
