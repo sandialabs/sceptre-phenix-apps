@@ -108,14 +108,16 @@ class Helics(AppBase):
                 self.add_label(hostname, "group", "helics")
                 self.add_label(hostname, "helics", "broker")
 
-                entry = brokers.get(hostname, {broker_ip: [0, None]})
-                entry[broker][0] += count
+                # keyed by the resolved ip:port, not the annotation's own spelling,
+                # so every form of the same broker lands on one sub-broker
+                fedinfo = brokers.setdefault(hostname, {}).setdefault(
+                    broker_ip, [0, None]
+                )
+                fedinfo[0] += count
 
                 # only overwrite the log level if it wasn't already set
-                if entry[broker][1] is None:
-                    entry[broker][1] = level
-
-                brokers[hostname] = entry
+                if fedinfo[1] is None:
+                    fedinfo[1] = level
 
         log_dir = broker_md.get("log-dir", "/var/log")
 
