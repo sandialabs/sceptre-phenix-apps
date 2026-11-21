@@ -4,6 +4,13 @@ from phenix_apps.apps.otsim.infrastructure import merge_infrastructure_with_defa
 from phenix_apps.apps.otsim.protocols.dnp3 import DNP3
 from phenix_apps.apps.otsim.protocols.modbus import Modbus
 
+# Protocols a FEP can serve downstream. Add one here when the FEP gains a
+# server for it. A tuple, not a set, so FEP.downstream() keeps a fixed order.
+DOWNSTREAM_PROTOCOLS = ("dnp3", "modbus")
+
+# What a FEP serves downstream when its `downstream` metadata names nothing.
+DEFAULT_DOWNSTREAM = ("dnp3",)
+
 
 class Register:
     """One protocol register. `device`, `device_type`, `variable` and
@@ -91,9 +98,9 @@ class FEP(Device):
             downstream = [downstream]
 
         if not downstream:
-            return ["dnp3"]
+            return list(DEFAULT_DOWNSTREAM)
 
-        return [proto for proto in ("dnp3", "modbus") if proto in downstream]
+        return [proto for proto in DOWNSTREAM_PROTOCOLS if proto in downstream]
 
     def served(self):
         # A client reaches this FEP through its downstream servers, which carry
