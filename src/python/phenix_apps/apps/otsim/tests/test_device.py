@@ -4,7 +4,13 @@ import pytest
 from box import Box
 
 from phenix_apps.apps.otsim.config import Config
-from phenix_apps.apps.otsim.device import FEP, FieldDeviceClient, FieldDeviceServer
+from phenix_apps.apps.otsim.device import (
+    DEFAULT_DOWNSTREAM,
+    DOWNSTREAM_PROTOCOLS,
+    FEP,
+    FieldDeviceClient,
+    FieldDeviceServer,
+)
 
 
 def node(hostname, metadata, address):
@@ -114,3 +120,16 @@ def test_fep_behind_fep_polls_what_the_upstream_fep_serves():
     assert config.root.findtext("dnp3[@mode='client']/endpoint") == "10.0.0.2:20000"
     assert config.root.find("modbus[@mode='client']") is None
     assert config.root.findtext("modbus[@mode='server']/endpoint") == "10.0.0.4:502"
+
+
+@pytest.mark.parametrize(
+    ("downstream", "expected"),
+    [
+        ([], list(DEFAULT_DOWNSTREAM)),
+        (["modbus", "dnp3"], list(DOWNSTREAM_PROTOCOLS)),
+        (["modbus", "iec104"], ["modbus"]),
+    ],
+)
+def test_fep_downstream_picks_from_the_shared_protocol_list(downstream, expected):
+    fep = FEP(node("fep-1", {"downstream": downstream}, "10.0.0.2"))
+    assert fep.downstream() == expected
