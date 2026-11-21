@@ -1,18 +1,66 @@
 import json
 import os
-import shlex
 import subprocess
 import uuid
+from ipaddress import ip_address
 from pathlib import Path
-from typing import Final
+from typing import Annotated, Any, Final
+
+from pydantic import BeforeValidator, Field, IPvAnyAddress, StrictBool
 
 from phenix_apps.apps.scorch import ComponentBase
+from phenix_apps.apps.scorch.app import MetadataBlock
 from phenix_apps.common.logger import logger
 
 LISTENER: Final[Path] = Path(__file__).with_name("kafka_listener.py")
 
 
+def _none_is_empty(v: object) -> object:
+    return [] if v is None else v
+
+
+class KafkaEndpoint(MetadataBlock):
+    ip: IPvAnyAddress  # an IP address, not a hostname
+    port: Annotated[int, Field(strict=True, ge=1, le=65535)]
+
+    @property
+    def address(self) -> str:
+        # bootstrap "host:port"; an IPv6 address needs brackets
+        ip = f"[{self.ip}]" if self.ip.version == 6 else str(self.ip)
+        return f"{ip}:{self.port}"
+
+
+class KafkaFilter(MetadataBlock):
+    key: str
+    value: Any = None
+
+
+class KafkaTopic(MetadataBlock):
+    name: Annotated[str, Field(min_length=1)]
+    filter: Annotated[
+        list[KafkaFilter],
+        BeforeValidator(_none_is_empty),
+        Field(default_factory=list),
+    ]
+
+
+class KafkaMetadata(MetadataBlock):
+    """Metadata for the kafka component; see README.md for each field."""
+
+    kafka_endpoints: list[KafkaEndpoint] = Field(
+        default_factory=lambda: [KafkaEndpoint(ip=ip_address("127.0.0.1"), port=9092)]
+    )
+    csv: StrictBool = True
+    wait_duration_seconds: Annotated[int, Field(strict=True, ge=0)] = 305
+    topics: Annotated[
+        list[KafkaTopic], BeforeValidator(_none_is_empty), Field(default_factory=list)
+    ]
+
+
 class Kafka(ComponentBase):
+    metadata_model = KafkaMetadata
+    config: KafkaMetadata
+
     def __init__(self):
         ComponentBase.__init__(self, "kafka")
 
@@ -48,51 +96,45 @@ class Kafka(ComponentBase):
 
         logger.info(f"Configuring user component: {self.name}")
 
-        # get kafka ip addresses and concatenate them into a list of
-        # strings in format ip:port
-        kafka_ips = []
-        kafka_endpoints = self.metadata.get(
-            "kafka_endpoints", [{"ip": "127.0.0.1", "port": "9092"}]
-        )
-        wait_duration_seconds = self.metadata.get("wait_duration_seconds", 305)
-
-        for item in kafka_endpoints:
-            kafka_ips.append(item["ip"] + ":" + item["port"])
-
+        config = self.config
+        kafka_ips = [e.address for e in config.kafka_endpoints]
         logger.info(f"Kafka_ips list: {kafka_ips}")
-
-        topics = self.metadata.get("topics", [])
-        csv_bool = self.metadata.get("csv", True)  # if false output a JSON
 
         # get and output the output directory to the logger
         output_dir: Path = self.base_dir
         logger.info(f"Output Directory: {output_dir}")
         output_dir.mkdir(parents=True, exist_ok=True)
-        if csv_bool:
-            self.path = output_dir / f"{self.name}_output.csv"
-        else:
-            self.path = output_dir / f"{self.name}_output.ndjson"
+        suffix = "csv" if config.csv else "ndjson"  # if not csv, output JSON lines
+        self.path = output_dir / f"{self.name}_output.{suffix}"
+        log_path = output_dir / f"{self.name}_listener.log"
 
-        kafka_ips_str = ",".join(kafka_ips)
-        topics_str = json.dumps(topics)
+        topics_str = json.dumps([t.model_dump() for t in config.topics])
 
         # pass the inputs to the python file (which we execute as a
-        # separate process)
-        arguments = (
-            f"python3 {LISTENER} {csv_bool} '{self.path}' "
-            f"{kafka_ips_str} '{topics_str}' "
-            f"'{self.exp_name}' '{wait_duration_seconds}' {self.component_id}"
-        )
-        command = shlex.split(arguments)
+        # separate process); an argv list, so no value needs shell quoting
+        command = [
+            "python3",
+            str(LISTENER),
+            str(config.csv),
+            str(self.path),
+            ",".join(kafka_ips),
+            topics_str,
+            self.exp_name,
+            str(config.wait_duration_seconds),
+            self.component_id,
+        ]
 
         try:
-            response = subprocess.Popen(
-                command,
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True,
-            )
+            # the listener's own errors (a broker it cannot reach, a bad
+            # message) go to a log beside its output, not to /dev/null
+            with log_path.open("a") as log:
+                response = subprocess.Popen(
+                    command,
+                    stdin=subprocess.DEVNULL,
+                    stdout=log,
+                    stderr=log,
+                    start_new_session=True,
+                )
 
             # write PID to a file so that it can be found
             # and killed later
