@@ -16,6 +16,9 @@ metadata:
 spec:
   apps:
   - name: mirror
+    metadata:
+      version: v1
+      tapName: capture-mirror
     hosts:
     - hostname: monitor
       metadata:
@@ -23,6 +26,14 @@ spec:
         vlans:
         - EXP_1
 ```
+
+| App metadata field | Default | Meaning |
+| --- | --- | --- |
+| `tapName` | random `<8 chars>-mirror` | Host tap name created on each cluster host for the mirror network. Set it in `v1` metadata when another host-side control needs to know the tap name before `post-start`; it must be a safe Linux interface name of at most 15 characters. |
+
+| Host metadata field | Default | Meaning |
+| --- | --- | --- |
+| `interface` | required | Interface on the target VM that receives mirrored traffic. This is not the cluster-host mirror tap name. |
 
 Given the above configuration, each cluster host participating in the
 experiment except for the cluster host the `monitor` VM is scheduled on will

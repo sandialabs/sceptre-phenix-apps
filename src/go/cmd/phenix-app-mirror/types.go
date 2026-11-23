@@ -22,6 +22,7 @@ type MirrorAppMetadataV1 struct {
 	MirrorNet    string `mapstructure:"mirrorNet"`
 	MirrorBridge string `mapstructure:"mirrorBridge"`
 	MirrorVLAN   string `mapstructure:"mirrorVLAN"`
+	TapName      string `mapstructure:"tapName"`
 	ERSPAN       struct {
 		Enabled    bool `mapstructure:"enabled"`
 		Version    int  `mapstructure:"version"`

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFilterVMs(t *testing.T) {
@@ -82,6 +83,17 @@ func TestFilterVMs_CaseInsensitive(t *testing.T) {
 
 	got := filterVMs(log, vms, hmd, "target", getNodeType)
 	assert.Empty(t, got, "Should filter out ROUTER (case insensitive)")
+}
+
+func TestMirrorTapNameUsesConfiguredNameOrRandomFallback(t *testing.T) {
+	t.Parallel()
+
+	var configured MirrorAppMetadataV1
+	configured.TapName = "guarded-mirror"
+	assert.Equal(t, "guarded-mirror", mirrorTapName(configured))
+
+	generated := mirrorTapName(MirrorAppMetadataV1{}) //nolint:exhaustruct // empty metadata exercises defaults
+	require.Regexp(t, `^[A-Za-z0-9]{8}-mirror$`, generated)
 }
 
 func testMetadata(vlans []string, routed bool) MirrorHostMetadata {

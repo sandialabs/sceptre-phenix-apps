@@ -80,6 +80,13 @@ func extractMetadata(data map[string]any, defaultBridge string) (MirrorAppMetada
 		return amd, err
 	}
 
+	if _, ok := data["tapName"]; ok {
+		err = validateOVSToken("tapName", amd.TapName)
+		if err != nil {
+			return amd, err
+		}
+	}
+
 	return amd, nil
 }
 

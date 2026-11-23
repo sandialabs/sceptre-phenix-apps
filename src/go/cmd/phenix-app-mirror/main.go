@@ -307,8 +307,7 @@ func postStart(log *slog.Logger, exp *types.Experiment, dryrun bool) error {
 	cluster := cluster(exp)
 
 	status := MirrorAppStatus{
-		// Tap name is random, yet descriptive to the fact that it's a mirror tap.
-		TapName: util.RandomString(tapNameLength) + "-mirror",
+		TapName: mirrorTapName(amd),
 		Subnet:  nw.Masked().String(),
 		Mirrors: make(map[string]MirrorConfig),
 	}
@@ -343,6 +342,15 @@ func postStart(log *slog.Logger, exp *types.Experiment, dryrun bool) error {
 	return nil
 }
 
+func mirrorTapName(md MirrorAppMetadataV1) string {
+	if md.TapName != "" {
+		return md.TapName
+	}
+
+	// Keep the historical random default when no tap name is configured.
+	return util.RandomString(tapNameLength) + "-mirror"
+}
+
 func createMirrorTaps(
 	log *slog.Logger,
 	exp *types.Experiment,
@@ -358,7 +366,8 @@ func createMirrorTaps(
 	ip := nw.Range().From().Next()
 
 	// For each cluster host, create tap on mirror VLAN with IP in mirror network.
-	// The tap's name will be something like `<random 8 character string>-mirror`.
+	// The tap's name is either configured in app metadata or generated as
+	// `<random 8 character string>-mirror`.
 	// The maximum length of the name is dictated by the maximum length of a Linux
 	// interface name, which is 15 characters. Once created, move the tap into a
 	// network namespace on the cluster host so it doesn't interfere with other

@@ -49,3 +49,25 @@ func TestExtractMetadataRejectsUnsafeTokens(t *testing.T) {
 	_, err = extractHostMetadata(map[string]any{"hilInterfaces": []any{"eth1", "eth2 eth3"}})
 	require.Error(t, err)
 }
+
+func TestExtractMetadataValidatesTapName(t *testing.T) {
+	t.Parallel()
+
+	amd, err := extractMetadata(map[string]any{"version": "v1", "tapName": "guarded-mirror"}, "phenix")
+	require.NoError(t, err)
+	assert.Equal(t, "guarded-mirror", amd.TapName)
+
+	_, err = extractMetadata(map[string]any{"version": "v1", "tapName": "bad name"}, "phenix")
+	require.Error(t, err)
+
+	_, err = extractMetadata(map[string]any{"version": "v1", "tapName": ""}, "phenix")
+	require.Error(t, err)
+}
+
+func TestUpgradeLeavesTapNameUnset(t *testing.T) {
+	t.Parallel()
+
+	amd, err := extractMetadata(map[string]any{"version": "v0", "directGRE": map[string]any{}}, "phenix")
+	require.NoError(t, err)
+	assert.Empty(t, amd.TapName)
+}
