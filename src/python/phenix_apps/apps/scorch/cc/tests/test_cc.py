@@ -277,6 +277,24 @@ def test_validator_failure_raises(monkeypatch, tmp_path):
         comp.start()
 
 
+@pytest.mark.parametrize(
+    ("settings", "method"), [({}, "mount"), ({"method": "stream"}, "stream")]
+)
+def test_recv_forwards_transfer_method(monkeypatch, tmp_path, settings, method):
+    recv = MagicMock()
+    monkeypatch.setattr(cc_mod.utils, "mm_recv", recv)
+    comp = component(
+        vm_md({"type": "recv", "args": "/tmp/data.log:result.log", **settings}),
+        tmp_path,
+    )
+
+    comp.start()
+
+    recv.assert_called_once_with(
+        comp.mm, "aa", "/tmp/data.log", str(tmp_path / "result.log"), method=method
+    )
+
+
 def test_recv_absolute_dst_outside_base_dir_raises(tmp_path):
     comp = component(vm_md({"type": "recv", "args": "/etc/x:/etc/passwd"}), tmp_path)
     with pytest.raises(error.AppError, match="escapes"):

@@ -101,6 +101,7 @@ class VMSend(MetadataBlock):
 class VMRecv(MetadataBlock):
     type: Literal["recv"]
     args: FileArg
+    method: Literal["mount", "stream"] = "mount"
 
 
 class VMReset(MetadataBlock):
@@ -402,7 +403,7 @@ class CC(ComponentBase):
         logger.info(f"receiving file '{src}' from VM {vm.hostname} to `{dst}` using cc")
 
         try:
-            utils.mm_recv(self.mm, vm.hostname, src, dst)
+            utils.mm_recv(self.mm, vm.hostname, src, dst, method=cmd.method)
             logger.info(f"file '{src}' received from VM {vm.hostname} to `{dst}`")
         except Exception as ex:
             raise RuntimeError(
