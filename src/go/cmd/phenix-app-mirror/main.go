@@ -41,7 +41,7 @@ func main() {
 
 	if len(os.Args) != expectedArgs {
 		log.Error("incorrect amount of args provided")
-		return
+		os.Exit(1)
 	}
 
 	var (
@@ -55,7 +55,11 @@ func main() {
 		return
 	}
 
-	processExperiment(log, stage, dryrun)
+	err := processExperiment(log, stage, dryrun)
+	if err != nil {
+		log.Error("mirror app failed", "stage", stage, "err", err)
+		os.Exit(1)
+	}
 }
 
 func printVersion(log *slog.Logger) {
@@ -82,17 +86,15 @@ func printVersion(log *slog.Logger) {
 	fmt.Fprintf(os.Stdout, "%s - %s (%s)\n", version.Version, rev, ts)
 }
 
-func processExperiment(log *slog.Logger, stage string, dryrun bool) {
+func processExperiment(log *slog.Logger, stage string, dryrun bool) error {
 	body, err := io.ReadAll(os.Stdin)
 	if err != nil {
-		log.Error("unable to read JSON from STDIN")
-		return
+		return fmt.Errorf("reading JSON from STDIN: %w", err)
 	}
 
 	exp, err := util.DecodeExperiment(body)
 	if err != nil {
-		log.Error("decoding experiment", "err", err)
-		return
+		return fmt.Errorf("decoding experiment: %w", err)
 	}
 
 	endpoint := os.Getenv("PHENIX_STORE_ENDPOINT")
@@ -102,50 +104,49 @@ func processExperiment(log *slog.Logger, stage string, dryrun bool) {
 		log.Error("initializing store", "err", err)
 	}
 
-	if !runStage(log, stage, exp, dryrun, body) {
-		return
+	handled, err := runStage(log, stage, exp, dryrun)
+	if err != nil {
+		return err
+	}
+
+	if !handled {
+		_, _ = os.Stdout.Write(body)
+
+		return nil
 	}
 
 	body, err = json.Marshal(exp)
 	if err != nil {
-		log.Error("unable to convert experiment to JSON")
-		return
+		return fmt.Errorf("converting experiment to JSON: %w", err)
 	}
 
 	_, _ = os.Stdout.Write(body)
+
+	return nil
 }
 
-func runStage(log *slog.Logger, stage string, exp *types.Experiment, dryrun bool, body []byte) bool {
+// runStage runs the given stage and reports whether the app handles it.
+func runStage(log *slog.Logger, stage string, exp *types.Experiment, dryrun bool) (bool, error) {
 	var err error
 
 	switch stage {
 	case "configure":
 		err = configure(log, exp)
-		if err != nil {
-			log.Error("failed to execute configure stage", "err", err)
-		}
 	case "pre-start":
 		err = preStart(log, exp, dryrun)
-		if err != nil {
-			log.Error("failed to execute pre-start stage", "err", err)
-		}
 	case "post-start":
 		err = postStart(log, exp, dryrun)
-		if err != nil {
-			log.Error("failed to execute post-start stage", "err", err)
-		}
 	case "cleanup":
 		err = cleanup(log, exp, dryrun)
-		if err != nil {
-			log.Error("failed to execute cleanup stage", "err", err)
-		}
 	default:
-		_, _ = os.Stdout.Write(body)
-
-		return false
+		return false, nil
 	}
 
-	return true
+	if err != nil {
+		return true, fmt.Errorf("executing %s stage: %w", stage, err)
+	}
+
+	return true, nil
 }
 
 func configure(log *slog.Logger, exp *types.Experiment) error {
@@ -156,7 +157,7 @@ func configure(log *slog.Logger, exp *types.Experiment) error {
 		return fmt.Errorf("extracting app metadata: %w", err)
 	}
 
-	nw, err := mirrorNet(log, &amd)
+	nw, err := mirrorNet(log, &amd, exp.Metadata.Name)
 	if err != nil {
 		return fmt.Errorf("determining mirror network: %w", err)
 	}
@@ -298,10 +299,14 @@ func postStart(log *slog.Logger, exp *types.Experiment, dryrun bool) error {
 		return fmt.Errorf("extracting app metadata: %w", err)
 	}
 
-	var nw netaddr.IPPrefix
-	nw, err = mirrorNet(log, &amd)
-	if err != nil {
-		return fmt.Errorf("determining mirror network: %w", err)
+	// Use the subnet configure gave the mirror hosts, so the cluster host taps
+	// end up on the same network as the hosts receiving the mirrored traffic.
+	nw, ok := sensorSubnet(exp)
+	if !ok {
+		nw, err = mirrorNet(log, &amd, exp.Metadata.Name)
+		if err != nil {
+			return fmt.Errorf("determining mirror network: %w", err)
+		}
 	}
 
 	cluster := cluster(exp)
@@ -732,9 +737,14 @@ func cleanup(log *slog.Logger, exp *types.Experiment, dryrun bool) error {
 
 	var status MirrorAppStatus
 
+	if exp.Status == nil {
+		return nil
+	}
+
 	err = exp.Status.ParseAppStatus("mirror", &status)
 	if err != nil {
-		return fmt.Errorf("decoding app status: %w", err)
+		//nolint:nilerr // No mirror app status (post-start never finished), so nothing to clean up.
+		return nil
 	}
 
 	for _, cfg := range status.Mirrors {
@@ -834,7 +844,10 @@ func deleteMirrorFromHost(log *slog.Logger, mirror, bridge, host string) error {
 	return errs.ErrorOrNil()
 }
 
-func mirrorNet(log *slog.Logger, md *MirrorAppMetadataV1) (netaddr.IPPrefix, error) {
+// mirrorNet returns the first subnet, starting at the configured mirror net,
+// that no other stored experiment uses. name is the experiment being
+// configured.
+func mirrorNet(log *slog.Logger, md *MirrorAppMetadataV1, name string) (netaddr.IPPrefix, error) {
 	md.Init()
 
 	subnet, err := netaddr.ParseIPPrefix(md.MirrorNet)
@@ -842,34 +855,86 @@ func mirrorNet(log *slog.Logger, md *MirrorAppMetadataV1) (netaddr.IPPrefix, err
 		return netaddr.IPPrefix{}, fmt.Errorf("parsing mirror net: %w", err)
 	}
 
-	running, err := runningExperiments(log)
+	stored, err := storedExperiments(log)
 	if err != nil {
-		// Log the error, but don't escalate it. Instead, just assume there's no
-		// other experiments running and let things (potentially) fail
-		// spectacularly.
-		log.Error("getting running experiments", "err", err)
-
-		return subnet, nil
+		// Without the other experiments, the subnet picked could already be in use.
+		return netaddr.IPPrefix{}, fmt.Errorf("getting stored experiments: %w", err)
 	}
 
-	var used []netaddr.IPPrefix
-
-	for _, exp := range running {
-		var status MirrorAppStatus
-
-		// Not every experiment uses the mirror app, so don't worry about errors.
-		pErr := exp.Status.ParseAppStatus("mirror", &status)
-		if pErr == nil {
-			used = append(used, netaddr.MustParseIPPrefix(status.Subnet))
-		}
-	}
-
-	subnet, err = putil.UnusedSubnet(subnet, used)
+	subnet, err = putil.UnusedSubnet(subnet, usedSubnets(stored, name))
 	if err != nil {
 		return netaddr.IPPrefix{}, fmt.Errorf("searching for unused subnet for mirror net: %w", err)
 	}
 
 	return subnet, nil
+}
+
+// usedSubnets returns the mirror subnets of every experiment except the one
+// named name. Mirror hosts are addressed in configure, which runs when an
+// experiment is created, but the mirror status is only written at the end of
+// post-start, so both are checked.
+func usedSubnets(exps []*types.Experiment, name string) []netaddr.IPPrefix {
+	var used []netaddr.IPPrefix
+
+	for _, exp := range exps {
+		if exp.Metadata.Name == name {
+			continue
+		}
+
+		var status MirrorAppStatus
+
+		// Not every experiment uses the mirror app, so don't worry about errors.
+		if exp.Status != nil && exp.Status.ParseAppStatus("mirror", &status) == nil {
+			prefix, err := netaddr.ParseIPPrefix(status.Subnet)
+			if err == nil {
+				used = append(used, prefix.Masked())
+			}
+		}
+
+		if subnet, ok := sensorSubnet(exp); ok {
+			used = append(used, subnet)
+		}
+	}
+
+	return used
+}
+
+// sensorSubnet returns the mirror network configure assigned to the mirror
+// hosts' interfaces in the experiment topology.
+func sensorSubnet(exp *types.Experiment) (netaddr.IPPrefix, bool) {
+	if exp.Spec == nil || exp.Spec.Topology() == nil {
+		return netaddr.IPPrefix{}, false
+	}
+
+	app := util.ExtractApp(exp.Spec.Scenario(), "mirror")
+	if app == nil {
+		return netaddr.IPPrefix{}, false
+	}
+
+	for _, host := range app.Hosts() {
+		hmd, err := extractHostMetadata(host.Metadata())
+		if err != nil || hmd.Interface == "" {
+			continue
+		}
+
+		node := exp.Spec.Topology().FindNodeByName(host.Hostname())
+		if node == nil {
+			continue
+		}
+
+		for _, iface := range node.Network().Interfaces() {
+			if iface.Name() != hmd.Interface || iface.Address() == "" {
+				continue
+			}
+
+			prefix, pErr := netaddr.ParseIPPrefix(fmt.Sprintf("%s/%d", iface.Address(), iface.Mask()))
+			if pErr == nil {
+				return prefix.Masked(), true
+			}
+		}
+	}
+
+	return netaddr.IPPrefix{}, false
 }
 
 // Returns a map of cluster hosts, each referencing a slice of names of VMs
@@ -977,7 +1042,7 @@ func vlanTaps(log *slog.Logger, ns string, vms, vlans []string) []string {
 	return taps
 }
 
-func runningExperiments(log *slog.Logger) ([]*types.Experiment, error) {
+func storedExperiments(log *slog.Logger) ([]*types.Experiment, error) {
 	configs, err := store.List("Experiment")
 	if err != nil {
 		return nil, fmt.Errorf("getting list of experiment configs from store: %w", err)
@@ -994,9 +1059,7 @@ func runningExperiments(log *slog.Logger) ([]*types.Experiment, error) {
 			continue
 		}
 
-		if exp.Running() {
-			experiments = append(experiments, exp)
-		}
+		experiments = append(experiments, exp)
 	}
 
 	return experiments, nil

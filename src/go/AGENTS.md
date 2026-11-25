@@ -29,9 +29,8 @@ contracts. These rules apply to all work under `src/go/`.
 - Decode stdin with `util.DecodeExperiment` and reserve stdout for the
   experiment JSON. The `version` pseudo-stage is the one exception: it prints a
   version line and returns without reading stdin.
-- `phenix-app-mirror` currently logs and returns on failure rather than exiting
-  nonzero, so core cannot distinguish a failed stage from a no-op. Do not copy
-  that pattern into new code, and prefer a nonzero exit when touching it.
+- `phenix-app-mirror` exits nonzero when a stage fails, so core marks the stage
+  failed. Return errors from stage functions instead of only logging them.
 - Keep files referenced by `//go:embed` in place, and keep them covered by a
   test that builds the embedded tree.
 
