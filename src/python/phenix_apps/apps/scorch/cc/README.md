@@ -54,6 +54,7 @@ A VM-level command:
 | `once` | bool | no (`true`) | For `exec`/`background`: run the command only once |
 | `wait` | bool | no (`false`) | For `exec`: wait for the command to finish and fail the stage on a non-zero exit |
 | `validator` | string (bash) | no | For `exec`: a script that checks the command's output; forces `wait` |
+| `method` | `mount` or `stream` | no (`mount`) | For `recv`: how the file is copied from the VM (see below) |
 
 ## Types
 
@@ -149,6 +150,26 @@ host for the current scorch run, loop, and count.
 
 > In most cases, it's recommended to only provide the source path and let the
 > file be placed in the appropriate location on the phenix host.
+
+By default, `recv` mounts the VM's filesystem over miniccc and copies the file
+from the mount. Set `method: stream` to have miniccc send the file instead, for
+example when the mount is slow or unavailable. `stream` takes one absolute file
+path with no globs. A missing source fails the command and leaves the
+destination unchanged.
+
+Limits of `stream`:
+
+- minimega doesn't deliver an empty source file over `stream` (3.3.0 and the
+  current master); use the default `mount` for files that may be empty.
+- The source can't contain a backslash, so Windows paths (`C:\...`) need `mount`.
+- The file is read from the minimega response directory on the phenix host, so
+  the VM must run on the phenix host or share its `MM_FILEPATH`.
+
+```yaml
+- type: recv
+  args: /tmp/results.log
+  method: stream
+```
 
 ## Examples
 

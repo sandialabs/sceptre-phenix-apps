@@ -1,7 +1,132 @@
+import errno
+from pathlib import Path
+from unittest.mock import Mock
+
 import minimega
 import pytest
 
 from phenix_apps.common import settings, utils
+
+
+@pytest.fixture
+def stream_receive(monkeypatch, tmp_path):
+    mm = Mock(_namespace="exp")
+    mm.cc_recv.return_value = [
+        {"Host": "other", "Data": 72},
+        {"Host": "node", "Data": 7},
+    ]
+    monkeypatch.setattr(settings, "MM_FILEPATH", str(tmp_path))
+    monkeypatch.setattr(
+        utils, "mm_cc_client_locate", Mock(return_value=("abc-1234", "node"))
+    )
+    wait = Mock()
+    monkeypatch.setattr(utils, "mm_wait_for_cmd", wait)
+    response = tmp_path / "exp" / "miniccc_responses" / "7" / "abc-1234"
+    return mm, response, wait
+
+
+def write_received(path, data):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+
+
+def test_mm_recv_stream_uses_the_vm_hosts_command(stream_receive, tmp_path):
+    mm, response, wait = stream_receive
+    payload = b"a\x00b\xff"
+    src = '/file "name".log'
+    received = response / src.removeprefix("/")
+    wait.side_effect = lambda *_a, **_kw: write_received(received, payload)
+    dst = tmp_path / "results"
+    dst.mkdir()
+
+    utils.mm_recv(mm, "vm", src, dst, grace=9, method="stream")
+
+    mm.cc_filter.assert_called_once_with("uuid=abc-1234")
+    mm.cc_recv.assert_called_once_with(r'"/file \"name\".log"')
+    mm.clear_cc_filter.assert_called_once_with()
+    mm.cc_mount.assert_not_called()
+    wait.assert_called_once_with(
+        mm, "7", client="abc-1234", client_grace=9, host="node"
+    )
+    assert (dst / received.name).read_bytes() == payload
+    assert not received.exists()
+
+
+def test_mm_recv_stream_removes_the_response_directory(stream_receive, tmp_path):
+    mm, response, wait = stream_receive
+    data = iter([b"first", b"second"])
+    wait.side_effect = lambda *_a, **_kw: write_received(response / "file", next(data))
+    dst = tmp_path / "result"
+
+    utils.mm_recv(mm, "vm", "/file", dst, method="stream")
+
+    assert not response.parent.exists()
+
+    # A later command that reuses the ID isn't reported as stale.
+    utils.mm_recv(mm, "vm", "/file", dst, method="stream")
+
+    assert dst.read_bytes() == b"second"
+
+
+def test_mm_recv_stream_leaves_existing_file_on_incomplete_transfer(
+    stream_receive, tmp_path
+):
+    mm, response, wait = stream_receive
+    wait.side_effect = lambda *_a, **_kw: write_received(
+        response / "large.log.partial", b"incomplete"
+    )
+    dst = tmp_path / "result"
+    dst.write_bytes(b"existing")
+
+    with pytest.raises(ValueError, match="was not received"):
+        utils.mm_recv(mm, "vm", "/large.log", dst, method="stream")
+
+    assert dst.read_bytes() == b"existing"
+
+
+def test_mm_recv_stream_moves_across_filesystems(stream_receive, tmp_path, monkeypatch):
+    mm, response, wait = stream_receive
+    received = response / "data.log"
+    wait.side_effect = lambda *_a, **_kw: write_received(received, b"complete")
+    dst = tmp_path / "result"
+    dst.write_bytes(b"old")
+    replace = Path.replace
+
+    def cross_device(path, target):
+        if path == received:
+            raise OSError(errno.EXDEV, "cross-device link")
+        return replace(path, target)
+
+    monkeypatch.setattr(Path, "replace", cross_device)
+    utils.mm_recv(mm, "vm", "/data.log", dst, method="stream")
+
+    assert dst.read_bytes() == b"complete"
+    assert not received.exists()
+
+
+def test_mm_recv_stream_rejects_stale_responses(stream_receive, tmp_path):
+    mm, response, wait = stream_receive
+    write_received(response / "file", b"stale")
+    dst = tmp_path / "result"
+    dst.write_bytes(b"existing")
+
+    with pytest.raises(ValueError, match="stale responses"):
+        utils.mm_recv(mm, "vm", "/file", dst, method="stream")
+
+    wait.assert_not_called()
+    assert dst.read_bytes() == b"existing"
+
+
+@pytest.mark.parametrize(
+    "src", ["relative", "/", "/one/../file", "/a*.txt", ["/one", "/two"]]
+)
+def test_mm_recv_stream_rejects_ambiguous_sources(src, tmp_path):
+    mm = Mock()
+
+    with pytest.raises(ValueError, match="one absolute file path"):
+        utils.mm_recv(mm, "vm", src, tmp_path / "result", method="stream")
+
+    assert not mm.mock_calls
 
 
 class _FakeClock:

@@ -1,5 +1,7 @@
+import contextlib
 import csv
 import datetime
+import errno
 import ipaddress
 import json
 import math
@@ -21,7 +23,7 @@ from itertools import pairwise
 from pathlib import Path
 from socket import inet_ntoa
 from struct import pack
-from typing import IO, Final
+from typing import IO, Final, Literal
 
 import mako.lookup
 import mako.template
@@ -422,13 +424,29 @@ def mm_recv(
     src: list[str] | str,
     dst: str | Path,
     grace: float = phenix_settings.CC_CLIENT_GRACE,
+    *,
+    method: Literal["mount", "stream"] = "mount",
 ) -> None:
     """
-    Transfer one or more files from a VM to a destination on the host using miniccc mounts.
+    Transfer files from a VM using a miniccc mount or a single-file stream.
     """
 
     # The normalization check below compares the caller's spelling of the path.
     dst = str(dst)
+
+    # PurePath construction collapses spurious slashes and single-dot segments
+    # (but not '..'), so str(Path(dst)) == dst is equivalent to the old
+    # os.path.normpath(dst) == dst normalization check.
+    if not Path(dst).is_absolute() or str(Path(dst)) != dst or ".." in Path(dst).parts:
+        raise AppError(
+            f"invalid host destination path '{dst}' (must be absolute and normalized, with no '..' segments)"
+        )
+
+    if method == "stream":
+        _mm_recv_stream(mm, vm, src, Path(dst), grace)
+        return
+    if method != "mount":
+        raise ValueError(f"unknown receive method '{method}'")
 
     # Use PHENIX_DIR as base directory to ensure minimega has access to it. This
     # assumes PHENIX_DIR is mounted into the containers if containers are being
@@ -441,14 +459,6 @@ def mm_recv(
     # has to be enabled (and is done so via a Kubernetes `emptyDir` volume).
     if Path("/tmp/miniccc-mounts").is_dir():
         base = "/tmp/miniccc-mounts"
-
-    # PurePath construction collapses spurious slashes and single-dot segments
-    # (but not '..'), so str(Path(dst)) == dst is equivalent to the old
-    # os.path.normpath(dst) == dst normalization check.
-    if not Path(dst).is_absolute() or str(Path(dst)) != dst or ".." in Path(dst).parts:
-        raise AppError(
-            f"invalid host destination path '{dst}' (must be absolute and normalized, with no '..' segments)"
-        )
 
     mm_cc_client_active(mm, vm, grace=grace)
 
@@ -485,6 +495,65 @@ def mm_recv(
             # race condition between miniccc clearing mount and temp directory being
             # cleaned up when exiting the context of the 'with' statement.
             time.sleep(1.0)
+
+
+def _mm_recv_stream(
+    mm: minimega.minimega,
+    vm: str,
+    src: list[str] | str,
+    dst: Path,
+    grace: float,
+) -> None:
+    if (
+        not isinstance(src, str)
+        or not Path(src).is_absolute()
+        or src.startswith("//")
+        or not Path(src).name
+        or str(Path(src)) != src
+        or ".." in Path(src).parts
+        or any(char in src for char in "*?[]\\\x00\r\n")
+    ):
+        raise ValueError("stream receive requires one absolute file path without globs")
+    if not mm._namespace:
+        raise ValueError("stream receive requires a minimega namespace")
+
+    uuid, host = mm_cc_client_locate(mm, vm, grace=grace)
+    responses = safe_join(
+        phenix_settings.MM_FILEPATH, mm._namespace, "miniccc_responses"
+    )
+    # Clearing commands can reset IDs without deleting earlier response files.
+    existing_ids = {path.parent.name for path in responses.glob(f"*/{uuid}")}
+    quoted_src = '"' + src.replace('"', '\\"') + '"'
+    with mm_cc_filter(mm, f"uuid={uuid}"):
+        cmd_id = mm_command_id_for_host(mm.cc_recv(quoted_src), host)
+
+    if cmd_id in existing_ids:
+        raise ValueError(f"receive command {cmd_id} for VM {vm} has stale responses")
+    mm_wait_for_cmd(mm, cmd_id, client=uuid, client_grace=grace, host=host)
+    received = safe_join(responses, cmd_id, uuid, src.removeprefix("/"))
+    # Miniccc writes incomplete files with a .partial suffix.
+    if not received.is_file():
+        raise ValueError(f"'{src}' was not received from VM {vm} on host {host}")
+
+    if dst.is_dir():
+        dst /= received.name
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        received.replace(dst)
+    except OSError as exc:
+        if exc.errno != errno.EXDEV:
+            raise
+        with tempfile.TemporaryDirectory(dir=dst.parent) as tmp:
+            staged = Path(tmp, dst.name)
+            shutil.copy2(received, staged)
+            staged.replace(dst)
+        received.unlink()
+
+    # Remove this command's response directory so a later command that reuses
+    # the ID isn't reported as stale.
+    shutil.rmtree(safe_join(responses, cmd_id, uuid), ignore_errors=True)
+    with contextlib.suppress(OSError):
+        safe_join(responses, cmd_id).rmdir()
 
 
 def mm_get_cc_path(mm: minimega.minimega) -> Path | None:
