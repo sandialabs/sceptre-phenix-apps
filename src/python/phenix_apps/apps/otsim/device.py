@@ -1,6 +1,9 @@
 import lxml.etree as ET
 
-from phenix_apps.apps.otsim.infrastructure import merge_infrastructure_with_default
+from phenix_apps.apps.otsim.infrastructure import (
+    merge_infrastructure_with_default,
+    var_tags,
+)
 from phenix_apps.apps.otsim.protocols.dnp3 import DNP3
 from phenix_apps.apps.otsim.protocols.modbus import Modbus
 
@@ -211,16 +214,17 @@ class FieldDeviceServer(Device):
                     if isinstance(var_type, str):
                         var_type = {"type": var_type}
 
-                    reg = Register(
-                        var_type["type"],
-                        f"{name}.{var}",
-                        var_type.get("dnp3", {}),
-                        device=name,
-                        device_type=fd["type"],
-                        variable=var,
-                        protocol="dnp3",
-                    )
-                    self.registers["dnp3"].append(reg)
+                    for tag_var in var_tags(var, var_type):
+                        reg = Register(
+                            var_type["type"],
+                            f"{name}.{tag_var}",
+                            var_type.get("dnp3", {}),
+                            device=name,
+                            device_type=fd["type"],
+                            variable=tag_var,
+                            protocol="dnp3",
+                        )
+                        self.registers["dnp3"].append(reg)
 
         if "modbus" in self.md:
             if "modbus" not in self.registers:
@@ -251,16 +255,17 @@ class FieldDeviceServer(Device):
                     if isinstance(var_type, str):
                         var_type = {"type": var_type}
 
-                    reg = Register(
-                        var_type["type"],
-                        f"{name}.{var}",
-                        var_type.get("modbus", {}),
-                        device=name,
-                        device_type=fd["type"],
-                        variable=var,
-                        protocol="modbus",
-                    )
-                    self.registers["modbus"].append(reg)
+                    for tag_var in var_tags(var, var_type):
+                        reg = Register(
+                            var_type["type"],
+                            f"{name}.{tag_var}",
+                            var_type.get("modbus", {}),
+                            device=name,
+                            device_type=fd["type"],
+                            variable=tag_var,
+                            protocol="modbus",
+                        )
+                        self.registers["modbus"].append(reg)
 
         self.processed = True
 

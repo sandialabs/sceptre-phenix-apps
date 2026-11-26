@@ -256,6 +256,37 @@ def merge_infrastructure_with_default(infra, mappings):
     return merged
 
 
+def var_phases(var, var_type):
+    """Phase count of a vector variable (`phases: N`), or None for a scalar."""
+    phases = var_type.get("phases") if isinstance(var_type, dict) else None
+    if phases is None:
+        return None
+
+    # ot-sim only expands vector subscriptions, so a vector can't be written to
+    if (
+        var_type.get("type") != "analog-read"
+        or isinstance(phases, bool)
+        or not isinstance(phases, int)
+        or phases < 1
+    ):
+        raise ValueError(
+            f"infrastructure variable '{var}' sets phases {phases!r}: phases must "
+            "be a positive integer on an analog-read variable"
+        )
+
+    return phases
+
+
+def var_tags(var, var_type):
+    """Tag names ot-sim gives a variable: `{var}_0` to `{var}_{N-1}` for a
+    vector of N phases, otherwise just `var`."""
+    phases = var_phases(var, var_type)
+    if phases is None:
+        return [var]
+
+    return [f"{var}_{index}" for index in range(phases)]
+
+
 class Infrastructure:
     def __init__(self, mappings):
         self.mappings = mappings
@@ -283,6 +314,7 @@ class Infrastructure:
                 # We don't care about scaling in the I/O module, so if the variable
                 # type is a dictionary convert it to a string (using its `type` entry)
                 # so the rest of the code can assume it's just a string.
+                phases = var_phases(var, var_type)
                 if isinstance(var_type, dict):
                     var_type = var_type["type"]
 
@@ -297,7 +329,10 @@ class Infrastructure:
                 typ = ET.SubElement(sub, "type")
 
                 if var_type in ["analog-read", "analog-read-write"]:
-                    typ.text = "double"
+                    if phases:
+                        typ.text = "vector"
+                    else:
+                        typ.text = "double"
                 else:
                     typ.text = "boolean"
 
