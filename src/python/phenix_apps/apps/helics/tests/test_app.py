@@ -1,5 +1,6 @@
 """Broker lookup failures keep their role context."""
 
+import subprocess
 from types import SimpleNamespace
 
 import pytest
@@ -41,6 +42,16 @@ def test_sub_broker_not_found(tmp_path):
     app.helics_dir = tmp_path
     with pytest.raises(ValueError, match=r"^broker not found in topology"):
         app.pre_start()
+
+
+def test_federates_wait_for_the_root_broker_port(tmp_path):
+    sub_broker_app(tmp_path, []).pre_start()
+
+    script = tmp_path / "wait-broker.sh"
+    text = script.read_text()
+    assert 'timeout 1 bash -c "exec 3<> /dev/tcp/10.0.0.1/23404"' in text
+    assert "ping" not in text
+    subprocess.run(["bash", "-n", str(script)], check=True)
 
 
 def sub_broker_app(tmp_path, brokers):

@@ -249,9 +249,19 @@ class OTSim(AppBase):
                         wait_file = (
                             self.otsim_dir / f"wait-broker-{len(broker_addr_wait)}.sh"
                         )  # just need a unique name
+                        try:
+                            host, port = utils.split_host_port(addr)
+                        except ValueError as ex:
+                            raise ValueError(
+                                f"'{server.hostname}' has an invalid broker: {ex}"
+                            ) from None
                         with wait_file.open("w") as f:
                             utils.mako_serve_template(
-                                "wait_broker.mako", templates, f, rootbroker_ip=addr
+                                "wait_broker.mako",
+                                templates,
+                                f,
+                                broker_host=host,
+                                broker_port=port or 23404,
                             )
                         broker_addr_wait[addr] = str(wait_file)
 
