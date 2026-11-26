@@ -186,6 +186,42 @@ spec:
                 tag: foo.bar
                 value: 0
 ```
+
+## Three phase variables
+
+Set `phases: N` on an `analog-read` variable when its HELICS topic publishes a
+vector with one value per phase. The I/O module subscribes to it as a `vector`
+and ot-sim splits it into the tags `<device>.<var>_0` to `<device>.<var>_<N-1>`.
+DNP3 and Modbus get one register per phase under those tags.
+
+- The `vector` type needs an ot-sim build with vector subscription support
+  ([patsec/ot-sim#18](https://github.com/patsec/ot-sim/pull/18)). Older builds do
+  not know the type.
+- A topic that publishes a double arrives as a vector of length 1. Only
+  `<var>_0` gets a value and the other registers stay 0.
+
+```yaml
+spec:
+  scenario:
+    apps:
+    - name: ot-sim
+      metadata:
+        infrastructure: three-phase
+        infrastructures:
+          three-phase:
+            bus:
+              voltage_magnitude:
+                type: analog-read
+                phases: 3
+      hosts:
+      - hostname: outstation
+        metadata:
+          type: fd-server
+          dnp3:
+          - name: OpenDSS/bus-1
+            type: bus
+```
+
 # Node-RED
 [Node-RED](https://www.node-red.dev/) is a coding software that is
 used for creating flows of data between systems.
