@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Final
 
 import lxml.etree as ET
 
@@ -10,6 +11,13 @@ from phenix_apps.apps.otsim.logic import Logic
 from phenix_apps.apps.otsim.nodered import NodeRed
 from phenix_apps.common import utils
 from phenix_apps.common.logger import logger
+
+# I/O module settings passed through from `helics` metadata when set, with the
+# value types each accepts and how to describe them in an error.
+HELICS_IO_SETTINGS: Final = {
+    "step-time": ((int, float), "number of seconds"),
+    "full-status-steps": ((int,), "integer"),
+}
 
 
 class OTSim(AppBase):
@@ -80,6 +88,29 @@ class OTSim(AppBase):
                 return md["helics"]["scan-rate"]
             return 5
         return None
+
+    def __process_helics_io_metadata(self, hostname, md):
+        # A host's `helics` block overrides the app's. Unset settings are left out
+        # so the ot-sim I/O module applies its own defaults.
+        settings = {}
+
+        for key, (types, kind) in HELICS_IO_SETTINGS.items():
+            value = md.get("helics", {}).get(
+                key, self.metadata.get("helics", {}).get(key)
+            )
+
+            if value is None:
+                continue
+
+            if isinstance(value, bool) or not isinstance(value, types) or value <= 0:
+                raise ValueError(
+                    f"ot-sim host '{hostname}' has an invalid helics.{key} "
+                    f"{value!r}: it must be a positive {kind}"
+                )
+
+            settings[key] = str(value)
+
+        return settings
 
     def __init_defaults(self):
         self.default_infrastructure: str = self.metadata.get(
@@ -199,6 +230,11 @@ class OTSim(AppBase):
                 end_time = ET.SubElement(io, "end-time")
 
                 end_time.text = self.end_time
+
+                for key, value in self.__process_helics_io_metadata(
+                    server.hostname, md
+                ).items():
+                    ET.SubElement(io, key).text = value
 
                 if "helics" in md:
                     if "broker" in md["helics"]:
