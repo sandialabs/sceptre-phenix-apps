@@ -44,6 +44,12 @@ spec:
           scan-rate: 5      # DNP3 master scan rate in seconds; FEPs default to 5 when
                             # `helics` is set, fd-clients only use it if set explicitly,
                             # otherwise the ot-sim default (30) applies
+          step-time: 1           # I/O module HELICS period in seconds. Left out of the
+                                 # config when not set, so ot-sim uses its default (1).
+          full-status-steps: 60  # I/O module steps between resends of every value. Left
+                                 # out when not set, so ot-sim uses its default (60).
+                                 # Both need an ot-sim build whose I/O module supports
+                                 # them. Older builds ignore them.
         message-bus:
           pull-endpoint: tcp://127.0.0.1:1234 # this is the default
           pub-endpoint: tcp://127.0.0.1:5678  # this is the default
@@ -145,6 +151,8 @@ spec:
             federate: # value can be a string or map; string value used directly as name for federate
               name: outstation-fed # name to use for this federate; defaults to hostname if not provided
               log-level: SUMMARY   # log level to pass to I/O module's init string; this is the default
+            step-time: 5           # overrides helics.step-time in app metadata for this host
+            full-status-steps: 12  # overrides helics.full-status-steps in app metadata for this host
 
           # The `modbus` and `dnp3` sections can take two forms. The first
           # is an array of device name/type configs, in which case the app
