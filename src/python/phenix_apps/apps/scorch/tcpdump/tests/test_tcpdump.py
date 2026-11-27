@@ -360,3 +360,14 @@ def test_stage_list_warnings(monkeypatch, tmp_path, caplog_loguru, run, message)
     else:
         assert "stop list" not in log
         assert "collector" not in log
+
+
+def test_start_logs_the_deprecation(monkeypatch, tmp_path, caplog_loguru):
+    component, _, _ = make_component(MD, tmp_path, monkeypatch)
+
+    component.start()
+
+    assert (
+        "WARNING: the tcpdump component is deprecated; use the pcap component "
+        "with method: tcpdump" in caplog_loguru()
+    )
