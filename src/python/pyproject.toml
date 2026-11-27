@@ -239,6 +239,5 @@ module = [
     "phenix_apps.apps.scorch.opcexport.scada_to_elastic",
     "phenix_apps.apps.scorch.rtds.rtds",
     "phenix_apps.apps.scorch.vmstats.vmstats",
-    "phenix_apps.common.utils",
 ]
 ignore_errors = true
