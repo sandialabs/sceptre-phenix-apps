@@ -23,7 +23,7 @@ def readme_examples() -> list[dict]:
 
 
 def test_readme_has_examples():
-    assert len(readme_examples()) == 2
+    assert len(readme_examples()) == 3
 
 
 @pytest.mark.parametrize("cmp", readme_examples(), ids=lambda c: c["name"])
@@ -281,3 +281,92 @@ def test_start_ignores_no_capture_error_on_leftover_delete(tmp_path):
 
     assert ("capture", "aa", 0) in mm.calls
     assert ("clear", "pcap") not in mm.calls
+
+
+@pytest.mark.parametrize(
+    ("vm", "message"),
+    [
+        ({"method": "tcpdump"}, "method tcpdump needs the interface name"),
+        ({"method": "tcpdump", "interface": 1}, "method tcpdump needs the interface"),
+        ({"options": "-c 5"}, "options: only used with method: tcpdump"),
+        ({"method": "tshark", "interface": "eth1"}, r"vms\.0\.method"),
+        ({"method": "tcpdump", "interface": "eth1", "options": "-w 'x'"}, "options"),
+    ],
+)
+def test_bad_method_metadata_is_rejected(vm, message):
+    md = {"vms": [{"hostname": "aa", **vm}]}
+    with pytest.raises(ValueError, match=message):
+        parse_metadata(PCAPMetadata, md, "p")
+
+
+def test_same_interface_may_be_captured_both_ways():
+    md = {
+        "vms": [
+            {"hostname": "aa", "interface": "eth1"},
+            {"hostname": "aa", "interface": "eth1", "method": "tcpdump"},
+        ]
+    }
+    config = parse_metadata(PCAPMetadata, md, "p")
+    assert [vm.method for vm in config.vms] == ["minimega", "tcpdump"]
+
+
+def test_tcpdump_captures_start_and_stop_in_the_guest(tmp_path, monkeypatch):
+    mm = FakeMM([])
+    mm.clear_cc_filter = lambda: mm.calls.append(("clear_cc_filter",))
+    comp = component(mm)
+    comp.name, comp.base_dir = "pcap", tmp_path
+    comp._check_run_order = lambda: None
+    comp.get_host_and_iface = lambda cfg: (cfg["hostname"], cfg["interface"])
+    comp.config = PCAPMetadata.model_validate(
+        {
+            "filter": "port 80",
+            "snaplen": 128,
+            "vms": [
+                {"hostname": "aa"},
+                {"hostname": "bb", "method": "tcpdump", "interface": "eth1"},
+                {
+                    "hostname": "cc",
+                    "method": "tcpdump",
+                    "interface": "any",
+                    "filter": "udp",
+                    "snaplen": 0,
+                    "options": "-c 5",
+                },
+            ],
+        }
+    )
+    guest_calls = []
+    monkeypatch.setattr(
+        "phenix_apps.apps.scorch.tcpdump.guest.start_capture",
+        lambda c, *a: guest_calls.append(("start", *a)),
+    )
+    monkeypatch.setattr(
+        "phenix_apps.apps.scorch.tcpdump.guest.stop_capture",
+        lambda c, *a: guest_calls.append(("stop", *a)),
+    )
+
+    comp.start()
+
+    # minimega captures only the minimega VM; the guest captures get the same
+    # filter and snaplen, as tcpdump options
+    assert ("capture", "aa", 0) in mm.calls
+    assert not [c for c in mm.calls if c[0] == "capture" and c[1] != "aa"]
+    assert guest_calls == [
+        ("start", "bb", "eth1", "-s 128", "port 80"),
+        ("start", "cc", "any", "-c 5", "udp"),
+    ]
+    assert mm.calls[-1] == ("clear_cc_filter",)
+
+    guest_calls.clear()
+    paths, host_of = comp._stop_captures()
+
+    assert guest_calls == [
+        ("stop", "bb", "eth1", str(tmp_path / "bb-eth1.pcap")),
+        ("stop", "cc", "any", str(tmp_path / "cc-any.pcap")),
+    ]
+    assert paths == [
+        tmp_path / "aa-0.pcap",
+        tmp_path / "bb-eth1.pcap",
+        tmp_path / "cc-any.pcap",
+    ]
+    assert host_of == {"aa-0.pcap": "aa", "bb-eth1.pcap": "bb", "cc-any.pcap": "cc"}
