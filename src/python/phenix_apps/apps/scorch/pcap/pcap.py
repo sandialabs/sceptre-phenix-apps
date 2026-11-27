@@ -1,7 +1,7 @@
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Annotated, Any, Self
+from typing import Annotated, Any, Literal, Self
 
 from box import Box
 from pydantic import (
@@ -20,6 +20,8 @@ from phenix_apps.apps.scorch.app import (
     MetadataBlock,
     PositiveSeconds,
 )
+from phenix_apps.apps.scorch.tcpdump import guest
+from phenix_apps.apps.scorch.tcpdump.guest import GuestOptions
 from phenix_apps.common import utils
 from phenix_apps.common.logger import logger
 
@@ -35,7 +37,6 @@ MATCH_ALL_BPF = "len >= 0"
 
 # TODO: pcap file retrieval functionality from mm.py component (this assumes one node)
 # TODO: netflow capture
-# TODO: allow tcpdump and/or tshark to be used instead of minimega api
 
 
 # minimega needs the filter wrapped in single quotes, and re-lexes it on the
@@ -49,11 +50,36 @@ Bpf = Annotated[
 
 class VM(MetadataBlock):
     hostname: Hostname
-    # an index into the node's interfaces, or an interface name
+    # minimega captures outside the VM; tcpdump runs inside it through miniccc
+    method: Literal["minimega", "tcpdump"] = "minimega"
+    # an index into the node's interfaces, or an interface name; with tcpdump,
+    # the name the guest OS uses
     interface: Interface | NonNegativeInt = 0
     # override the component-wide filter and snaplen for this VM
     filter: Bpf | None = None
     snaplen: NonNegativeInt | None = None
+    # extra tcpdump options, only with method: tcpdump
+    options: GuestOptions | None = None
+
+    @model_validator(mode="after")
+    def _check_method(self) -> Self:
+        if self.method == "tcpdump":
+            if not isinstance(self.interface, str):
+                raise ValueError(
+                    "interface: method tcpdump needs the interface name the guest "
+                    "uses (eth1), not an index"
+                )
+        elif self.options is not None:
+            raise ValueError("options: only used with method: tcpdump")
+        return self
+
+    def capture_file(self) -> str | None:
+        """The capture's file name for a tcpdump capture, which is named by
+        the guest's interface; None for minimega, named by interface index."""
+
+        if self.method == "tcpdump":
+            return f"{self.hostname}-{self.interface}.pcap"
+        return None
 
 
 class PCAPMetadata(BaseModel):
@@ -86,8 +112,10 @@ class PCAPMetadata(BaseModel):
 
     @model_validator(mode="after")
     def _check_vms(self) -> Self:
-        seen = [(vm.hostname, str(vm.interface)) for vm in self.vms]
-        if dupes := sorted({f"{h} {i}" for h, i in seen if seen.count((h, i)) > 1}):
+        seen = [(vm.hostname, vm.method, str(vm.interface)) for vm in self.vms]
+        if dupes := sorted(
+            {f"{h} {i}" for h, m, i in seen if seen.count((h, m, i)) > 1}
+        ):
             raise ValueError(
                 f"vms: captured more than once: {', '.join(dupes)}; each capture "
                 "writes the same file"
@@ -97,7 +125,8 @@ class PCAPMetadata(BaseModel):
 
 class PCAP(ComponentBase):
     """
-    Implements minimega's "capture pcap" API as a Scorch component.
+    Captures with minimega's "capture pcap" API or with tcpdump in the VMs,
+    as a Scorch component.
     """
 
     metadata_model = PCAPMetadata
@@ -120,7 +149,7 @@ class PCAP(ComponentBase):
 
         self._check_run_order()
 
-        vms = self.config.vms
+        vms = [vm for vm in self.config.vms if vm.method == "minimega"]
         # Delete only our own leftover captures. "clear capture pcap" stops
         # every capture in the namespace, including other components' (mm's
         # bridge capture), so it is never used here.
@@ -149,6 +178,22 @@ class PCAP(ComponentBase):
         finally:
             # unset, so they do not apply to later captures in the namespace
             self._set_capture_options(None, None)
+
+        guest_vms = [vm for vm in self.config.vms if vm.method == "tcpdump"]
+        for vm in guest_vms:
+            snaplen = self.config.snaplen if vm.snaplen is None else vm.snaplen
+            options = vm.options or ""
+            if snaplen:
+                options = f"-s {snaplen} {options}".strip()
+            guest.start_capture(
+                self,
+                vm.hostname,
+                str(vm.interface),
+                options,
+                vm.filter or self.config.filter or "",
+            )
+        if guest_vms:
+            self.mm.clear_cc_filter()
 
         logger.info(f"Started user component: {self.name}")
 
@@ -195,6 +240,13 @@ class PCAP(ComponentBase):
         vms = self.config.vms
         logger.info(f"stopping captures for {len(vms)} VMs")
         for i, vm in enumerate(vms):
+            if (name := vm.capture_file()) is not None:
+                pcap_path = Path(self.base_dir, name)
+                guest.stop_capture(self, vm.hostname, str(vm.interface), str(pcap_path))
+                pcap_paths.append(pcap_path)
+                host_of[pcap_path.name] = vm.hostname
+                continue
+
             hostname, interface = self.get_host_and_iface(Box(vm.model_dump()))
 
             logger.info(

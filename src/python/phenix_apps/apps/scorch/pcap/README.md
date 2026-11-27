@@ -1,6 +1,8 @@
 # pcap Component
 
-Collects PCAPs from VMs via minimega's `capture pcap` API.
+Collects PCAPs from VMs via minimega's `capture pcap` API, or with `tcpdump`
+inside the VMs (`method: tcpdump`). Both kinds of capture get the same checks,
+merging, de-duplication and JSON conversion.
 
 ```
 type:   pcap
@@ -10,11 +12,12 @@ stages: start, stop
 
 | Stage | What it does |
 |---|---|
-| `start` | Deletes leftover captures on the listed VM interfaces, applies `filter` and `snaplen`, and starts a capture on each listed VM interface. |
-| `stop` | Stops the captures, checks every file with `capinfos`, optionally merges and de-duplicates them, writes `pcap_metadata.json`, and optionally converts the files to JSON. |
+| `start` | Deletes leftover captures on the listed VM interfaces, applies `filter` and `snaplen`, and starts a capture on each listed VM interface. For `method: tcpdump`, starts `tcpdump` in the VM through miniccc instead (as the deprecated [`tcpdump` component](../tcpdump/README.md) did). |
+| `stop` | Stops the captures (for `method: tcpdump`, stops `tcpdump` and copies its capture back), checks every file with `capinfos`, optionally merges and de-duplicates them, writes `pcap_metadata.json`, and optionally converts the files to JSON. |
 
-Capture happens in minimega's virtual switch, so the guests need nothing
-installed.
+With the default `method: minimega`, capture happens in minimega's virtual
+switch, so the guests need nothing installed. `method: tcpdump` captures what
+the guest itself sees, for example on its loopback or `any` interface.
 
 ## What you get
 
@@ -23,6 +26,7 @@ In the component's run folder
 
 ```
 <hostname>-<index>.pcap    one per listed VM interface (moved to raw/ with create_merged_pcap)
+<hostname>-<iface>.pcap    the same, for method: tcpdump, named by the guest's interface
 merged.pcap                only with create_merged_pcap
 raw/                       only with create_merged_pcap: the per-interface captures
 pcap_metadata.json         capinfos output for each capture, and for merged.pcap
@@ -30,7 +34,8 @@ pcap_metadata.json         capinfos output for each capture, and for merged.pcap
 ```
 
 - File names use the interface's index, never its name: `interface: eth0` on a
-  VM where `eth0` is the second interface gives `<host>-1.pcap`.
+  VM where `eth0` is the second interface gives `<host>-1.pcap`. With
+  `method: tcpdump` they use the guest's interface name: `<host>-eth0.pcap`.
 - The `collector` component copies the folder and puts `pcap_metadata.json` in
   its experiment record as `pcap_metadata`.
 - Each `.jsonl` is written next to its source. With `create_merged_pcap` the
@@ -43,6 +48,9 @@ pcap_metadata.json         capinfos output for each capture, and for merged.pcap
 - The head node (the host running phenix) has `tshark`, `capinfos`, `editcap`
   and `mergecap` (the Wireshark command line tools). On Debian or Ubuntu:
   `sudo apt install -y tshark wireshark-common`.
+- For `method: tcpdump`: Linux guests with `tcpdump` installed, the VM's
+  miniccc client running and registered, and a writable `/` with room for the
+  capture.
 
 ## Metadata
 
@@ -50,9 +58,11 @@ pcap_metadata.json         capinfos output for each capture, and for merged.pcap
 |---|---|---|---|---|
 | `vms` | list | yes | | VMs to capture on, at least one. Each VM and interface once |
 | `vms[].hostname` | hostname | yes | | VM in the topology: 2 to 63 letters, digits and interior hyphens |
-| `vms[].interface` | index or name | no | `0` | Interface to capture on: an index into the VM's interfaces (`0` is the first, which may be `MGMT`) or a Linux interface name (at most 15 characters) |
+| `vms[].method` | `minimega` or `tcpdump` | no | `minimega` | Capture in minimega's virtual switch, or run `tcpdump` in the VM |
+| `vms[].interface` | index or name | no | `0` | Interface to capture on: an index into the VM's interfaces (`0` is the first, which may be `MGMT`) or a Linux interface name (at most 15 characters). With `method: tcpdump`, required, and the name the guest OS uses (`eth1`, or `any` for every interface) |
 | `vms[].filter` | string | no | `filter` | BPF filter for this VM only, overriding `filter` |
-| `vms[].snaplen` | integer >= 0 | no | `snaplen` | Snaplen for this VM only, overriding `snaplen` |
+| `vms[].snaplen` | integer >= 0 | no | `snaplen` | Snaplen for this VM only, overriding `snaplen`. With `method: tcpdump` it is passed as `-s` |
+| `vms[].options` | string | no | | Only with `method: tcpdump`: extra tcpdump options (`-c 1000`), no single quotes. Do not pass `-i`, `-U` or `-w`; the component adds them |
 | `filter` | string | no | | BPF filter ([syntax](https://biot.com/capstats/bpf.html)), as for tcpdump (`not port 22`), for every VM without its own. May not contain `'`, `"`, `\`, `#` or line breaks (minimega would misread them) |
 | `snaplen` | integer >= 0 | no | | Bytes kept per packet ([snaplen](https://wiki.wireshark.org/SnapLen)), for every VM without its own. `0` or unset is minimega's 1600-byte default |
 | `create_merged_pcap` | bool | no | `false` | Merge all captures into `merged.pcap` with `mergecap`, moving the originals into `raw/` |
@@ -142,6 +152,25 @@ components:
                   - UNIX_MS
 ```
 
+Capture one VM from the switch and another from inside the guest, merged into
+one file. This replaces the `tcpdump` component.
+
+```yaml
+components:
+  - name: pcap-mixed
+    type: pcap
+    metadata:
+      filter: port 502
+      create_merged_pcap: true
+      vms:
+        - hostname: rtu-1
+          interface: eth0
+        - hostname: scada
+          method: tcpdump
+          interface: eth1
+          options: -c 10000
+```
+
 To check a config before an experiment: `phenix-scorch-validate scenario.yaml`
 
 ## Troubleshooting
@@ -155,6 +184,8 @@ To check a config before an experiment: `phenix-scorch-validate scenario.yaml`
 | `PCAP file doesn't exist: <path>` | `stop` found no file for a listed VM. `start` did not run, another component cleared the capture, or the VM was not running. |
 | `failed validation of PCAP metadata for file <path>` | `capinfos` ran but the file is not a pcap. |
 | `PCAP merge failed, output file '<path>' doesn't exist` | `mergecap` produced nothing. Check the status file's logs. |
+| `tcpdump is not installed in VM X` | `method: tcpdump` needs `tcpdump` in the guest. Install it, or use `method: minimega`. |
+| `interface eth9 does not exist in VM X` | With `method: tcpdump`, the guest has no such interface. Use the name the guest OS gives it. |
 
 ## Limitations
 
@@ -171,6 +202,9 @@ To check a config before an experiment: `phenix-scorch-validate scenario.yaml`
   and `snaplen` for long runs; `create_merged_pcap` needs room for a second copy
   and `convert_to_json` output is many times larger than the capture.
 - Index `0` may be the `MGMT` interface; check the VM's interface order.
+- `method: tcpdump` captures carry the guest's clock, `minimega` captures the
+  host's. When the clocks differ, `merged.pcap` orders the two copies of a
+  packet apart and `dedupe` (which only looks back four packets) keeps both.
 - List `pcap` in `start` before the traffic you want and in `stop` after it
   ends, and before `collector` in `stop`. Both stages log a warning when the
   component is missing from a `start` or `stop` list, or a `collector` is listed

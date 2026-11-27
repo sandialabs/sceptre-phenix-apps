@@ -1,5 +1,10 @@
 # tcpdump Component
 
+> Deprecated: use the [`pcap` component](../pcap/README.md) with
+> `method: tcpdump`, which also checks, merges, de-duplicates and converts the
+> captures. This component still works, unchanged, and logs a warning in
+> `start`.
+
 Runs `tcpdump` inside VMs through miniccc, then copies the captures back and
 can convert them to JSON for Filebeat. The `pcap` component captures from
 outside the VM with minimega instead.

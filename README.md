@@ -80,13 +80,13 @@ make clean       # Clean build artifacts
 | [kafka](src/python/phenix_apps/apps/scorch/kafka) | Interacts with Apache Kafka topics. |
 | [mm](src/python/phenix_apps/apps/scorch/mm) | Executes arbitrary minimega commands. |
 | [opcexport](src/python/phenix_apps/apps/scorch/opcexport) | Exports data from an OPC-UA server. |
-| [pcap](src/python/phenix_apps/apps/scorch/pcap) | Manages network packet captures (.pcap files) across the experiment. |
+| [pcap](src/python/phenix_apps/apps/scorch/pcap) | Manages network packet captures (.pcap files) across the experiment, from minimega or tcpdump in the VMs. |
 | [pipe](src/python/phenix_apps/apps/scorch/pipe) | Implements minimega 'pipe' API. |
 | [providerdata](src/python/phenix_apps/apps/scorch/providerdata) | Collects and verifies data from pybennu providers, such as the RTDS or OPALRT. |
 | [qos](src/python/phenix_apps/apps/scorch/qos) | Applies Quality of Service (QoS) rules (e.g., latency, packet loss) to interfaces. |
 | [rtds](src/python/phenix_apps/apps/scorch/rtds) | Interacts with RTDS (Real Time Digital Simulator) systems. |
 | [snort](src/python/phenix_apps/apps/scorch/snort) | Runs the Snort Intrusion Detection System on specified interfaces. |
 | [ssh](src/python/phenix_apps/apps/scorch/ssh) | Executes commands on and copies files from a remote host over SSH. |
-| [tcpdump](src/python/phenix_apps/apps/scorch/tcpdump) | Captures network traffic using tcpdump. |
+| [tcpdump](src/python/phenix_apps/apps/scorch/tcpdump) | Captures network traffic using tcpdump. Deprecated: use pcap with `method: tcpdump`. |
 | [trafficgen](src/python/phenix_apps/apps/scorch/trafficgen) | Generates network traffic between specified source and destination nodes. |
 | [vmstats](src/python/phenix_apps/apps/scorch/vmstats) | Collects detailed VM statistics from minimega. |
