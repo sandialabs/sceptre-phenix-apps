@@ -17,7 +17,6 @@ import warnings
 from collections.abc import Iterator
 from contextlib import contextmanager
 from io import StringIO
-from itertools import pairwise
 from pathlib import Path
 from socket import inet_ntoa
 from struct import pack
@@ -339,9 +338,9 @@ def _cc_response_files(text: str) -> dict[tuple[str, str], dict[str, str]]:
     files: dict[tuple[str, str], dict[str, str]] = {}
     headers = list(_CC_RESP_HEADER.finditer(text))
 
-    for header, nxt in pairwise([*headers, None]):
+    for i, header in enumerate(headers):
         cmd_id, uuid, name = header.groups()
-        end = nxt.start() if nxt else len(text)
+        end = headers[i + 1].start() if i + 1 < len(headers) else len(text)
         files.setdefault((cmd_id, uuid), {})[name] = text[header.end() : end].strip()
 
     return files
@@ -878,7 +877,9 @@ def mm_wait_for_cmd(
                     continue
 
                 # Same id, different payload: not ours.
-                if match_value is not None and row.get(match_column) != match_value:
+                if match_value is not None and (
+                    match_column is None or row.get(match_column) != match_value
+                ):
                     continue
 
                 seen = True
@@ -992,7 +993,7 @@ def mm_get_cc_responses(mm: minimega.minimega, id_or_prefix_or_all: str) -> list
             continue
 
         for (cmd_id, uuid), files in _cc_response_files(row["Response"]).items():
-            cmd_result = {
+            cmd_result: dict[str, str | int] = {
                 "id": cmd_id,
                 "uuid": uuid,
                 "all_output": "\n".join(f"{k}:\n{v}" for k, v in files.items()),
@@ -1004,9 +1005,7 @@ def mm_get_cc_responses(mm: minimega.minimega, id_or_prefix_or_all: str) -> list
                 print_msg(f"WARNING: no stderr or stdout in response: {files!r}")
 
             # The id came from this host's response, so scope the lookup to it.
-            exit_resp = mm_cc_exitcode_wait(
-                mm, cmd_result["id"], cmd_result["uuid"], host=row.get("Host")
-            )
+            exit_resp = mm_cc_exitcode_wait(mm, cmd_id, uuid, host=row.get("Host"))
             cmd_result["exitcode"] = int(exit_resp["Response"])
 
             results.append(cmd_result)
@@ -1251,7 +1250,7 @@ def _validate_mm_filter(cap_filter: str) -> str:
     return cap_filter
 
 
-def _mm_socket_cmd(cmd: str, ignore_error: bool = False) -> list[str]:
+def _mm_socket_cmd(cmd: str, ignore_error: bool = False) -> list[dict]:
     """Send command to minimega socket and get a response.
 
     Args:
@@ -1430,10 +1429,7 @@ def mm_delete_file(
 def run_command(cmd: str | list[str], timeout: float | None = None) -> str:
     if isinstance(cmd, str):
         cmd = shlex.split(cmd)
-    result = subprocess.check_output(cmd, timeout=timeout)
-    if isinstance(result, bytes):
-        result = result.decode()
-    return result
+    return subprocess.check_output(cmd, timeout=timeout).decode()
 
 
 def read_json(path: str | Path):
